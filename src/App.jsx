@@ -2011,6 +2011,26 @@ const STATE_FIPS_BY_CODE = {
   WV: "54", WI: "55", WY: "56"
 };
 
+// Reverse lookup: FIPS "12" -> "FL"
+const STATE_CODE_BY_FIPS = Object.entries(STATE_FIPS_BY_CODE).reduce((acc, [code, fips]) => {
+  acc[fips] = code;
+  return acc;
+}, {});
+
+const STATE_NAMES = {
+  AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California",
+  CO: "Colorado", CT: "Connecticut", DE: "Delaware", DC: "District of Columbia",
+  FL: "Florida", GA: "Georgia", HI: "Hawaii", ID: "Idaho", IL: "Illinois",
+  IN: "Indiana", IA: "Iowa", KS: "Kansas", KY: "Kentucky", LA: "Louisiana",
+  ME: "Maine", MD: "Maryland", MA: "Massachusetts", MI: "Michigan", MN: "Minnesota",
+  MS: "Mississippi", MO: "Missouri", MT: "Montana", NE: "Nebraska", NV: "Nevada",
+  NH: "New Hampshire", NJ: "New Jersey", NM: "New Mexico", NY: "New York",
+  NC: "North Carolina", ND: "North Dakota", OH: "Ohio", OK: "Oklahoma", OR: "Oregon",
+  PA: "Pennsylvania", RI: "Rhode Island", SC: "South Carolina", SD: "South Dakota",
+  TN: "Tennessee", TX: "Texas", UT: "Utah", VT: "Vermont", VA: "Virginia",
+  WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming"
+};
+
 const STATE_MAP_VIEW = {
   FL: { center: [-82, 28], zoom: 4 },
   NY: { center: [-75.5, 43], zoom: 3.5 },
@@ -2075,6 +2095,8 @@ const scoreToT = (score) => {
 };
 
 const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyClick }) => {
+  const [hoveredCounty, setHoveredCounty] = useState(null);
+
   // Score range across the dataset — drives the gradient scale
   const { minScore, maxScore } = useMemo(() => {
     const scores = allMarkets
@@ -2116,7 +2138,8 @@ const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyCli
         border: `1px solid ${THEME.border}`,
         borderRadius: 6,
         padding: 12,
-        overflow: "hidden"
+        overflow: "hidden",
+        position: "relative"
       }}>
         <ComposableMap
           projection="geoAlbersUsa"
@@ -2134,7 +2157,9 @@ const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyCli
                 return geographies.map(geo => {
                   const fips = String(geo.id || "");
                   const stateFips = fips.slice(0, 2);
-                  const countyNorm = normalizeCountyName(geo.properties.name);
+                  const countyName = geo.properties.name;
+                  const countyNorm = normalizeCountyName(countyName);
+                  const stateCode = STATE_CODE_BY_FIPS[stateFips];
 
                   const stateMarkets = marketLookup.get(stateFips);
                   const market = stateMarkets ? stateMarkets.get(countyNorm) : null;
@@ -2142,26 +2167,35 @@ const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyCli
                   const isHighlighted = highlightedFips === stateFips && highlightedCounty === countyNorm;
                   const isInSelectedState = selectedFips === stateFips;
 
-                  let fill = THEME.bgPanel;
+                  // Every county gets a visible base fill + contrast stroke so the full map reads as a populated choropleth.
+                  let fill = THEME.bgRaised;
                   let stroke = THEME.border;
-                  let strokeWidth = 0.3;
+                  let strokeWidth = 0.4;
 
                   if (isInSelectedState) {
-                    fill = THEME.bgRaised;
-                    stroke = THEME.border;
+                    fill = THEME.bgTeal;
+                    stroke = THEME.teal;
+                    strokeWidth = 0.55;
                   }
                   if (isMarket) {
                     const score = getScore(market);
                     const t = scoreToT(score);
                     fill = scoreToHeatFill(t);
                     stroke = scoreToHeatStroke(t);
-                    strokeWidth = 0.5;
+                    strokeWidth = 0.6;
                   }
                   if (isHighlighted) {
                     fill = THEME.accent;
                     stroke = THEME.accentDim;
                     strokeWidth = 1.4;
                   }
+
+                  const hoverFill = isMarket
+                    ? THEME.accent
+                    : isInSelectedState
+                    ? THEME.teal
+                    : THEME.navy;
+                  const hoverTextColor = "#FFFFFF";
 
                   return (
                     <Geography
@@ -2173,14 +2207,35 @@ const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyCli
                       style={{
                         default: { outline: "none", transition: "fill 0.2s" },
                         hover: {
-                          fill: isMarket ? THEME.accent : (isInSelectedState ? THEME.border : THEME.bgRaised),
+                          fill: hoverFill,
+                          stroke: hoverFill,
                           outline: "none",
-                          cursor: isMarket ? "pointer" : "default"
+                          cursor: "pointer"
                         },
                         pressed: { outline: "none" }
                       }}
+                      onMouseEnter={() => {
+                        if (!stateCode) return;
+                        setHoveredCounty({
+                          name: countyName,
+                          state: stateCode,
+                          market: market || null,
+                          isMarket
+                        });
+                      }}
+                      onMouseLeave={() => setHoveredCounty(null)}
                       onClick={() => {
-                        if (market && onCountyClick) onCountyClick(market);
+                        if (!onCountyClick) return;
+                        if (market) {
+                          onCountyClick(market);
+                        } else if (stateCode) {
+                          onCountyClick({
+                            city: countyName,
+                            county: countyName,
+                            state: stateCode,
+                            synthetic: true
+                          });
+                        }
                       }}
                     />
                   );
@@ -2189,6 +2244,26 @@ const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyCli
             </Geographies>
           </ZoomableGroup>
         </ComposableMap>
+
+        {hoveredCounty && (
+          <div style={{
+            position: "absolute", top: 16, left: 16,
+            background: "rgba(15, 23, 42, 0.92)", color: "#fff",
+            padding: "8px 12px", borderRadius: 6,
+            fontSize: 12, pointerEvents: "none",
+            boxShadow: "0 6px 16px rgba(15,23,42,0.2)",
+            maxWidth: 260
+          }}>
+            <div style={{ fontWeight: 700, marginBottom: 2 }}>
+              {hoveredCounty.name} County, {hoveredCounty.state}
+            </div>
+            <div style={{ fontSize: 11, opacity: 0.85 }}>
+              {hoveredCounty.isMarket
+                ? `${hoveredCounty.market.city} • Score ${getScore(hoveredCounty.market)} • Click to drill in`
+                : "Click to load live listings for this area"}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Gradient legend */}
@@ -2261,9 +2336,25 @@ const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyCli
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{
             width: 14, height: 14, borderRadius: 2,
+            background: THEME.bgRaised,
+            border: `1px solid ${THEME.border}`
+          }} />
+          <span>Other Counties (clickable)</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{
+            width: 14, height: 14, borderRadius: 2,
+            background: THEME.bgTeal,
+            border: `1px solid ${THEME.teal}`
+          }} />
+          <span>Selected State</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{
+            width: 14, height: 14, borderRadius: 2,
             background: THEME.accent
           }} />
-          <span>Selected</span>
+          <span>Active Pin</span>
         </div>
         {highlightedMarket && (
           <div style={{ color: THEME.accent, fontWeight: 600 }}>
@@ -2273,7 +2364,7 @@ const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyCli
           </div>
         )}
         <div style={{ color: THEME.textDim, marginLeft: "auto", fontSize: 10 }}>
-          Click a market &bull; Scroll to zoom &bull; Drag to pan
+          Click any county &bull; Scroll to zoom &bull; Drag to pan
         </div>
       </div>
     </div>
@@ -2284,11 +2375,50 @@ const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyCli
    ADVANCED MARKET INTEL WITH LOCATION PREFERENCES
    ============================================================================ */
 /* ============================================================================
-   LIVE LISTINGS & COMPARABLES — RentCast integration + demo fallback
-   Docs: https://developers.rentcast.io
-   Signup (free tier 50 req/mo): https://app.rentcast.io/app/api
+   LIVE LISTINGS & COMPARABLES
+   ----------------------------------------------------------------------------
+   Providers supported:
+     1. RentCast   — https://developers.rentcast.io   (free tier 50 req/mo)
+     2. Zillow     — via RapidAPI zillow-com1 wrapper (official Zillow API
+                     was retired in 2014; RapidAPI wrappers are the current
+                     community-standard replacement)
+
+   API keys are stored client-side in localStorage (this app has no backend).
+   A build-time env fallback is also supported:
+     VITE_RENTCAST_API_KEY
+     VITE_RAPIDAPI_ZILLOW_KEY
    ============================================================================ */
+const PROVIDER_STORAGE_KEY = "dealtrack-data-provider";
 const RENTCAST_STORAGE_KEY = "dealtrack-rentcast-key";
+const RAPIDAPI_STORAGE_KEY = "dealtrack-rapidapi-zillow-key";
+
+// eslint-disable-next-line no-undef
+const ENV_RENTCAST_KEY = (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_RENTCAST_API_KEY) || "";
+// eslint-disable-next-line no-undef
+const ENV_RAPIDAPI_KEY = (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_RAPIDAPI_ZILLOW_KEY) || "";
+
+const PROVIDERS = {
+  rentcast: {
+    id: "rentcast",
+    name: "RentCast",
+    subtitle: "MLS sale + rental listings",
+    signupUrl: "https://app.rentcast.io/app/api",
+    docsUrl: "https://developers.rentcast.io",
+    freeTier: "Free tier: 50 requests/month",
+    storageKey: RENTCAST_STORAGE_KEY,
+    envKey: ENV_RENTCAST_KEY
+  },
+  zillow: {
+    id: "zillow",
+    name: "Zillow (via RapidAPI)",
+    subtitle: "Zillow for-sale listings & home details",
+    signupUrl: "https://rapidapi.com/apimaker/api/zillow-com1",
+    docsUrl: "https://rapidapi.com/apimaker/api/zillow-com1",
+    freeTier: "Free tier available on RapidAPI",
+    storageKey: RAPIDAPI_STORAGE_KEY,
+    envKey: ENV_RAPIDAPI_KEY
+  }
+};
 
 const buildDemoListings = (state, city, marketRef) => {
   if (!marketRef) return [];
@@ -2439,19 +2569,61 @@ const ListingCard = ({ listing, type = "sale", onUseInDeal }) => {
   );
 };
 
+// Normalize a Zillow (via RapidAPI zillow-com1) property to our shape.
+// Upstream shape: https://rapidapi.com/apimaker/api/zillow-com1
+const formatZillowListing = (raw) => {
+  const address = raw.address && typeof raw.address === "object"
+    ? `${raw.address.streetAddress || ""}, ${raw.address.city || ""}, ${raw.address.state || ""}`.trim()
+    : (raw.address || raw.streetAddress || "");
+  return {
+    id: raw.zpid || raw.id || `${address}`,
+    formattedAddress: address,
+    addressLine1: raw.streetAddress || raw.address?.streetAddress,
+    city: raw.city || raw.address?.city,
+    state: raw.state || raw.address?.state,
+    price: raw.price || raw.listPrice,
+    bedrooms: raw.bedrooms,
+    bathrooms: raw.bathrooms,
+    squareFootage: raw.livingArea || raw.livingAreaValue,
+    propertyType: raw.propertyType || raw.homeType,
+    yearBuilt: raw.yearBuilt,
+    listedDate: raw.datePosted,
+    pricePerSqft: raw.price && raw.livingArea ? Math.round(raw.price / raw.livingArea) : null,
+    daysOnMarket: raw.daysOnZillow,
+    status: raw.listingStatus || "Active",
+    latitude: raw.latitude,
+    longitude: raw.longitude,
+    externalUrl: raw.detailUrl ? `https://www.zillow.com${raw.detailUrl}` : null
+  };
+};
+
+const loadProviderPrefs = () => {
+  try {
+    const provider = window.localStorage.getItem(PROVIDER_STORAGE_KEY) || "rentcast";
+    const keys = {};
+    Object.values(PROVIDERS).forEach(p => {
+      keys[p.id] = window.localStorage.getItem(p.storageKey) || p.envKey || "";
+    });
+    return { provider, keys };
+  } catch {
+    return { provider: "rentcast", keys: {} };
+  }
+};
+
 const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarkets }) => {
-  const [apiKey, setApiKey] = useState(() => {
-    try {
-      return (typeof window !== "undefined" && window.localStorage.getItem(RENTCAST_STORAGE_KEY)) || "";
-    } catch { return ""; }
-  });
-  const [keyDraft, setKeyDraft] = useState("");
-  const [showKeyInput, setShowKeyInput] = useState(false);
+  const initial = useMemo(loadProviderPrefs, []);
+  const [provider, setProvider] = useState(initial.provider);
+  const [keys, setKeys] = useState(initial.keys);
+  const [keyDrafts, setKeyDrafts] = useState({ rentcast: "", zillow: "" });
+  const [showKeyInput, setShowKeyInput] = useState(!initial.keys[initial.provider]);
   const [listings, setListings] = useState([]);
   const [rentComps, setRentComps] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [liveMode, setLiveMode] = useState(false);
+
+  const activeProvider = PROVIDERS[provider] || PROVIDERS.rentcast;
+  const apiKey = keys[provider] || "";
 
   // Primary reference market for demo defaults
   const referenceMarket = useMemo(() => {
@@ -2464,6 +2636,55 @@ const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarket
   }, [selectedState, selectedCity, stateMarkets]);
 
   const targetCity = selectedCity || (referenceMarket && referenceMarket.city);
+
+  const fetchRentCast = async () => {
+    const params = new URLSearchParams({
+      city: targetCity,
+      state: selectedState,
+      limit: "10"
+    });
+    const [saleRes, rentRes] = await Promise.all([
+      fetch(`https://api.rentcast.io/v1/listings/sale?${params.toString()}`, {
+        headers: { "X-Api-Key": apiKey, "accept": "application/json" }
+      }),
+      fetch(`https://api.rentcast.io/v1/listings/rental/long-term?${params.toString()}`, {
+        headers: { "X-Api-Key": apiKey, "accept": "application/json" }
+      })
+    ]);
+    if (!saleRes.ok) throw new Error(`RentCast request failed (${saleRes.status}). Check your API key.`);
+    const saleJson = await saleRes.json();
+    const rentJson = rentRes.ok ? await rentRes.json() : [];
+    const saleList = Array.isArray(saleJson) ? saleJson : (saleJson.listings || []);
+    const rentList = Array.isArray(rentJson) ? rentJson : (rentJson.listings || []);
+    return {
+      listings: saleList.map(formatRentCastListing),
+      rentals: rentList.map(formatRentCastListing)
+    };
+  };
+
+  const fetchZillow = async () => {
+    const location = `${targetCity}, ${selectedState}`;
+    const forSaleUrl = `https://zillow-com1.p.rapidapi.com/propertyExtendedSearch?location=${encodeURIComponent(location)}&home_type=Houses&status_type=ForSale`;
+    const forRentUrl = `https://zillow-com1.p.rapidapi.com/propertyExtendedSearch?location=${encodeURIComponent(location)}&home_type=Houses&status_type=ForRent`;
+    const headers = {
+      "X-RapidAPI-Key": apiKey,
+      "X-RapidAPI-Host": "zillow-com1.p.rapidapi.com",
+      "accept": "application/json"
+    };
+    const [saleRes, rentRes] = await Promise.all([
+      fetch(forSaleUrl, { headers }),
+      fetch(forRentUrl, { headers })
+    ]);
+    if (!saleRes.ok) throw new Error(`Zillow request failed (${saleRes.status}). Check your RapidAPI key and subscription.`);
+    const saleJson = await saleRes.json();
+    const rentJson = rentRes.ok ? await rentRes.json() : { props: [] };
+    const saleList = Array.isArray(saleJson.props) ? saleJson.props : [];
+    const rentList = Array.isArray(rentJson.props) ? rentJson.props : [];
+    return {
+      listings: saleList.map(formatZillowListing),
+      rentals: rentList.map(formatZillowListing)
+    };
+  };
 
   const loadData = useCallback(async () => {
     if (!selectedState || !targetCity) return;
@@ -2479,39 +2700,20 @@ const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarket
     setLoading(true);
     setError("");
     try {
-      const params = new URLSearchParams({
-        city: targetCity,
-        state: selectedState,
-        limit: "10"
-      });
-      const [saleRes, rentRes] = await Promise.all([
-        fetch(`https://api.rentcast.io/v1/listings/sale?${params.toString()}`, {
-          headers: { "X-Api-Key": apiKey, "accept": "application/json" }
-        }),
-        fetch(`https://api.rentcast.io/v1/listings/rental/long-term?${params.toString()}`, {
-          headers: { "X-Api-Key": apiKey, "accept": "application/json" }
-        })
-      ]);
+      const result = provider === "zillow" ? await fetchZillow() : await fetchRentCast();
 
-      if (!saleRes.ok) throw new Error(`Listings request failed (${saleRes.status}). Check your API key.`);
-      const saleJson = await saleRes.json();
-      const rentJson = rentRes.ok ? await rentRes.json() : [];
-
-      const saleList = Array.isArray(saleJson) ? saleJson : (saleJson.listings || []);
-      const rentList = Array.isArray(rentJson) ? rentJson : (rentJson.listings || []);
-
-      if (saleList.length === 0 && rentList.length === 0) {
+      if (result.listings.length === 0 && result.rentals.length === 0) {
         setListings(buildDemoListings(selectedState, targetCity, referenceMarket));
         setRentComps(buildDemoComps(selectedState, targetCity, referenceMarket));
         setLiveMode(false);
         setError("No live results for this area — showing demo data.");
       } else {
-        setListings(saleList.map(formatRentCastListing));
-        setRentComps(rentList.map(formatRentCastListing));
+        setListings(result.listings);
+        setRentComps(result.rentals);
         setLiveMode(true);
       }
     } catch (err) {
-      console.warn("RentCast fetch failed:", err);
+      console.warn(`${activeProvider.name} fetch failed:`, err);
       setListings(buildDemoListings(selectedState, targetCity, referenceMarket));
       setRentComps(buildDemoComps(selectedState, targetCity, referenceMarket));
       setLiveMode(false);
@@ -2519,19 +2721,28 @@ const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarket
     } finally {
       setLoading(false);
     }
-  }, [apiKey, selectedState, targetCity, referenceMarket]);
+  }, [apiKey, provider, selectedState, targetCity, referenceMarket, activeProvider.name]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  const saveKey = (val) => {
+  const saveKey = (providerId, val) => {
     const trimmed = (val || "").trim();
-    setApiKey(trimmed);
+    setKeys(prev => ({ ...prev, [providerId]: trimmed }));
     try {
-      if (trimmed) window.localStorage.setItem(RENTCAST_STORAGE_KEY, trimmed);
-      else window.localStorage.removeItem(RENTCAST_STORAGE_KEY);
+      const p = PROVIDERS[providerId];
+      if (!p) return;
+      if (trimmed) window.localStorage.setItem(p.storageKey, trimmed);
+      else window.localStorage.removeItem(p.storageKey);
     } catch {}
-    setShowKeyInput(false);
-    setKeyDraft("");
+    setKeyDrafts(prev => ({ ...prev, [providerId]: "" }));
+    if (trimmed && providerId === provider) setShowKeyInput(false);
+  };
+
+  const switchProvider = (providerId) => {
+    setProvider(providerId);
+    try { window.localStorage.setItem(PROVIDER_STORAGE_KEY, providerId); } catch {}
+    setError("");
+    if (!keys[providerId]) setShowKeyInput(true);
   };
 
   if (!selectedState) return null;
@@ -2552,14 +2763,14 @@ const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarket
             background: liveMode ? THEME.greenDim : THEME.bgOrange,
             color: liveMode ? THEME.green : THEME.orange
           }}>
-            {liveMode ? "Live" : "Demo"}
+            {liveMode ? `Live · ${activeProvider.name}` : "Demo"}
           </span>
           <button
             onClick={() => setShowKeyInput(s => !s)}
             className="btn-ghost"
             style={{ padding: "4px 10px", fontSize: 11 }}
           >
-            <Settings size={12} /> {apiKey ? "API Key" : "Connect"}
+            <Settings size={12} /> {apiKey ? "Keys" : "Connect"}
           </button>
           <button
             onClick={loadData}
@@ -2573,41 +2784,111 @@ const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarket
       }
     >
       <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 14, lineHeight: 1.5 }}>
-        Properties currently for sale and recent rental comparables in <strong>{targetCity}, {selectedState}</strong>
-        {stateName && ` (${stateName})`}. Click the "Use in Deal Analyzer" button to pre-populate a new deal.
+        Properties currently for sale and rental comparables in <strong>{targetCity}, {selectedState}</strong>
+        {stateName && ` (${stateName})`}. Click any county on the map above to pull listings for that area.
       </div>
+
+      {/* Prominent "Connect Live Data" banner when no key is set for the active provider */}
+      {!apiKey && !showKeyInput && (
+        <div style={{
+          padding: 14, marginBottom: 16,
+          background: `linear-gradient(135deg, ${THEME.bgRaised}, ${THEME.bgTeal})`,
+          border: `1px solid ${THEME.accent}`,
+          borderRadius: 8,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          flexWrap: "wrap", gap: 12
+        }}>
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: THEME.accent, marginBottom: 4 }}>
+              Connect a Data Provider for Live Listings
+            </div>
+            <div style={{ fontSize: 11, color: THEME.textMuted, lineHeight: 1.5 }}>
+              Showing demo data. Add a RentCast or Zillow API key to pull live MLS-grade listings and rental comps.
+            </div>
+          </div>
+          <button onClick={() => setShowKeyInput(true)} className="btn-primary" style={{ padding: "8px 14px", fontSize: 12 }}>
+            <Key size={13} /> Connect API
+          </button>
+        </div>
+      )}
 
       {showKeyInput && (
         <div style={{
-          padding: 14, marginBottom: 16,
-          background: THEME.bgRaised, borderRadius: 6, border: `1px solid ${THEME.border}`
+          padding: 16, marginBottom: 16,
+          background: THEME.bg, borderRadius: 8, border: `1px solid ${THEME.accent}`
         }}>
-          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: THEME.text }}>
-            RentCast API Key
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: THEME.accent, display: "flex", alignItems: "center", gap: 8 }}>
+            <Key size={14} /> Connect a Data Provider
           </div>
-          <div style={{ fontSize: 11, color: THEME.textMuted, marginBottom: 10, lineHeight: 1.5 }}>
-            Paste your RentCast API key to pull live MLS data. Free tier = 50 requests/month.{" "}
-            <a href="https://app.rentcast.io/app/api" target="_blank" rel="noopener noreferrer" style={{ color: THEME.accent }}>
+
+          {/* Provider selector */}
+          <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr", gap: 10, marginBottom: 14 }}>
+            {Object.values(PROVIDERS).map(p => {
+              const hasKey = !!keys[p.id];
+              const isActive = provider === p.id;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => switchProvider(p.id)}
+                  style={{
+                    padding: 12, textAlign: "left",
+                    border: `2px solid ${isActive ? THEME.accent : THEME.border}`,
+                    borderRadius: 6,
+                    background: isActive ? THEME.bgRaised : THEME.bg,
+                    cursor: "pointer",
+                    position: "relative"
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 700, color: isActive ? THEME.accent : THEME.text, marginBottom: 4 }}>
+                    {p.name}
+                  </div>
+                  <div style={{ fontSize: 11, color: THEME.textMuted, marginBottom: 6 }}>{p.subtitle}</div>
+                  <div style={{ fontSize: 10, color: THEME.textDim }}>{p.freeTier}</div>
+                  {hasKey && (
+                    <div style={{
+                      position: "absolute", top: 10, right: 10,
+                      padding: "2px 7px", fontSize: 9, fontWeight: 700,
+                      background: THEME.greenDim, color: THEME.green,
+                      borderRadius: 4, letterSpacing: "0.06em", textTransform: "uppercase"
+                    }}>
+                      Saved
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <div style={{ fontSize: 11, color: THEME.textMuted, marginBottom: 8, lineHeight: 1.5 }}>
+            Paste your {activeProvider.name} API key below. Keys are stored only in this browser (localStorage).{" "}
+            <a href={activeProvider.signupUrl} target="_blank" rel="noopener noreferrer" style={{ color: THEME.accent, fontWeight: 600 }}>
               Get a key →
             </a>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <input
               type="password"
-              value={keyDraft}
-              onChange={(e) => setKeyDraft(e.target.value)}
-              placeholder={apiKey ? "••••••••••••••" : "Paste API key"}
+              value={keyDrafts[provider] || ""}
+              onChange={(e) => setKeyDrafts(prev => ({ ...prev, [provider]: e.target.value }))}
+              placeholder={apiKey ? "••••••••••••••  (saved)" : `Paste ${activeProvider.name} API key`}
               style={{ flex: 1, padding: "8px 10px", fontSize: 12 }}
             />
-            <button onClick={() => saveKey(keyDraft)} className="btn-primary" style={{ padding: "6px 12px", fontSize: 12 }}>
+            <button onClick={() => saveKey(provider, keyDrafts[provider])} className="btn-primary" style={{ padding: "6px 12px", fontSize: 12 }}>
               Save
             </button>
             {apiKey && (
-              <button onClick={() => saveKey("")} className="btn-danger" style={{ padding: "6px 12px", fontSize: 12 }}>
+              <button onClick={() => saveKey(provider, "")} className="btn-danger" style={{ padding: "6px 12px", fontSize: 12 }}>
                 Clear
               </button>
             )}
           </div>
+
+          {provider === "zillow" && (
+            <div style={{ marginTop: 10, fontSize: 10, color: THEME.textDim, lineHeight: 1.5 }}>
+              Note: Zillow retired their official public API in 2014. This integration uses the <strong>zillow-com1</strong>
+              {" "}community wrapper on RapidAPI (widely used, free tier available). Subscribe on RapidAPI first, then paste your X-RapidAPI-Key here.
+            </div>
+          )}
         </div>
       )}
 
@@ -2624,7 +2905,7 @@ const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarket
 
       {loading && (
         <div style={{ textAlign: "center", padding: 30, color: THEME.textMuted, fontSize: 13 }}>
-          <RefreshCw size={16} className="mono" style={{ animation: "spin 1s linear infinite" }} /> Loading live data…
+          <RefreshCw size={16} className="mono" style={{ animation: "spin 1s linear infinite" }} /> Loading live data from {activeProvider.name}…
         </div>
       )}
 
@@ -3689,12 +3970,27 @@ const AdvancedMarketIntel = () => {
     return null;
   }, [searchResults]);
 
-  // Clicking a county on the map drives the existing search flow
-  const handleMapCountyClick = useCallback((market) => {
-    setSearchQuery(market.city);
-    setShowSearchResults(true);
-    setSelectedState("");
-    setShowStateResults(false);
+  // Clicking any county on the map drives the search / live listings flow.
+  // Tracked markets use the existing search path; un-tracked counties fall through
+  // to the state selection so the LiveListingsPanel can query that county directly.
+  const [clickedArea, setClickedArea] = useState(null);
+
+  const handleMapCountyClick = useCallback((payload) => {
+    if (!payload) return;
+    if (payload.synthetic) {
+      // Non-tracked county: surface it as the state + county for live data queries
+      setSelectedState(payload.state);
+      setShowStateResults(true);
+      setSearchQuery("");
+      setShowSearchResults(false);
+      setClickedArea({ state: payload.state, city: payload.city, county: payload.county });
+    } else {
+      setSearchQuery(payload.city);
+      setShowSearchResults(true);
+      setSelectedState("");
+      setShowStateResults(false);
+      setClickedArea({ state: payload.state, city: payload.city, county: payload.county });
+    }
   }, []);
 
   const renderMarketCard = (market, showRank = false, rank = 0) => (
@@ -3803,20 +4099,25 @@ const AdvancedMarketIntel = () => {
     </div>
   );
 
-  // City drill-down when a specific search match is active (used by Live Listings)
+  // City drill-down: clicked area wins over search / state defaults
   const liveListingsCity = useMemo(() => {
+    if (clickedArea && clickedArea.city) return clickedArea.city;
     if (searchResults.length === 1) return searchResults[0].city;
     if (selectedState && stateMarkets.length > 0) return stateMarkets[0].city;
     return null;
-  }, [searchResults, selectedState, stateMarkets]);
+  }, [clickedArea, searchResults, selectedState, stateMarkets]);
 
   const liveListingsStateMarkets = useMemo(() => {
     if (selectedState) return stateMarkets;
+    if (clickedArea && clickedArea.state) return allMarkets.filter(m => m.state === clickedArea.state);
     if (searchResults.length === 1) return allMarkets.filter(m => m.state === searchResults[0].state);
     return [];
-  }, [selectedState, stateMarkets, searchResults, allMarkets]);
+  }, [selectedState, stateMarkets, clickedArea, searchResults, allMarkets]);
 
-  const liveListingsState = selectedState || (searchResults.length === 1 ? searchResults[0].state : "");
+  const liveListingsState =
+    selectedState ||
+    (clickedArea && clickedArea.state) ||
+    (searchResults.length === 1 ? searchResults[0].state : "");
 
   return (
     <div>
