@@ -10,8 +10,7 @@ import {
   Mail, Eye, Settings,
   ChevronDown, ChevronUp, MoreHorizontal, Layout, Smartphone, Tablet,
   Wifi, WifiOff, Timer, Gauge, Layers, Hammer,
-  PiggyBank, RotateCcw, Trophy, ClipboardList, Users, Handshake,
-  Megaphone, Scale, UserCheck, Network, Building, Cog
+  PiggyBank, RotateCcw, Trophy, Users
 } from "lucide-react";
 
 // Map visualization — requires: npm install react-simple-maps
@@ -3716,7 +3715,7 @@ const EducationCenter = () => {
         },
         "due-diligence": {
           title: "Due Diligence Checklist",
-          icon: <ClipboardList size={14} />,
+          icon: <FileText size={14} />,
           sections: [
             {
               heading: "The Property Walkthrough",
@@ -4247,7 +4246,7 @@ const EducationCenter = () => {
 
     sourcing: {
       title: "Deal Sourcing",
-      icon: <Megaphone size={16} />,
+      icon: <Mail size={16} />,
       topics: {
         "on-market-deals": {
           title: "On-Market Deals (MLS and Agents)",
@@ -4341,7 +4340,7 @@ const EducationCenter = () => {
         },
         "wholesaler-relationships": {
           title: "Working With Wholesalers",
-          icon: <Handshake size={14} />,
+          icon: <Briefcase size={14} />,
           sections: [
             {
               heading: "How Wholesaling Works",
@@ -4374,7 +4373,7 @@ const EducationCenter = () => {
 
     negotiation: {
       title: "Negotiation & Offers",
-      icon: <Handshake size={16} />,
+      icon: <Users size={16} />,
       topics: {
         "offer-structure": {
           title: "Structuring Competitive Offers",
@@ -4483,7 +4482,7 @@ const EducationCenter = () => {
       topics: {
         "core-team": {
           title: "The Core Team",
-          icon: <Network size={14} />,
+          icon: <Layers size={14} />,
           sections: [
             {
               heading: "Investor-Friendly Real Estate Agent",
@@ -4572,7 +4571,7 @@ const EducationCenter = () => {
 
     commercial: {
       title: "Commercial & Multifamily",
-      icon: <Building size={16} />,
+      icon: <Building2 size={16} />,
       topics: {
         "multifamily-economics": {
           title: "5+ Unit Multifamily Economics",
@@ -4606,7 +4605,7 @@ const EducationCenter = () => {
         },
         "commercial-types": {
           title: "Commercial Property Types",
-          icon: <Building size={14} />,
+          icon: <Home size={14} />,
           sections: [
             {
               heading: "Small Retail (Strip Centers, Single-Tenant)",
@@ -5435,3 +5434,4 @@ export default function BRRRRTracker() {
     </div>
   );
 }
+
