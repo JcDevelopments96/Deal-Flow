@@ -22,29 +22,29 @@ const getJsPDF = () => (typeof window !== "undefined" && window.jspdf && window.
   || null;
 
 /* ============================================================================
-   THEME + FONTS (DARK MODE)
+   THEME + FONTS (MIDNIGHT INK — rich dark navy + champagne)
    ============================================================================ */
 const THEME = {
-  bg: "#0B1220",          // Deep navy-black app background
-  bgPanel: "#111B2E",     // Panel background
-  bgInput: "#0F1828",     // Input background
-  bgRaised: "#1A2640",    // Raised/hover surface
-  border: "#22304A",      // Standard border
-  borderLight: "#2C3B58", // Subtle divider
-  text: "#E6EEF8",        // Primary text
-  textMuted: "#94A3B8",   // Secondary text
-  textDim: "#64748B",     // Tertiary text
-  accent: "#2DD4BF",      // Teal-400 — brighter for dark bg
-  accentDim: "#5EEAD4",   // Teal-300
-  secondary: "#FB923C",   // Orange-400 (retained)
-  secondaryDim: "#FDBA74",
-  green: "#4ADE80",       // Emerald-400
-  greenDim: "rgba(74, 222, 128, 0.15)",
-  red: "#F87171",         // Red-400
+  bg: "#0B1120",          // Deep navy-black canvas (rich, not harsh)
+  bgPanel: "#111827",     // Panel surface
+  bgInput: "#0F172A",     // Inputs — slate-900
+  bgRaised: "#1E293B",    // Hover / raised — slate-800
+  border: "#1E293B",      // Standard border
+  borderLight: "#334155", // Divider — slate-700
+  text: "#F8FAFC",        // Primary text — slate-50
+  textMuted: "#CBD5E1",   // Secondary — slate-300 (higher contrast for professional scan-ability)
+  textDim: "#64748B",     // Tertiary — slate-500
+  accent: "#D4AF37",      // Champagne gold — primary brand
+  accentDim: "#E8C960",   // Lighter gold for hover
+  secondary: "#60A5FA",   // Soft blue — cool counterpoint for secondary emphasis
+  secondaryDim: "#93C5FD",
+  green: "#34D399",       // Emerald-400 (positive)
+  greenDim: "rgba(52, 211, 153, 0.15)",
+  red: "#F87171",         // Red-400 (negative)
   redDim: "rgba(248, 113, 113, 0.15)",
-  orange: "#FB923C",
-  blue: "#60A5FA",        // Blue-400
-  purple: "#C084FC"       // Purple-400
+  orange: "#FBBF24",      // Amber-400 (warnings)
+  blue: "#60A5FA",
+  purple: "#C084FC"
 };
 
 const STYLE_TAG = `
@@ -74,11 +74,11 @@ body { margin: 0; }
 }
 input, select, textarea {
   font-family: inherit; background: ${THEME.bgInput}; color: ${THEME.text};
-  border: 1px solid ${THEME.border}; outline: none; border-radius: 2px;
+  border: 1px solid ${THEME.border}; outline: none; border-radius: 6px;
 }
 input::placeholder, textarea::placeholder { color: ${THEME.textDim}; }
 input:focus, select:focus, textarea:focus {
-  border-color: ${THEME.accent}; box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.18);
+  border-color: ${THEME.accent}; box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
 }
 select option { background: ${THEME.bgInput}; color: ${THEME.text}; }
 input[type="date"] { color-scheme: dark; }
@@ -86,24 +86,26 @@ input[type="checkbox"] { accent-color: ${THEME.accent}; }
 input[type="range"] { accent-color: ${THEME.accent}; }
 button {
   font-family: inherit; border: none; outline: none; cursor: pointer;
-  background: transparent; color: ${THEME.textMuted}; border-radius: 2px;
+  background: transparent; color: ${THEME.textMuted}; border-radius: 6px;
   transition: all 0.15s ease;
 }
 .btn-primary {
-  background: ${THEME.accent}; color: #0B1220; font-weight: 600;
+  background: ${THEME.accent}; color: ${THEME.bg}; font-weight: 600;
   padding: 8px 14px; font-size: 13px; display: inline-flex;
   align-items: center; gap: 6px; transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 .btn-primary:hover { background: ${THEME.accentDim}; }
 .btn-secondary {
-  border: 1px solid ${THEME.accent};
-  color: ${THEME.accent}; padding: 8px 14px; font-size: 13px;
+  border: 1px solid ${THEME.borderLight};
+  color: ${THEME.text}; padding: 8px 14px; font-size: 13px;
   display: inline-flex; align-items: center; gap: 6px;
   background: transparent;
 }
 .btn-secondary:hover {
-  background: ${THEME.accent};
-  color: #0B1220;
+  border-color: ${THEME.accent};
+  color: ${THEME.accent};
+  background: ${THEME.bgRaised};
 }
 .btn-ghost { color: ${THEME.textMuted}; }
 .btn-ghost:hover { color: ${THEME.accent}; background: ${THEME.bgRaised}; }
@@ -111,8 +113,8 @@ button {
 .btn-danger:hover { color: #FCA5A5; background: ${THEME.redDim}; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: ${THEME.bg}; }
-::-webkit-scrollbar-thumb { background: ${THEME.border}; border-radius: 5px; }
-::-webkit-scrollbar-thumb:hover { background: ${THEME.borderLight}; }
+::-webkit-scrollbar-thumb { background: ${THEME.borderLight}; border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: ${THEME.textDim}; }
 `;
 
 /* ============================================================================
@@ -3326,9 +3328,9 @@ const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal }) => {
                 <div style={{
                   padding: "4px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700,
                   background: metrics.grade === "A" ? THEME.greenDim :
-                             metrics.grade.startsWith("B") ? "rgba(251, 191, 36, 0.18)" : THEME.redDim,
+                             metrics.grade.startsWith("B") ? "rgba(212, 175, 55, 0.18)" : THEME.redDim,
                   color: metrics.grade === "A" ? THEME.green :
-                         metrics.grade.startsWith("B") ? "#FCD34D" : THEME.red
+                         metrics.grade.startsWith("B") ? THEME.accent : THEME.red
                 }}>
                   {metrics.grade}
                 </div>
