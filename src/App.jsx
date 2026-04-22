@@ -2420,26 +2420,29 @@ const PROVIDERS = {
   }
 };
 
-// A small curated set of royalty-free Unsplash house photos (direct CDN URLs — no API key needed).
-// Used as deterministic placeholders in demo mode so each card has a visually-distinct image.
+// Demo images — use Lorem Picsum's deterministic seed endpoint (no auth, no API key,
+// CORS-unrestricted for <img> tags, reliable). The seed guarantees each demo card gets
+// the same image across re-renders. Picsum photos rotate across many styles; they won't
+// always look like a house, but they render 100% of the time — which is the goal for demo.
+const PICSUM_BASE = "https://picsum.photos/seed";
 const DEMO_HOUSE_IMAGES = [
-  "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=600&h=400&fit=crop", // suburban house
-  "https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=600&h=400&fit=crop", // modern craftsman
-  "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=600&h=400&fit=crop", // white bungalow
-  "https://images.unsplash.com/photo-1583608205776-bfd35f0d9f83?w=600&h=400&fit=crop", // colonial
-  "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=600&h=400&fit=crop", // modern two-story
-  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&h=400&fit=crop", // mid-century
-  "https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=600&h=400&fit=crop", // ranch
-  "https://images.unsplash.com/photo-1605146769289-440113cc3d00?w=600&h=400&fit=crop"  // brick cottage
+  `${PICSUM_BASE}/dealtrack-house-1/640/400`,
+  `${PICSUM_BASE}/dealtrack-house-2/640/400`,
+  `${PICSUM_BASE}/dealtrack-house-3/640/400`,
+  `${PICSUM_BASE}/dealtrack-house-4/640/400`,
+  `${PICSUM_BASE}/dealtrack-house-5/640/400`,
+  `${PICSUM_BASE}/dealtrack-house-6/640/400`,
+  `${PICSUM_BASE}/dealtrack-house-7/640/400`,
+  `${PICSUM_BASE}/dealtrack-house-8/640/400`
 ];
 
 const DEMO_RENTAL_IMAGES = [
-  "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=600&h=400&fit=crop", // duplex
-  "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=600&h=400&fit=crop", // apartment living room
-  "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=600&h=400&fit=crop", // interior
-  "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=600&h=400&fit=crop", // condo
-  "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600&h=400&fit=crop", // kitchen
-  "https://images.unsplash.com/photo-1484154218962-a197022b5858?w=600&h=400&fit=crop"  // townhome
+  `${PICSUM_BASE}/dealtrack-rent-1/640/400`,
+  `${PICSUM_BASE}/dealtrack-rent-2/640/400`,
+  `${PICSUM_BASE}/dealtrack-rent-3/640/400`,
+  `${PICSUM_BASE}/dealtrack-rent-4/640/400`,
+  `${PICSUM_BASE}/dealtrack-rent-5/640/400`,
+  `${PICSUM_BASE}/dealtrack-rent-6/640/400`
 ];
 
 const buildDemoListings = (state, city, marketRef) => {
@@ -4445,29 +4448,52 @@ const AdvancedMarketIntel = () => {
         </div>
       </Panel>
 
-      {/* 2. MAP — below the filter */}
-      <Panel title="Market Map — US Counties" icon={<MapPin size={16} />} accent style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 14 }}>
-          Every tracked market, color-coded by overall deal score on a red-yellow-green heatmap. Red indicates weaker markets, yellow is average, and green represents the strongest investment conditions. Click a county to drill in.
+      {/* 2 + 3. MAP (left) + LIVE LISTINGS (right) side-by-side once a state is active.
+              Map is sticky so it stays in view while the listings column scrolls. */}
+      {liveListingsState ? (
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: isMobile() ? "1fr" : "minmax(420px, 1fr) minmax(380px, 1fr)",
+          gap: 20,
+          alignItems: "start",
+          marginBottom: 24
+        }}>
+          <div style={{ position: isMobile() ? "static" : "sticky", top: 16 }}>
+            <Panel title="Market Map — US Counties" icon={<MapPin size={16} />} accent>
+              <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 14 }}>
+                Click any county to load listings for that area on the right.
+              </div>
+              <USCountyMap
+                allMarkets={allMarkets}
+                selectedState={mapFocusState}
+                highlightedMarket={mapHighlight}
+                onCountyClick={handleMapCountyClick}
+              />
+            </Panel>
+          </div>
+          <div>
+            <LiveListingsPanel
+              selectedState={liveListingsState}
+              selectedCity={liveListingsCity}
+              stateName={stateInfo ? stateInfo.name : null}
+              stateMarkets={liveListingsStateMarkets}
+              bedsFilter={bedsFilter}
+              bathsFilter={bathsFilter}
+            />
+          </div>
         </div>
-        <USCountyMap
-          allMarkets={allMarkets}
-          selectedState={mapFocusState}
-          highlightedMarket={mapHighlight}
-          onCountyClick={handleMapCountyClick}
-        />
-      </Panel>
-
-      {/* 3. LIVE LISTINGS & COMPARABLES — when a state / area is active */}
-      {liveListingsState && (
-        <LiveListingsPanel
-          selectedState={liveListingsState}
-          selectedCity={liveListingsCity}
-          stateName={stateInfo ? stateInfo.name : null}
-          stateMarkets={liveListingsStateMarkets}
-          bedsFilter={bedsFilter}
-          bathsFilter={bathsFilter}
-        />
+      ) : (
+        <Panel title="Market Map — US Counties" icon={<MapPin size={16} />} accent style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 14 }}>
+            Every tracked market, color-coded by overall deal score on a red-yellow-green heatmap. Red indicates weaker markets, yellow is average, and green represents the strongest investment conditions. Click a county to drill in — listings for that area will load alongside the map.
+          </div>
+          <USCountyMap
+            allMarkets={allMarkets}
+            selectedState={mapFocusState}
+            highlightedMarket={mapHighlight}
+            onCountyClick={handleMapCountyClick}
+          />
+        </Panel>
       )}
 
       {/* 4. SEARCH / STATE RESULT CARDS */}
