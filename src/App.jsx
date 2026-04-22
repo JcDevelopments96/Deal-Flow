@@ -3,10 +3,10 @@ import {
   Building2, Calculator, TrendingUp, MapPin, Search, Plus, Trash2,
   Home, Calendar, FileText, X, ChevronRight, AlertTriangle, CheckCircle2,
   Info, Save, Sparkles, Wrench, Key, DoorOpen, Flame, Flag, BarChart3,
-  Edit3, Copy, Filter, ArrowRight, Shield, Zap, Radar, ExternalLink,
+  Edit3, Copy, Filter, ArrowRight, Shield, Zap, ExternalLink,
   RefreshCw, Star, Target, Clock, Upload, BookOpen, GraduationCap, 
-  DollarSign, TrendingDown, Percent, Users, Download, FileDown, 
-  PieChart, LineChart, Activity, Briefcase, Award, Globe, Phone,
+  DollarSign, TrendingDown, Percent, Download, FileDown, 
+  LineChart, Activity, Briefcase, Award, Globe, Phone,
   Mail, MapPin as Location, Calendar as CalendarIcon, Eye, Settings,
   ChevronDown, ChevronUp, MoreHorizontal, Layout, Smartphone, Tablet,
   MonitorSpeaker, Wifi, WifiOff, Timer, Gauge, Layers, Hammer, 
@@ -1647,6 +1647,66 @@ const AdvancedMarketIntel = () => {
           airbnb: { nightly: 145, occupancy: 76, monthlyRevenue: 3450, competition: "High" }
         },
         { 
+          city: "Deerfield Beach", state: "FL", medianPrice: 365000, medianRent: 2200, capRate: 6.4, rentGrowth: 11, inventory: 1.7, score: 76,
+          airbnb: { nightly: 170, occupancy: 77, monthlyRevenue: 4100, competition: "Very High" }
+        },
+        { 
+          city: "Boca Raton", state: "FL", medianPrice: 425000, medianRent: 2400, capRate: 5.8, rentGrowth: 10, inventory: 1.6, score: 74,
+          airbnb: { nightly: 185, occupancy: 78, monthlyRevenue: 4550, competition: "Very High" }
+        },
+        { 
+          city: "Delray Beach", state: "FL", medianPrice: 395000, medianRent: 2250, capRate: 6.2, rentGrowth: 11, inventory: 1.7, score: 75,
+          airbnb: { nightly: 175, occupancy: 76, monthlyRevenue: 4200, competition: "Very High" }
+        },
+        { 
+          city: "Coral Springs", state: "FL", medianPrice: 345000, medianRent: 2050, capRate: 6.6, rentGrowth: 12, inventory: 1.9, score: 78,
+          airbnb: { nightly: 160, occupancy: 74, monthlyRevenue: 3700, competition: "High" }
+        },
+        { 
+          city: "Pompano Beach", state: "FL", medianPrice: 315000, medianRent: 1950, capRate: 7.0, rentGrowth: 13, inventory: 2.0, score: 80,
+          airbnb: { nightly: 155, occupancy: 75, monthlyRevenue: 3650, competition: "High" }
+        },
+        { 
+          city: "Boynton Beach", state: "FL", medianPrice: 335000, medianRent: 2000, capRate: 6.8, rentGrowth: 12, inventory: 1.8, score: 77,
+          airbnb: { nightly: 165, occupancy: 76, monthlyRevenue: 3950, competition: "High" }
+        },
+        { 
+          city: "Hollywood", state: "FL", medianPrice: 375000, medianRent: 2150, capRate: 6.3, rentGrowth: 11, inventory: 1.7, score: 76,
+          airbnb: { nightly: 170, occupancy: 78, monthlyRevenue: 4200, competition: "Very High" }
+        },
+        { 
+          city: "Pembroke Pines", state: "FL", medianPrice: 355000, medianRent: 2100, capRate: 6.5, rentGrowth: 12, inventory: 1.8, score: 77,
+          airbnb: { nightly: 160, occupancy: 75, monthlyRevenue: 3800, competition: "High" }
+        },
+        { 
+          city: "Davie", state: "FL", medianPrice: 385000, medianRent: 2200, capRate: 6.2, rentGrowth: 11, inventory: 1.8, score: 75,
+          airbnb: { nightly: 165, occupancy: 76, monthlyRevenue: 3950, competition: "High" }
+        },
+        { 
+          city: "Plantation", state: "FL", medianPrice: 395000, medianRent: 2250, capRate: 6.1, rentGrowth: 10, inventory: 1.7, score: 74,
+          airbnb: { nightly: 170, occupancy: 77, monthlyRevenue: 4100, competition: "Very High" }
+        },
+        { 
+          city: "Clearwater", state: "FL", medianPrice: 285000, medianRent: 1800, capRate: 7.5, rentGrowth: 15, inventory: 2.2, score: 83,
+          airbnb: { nightly: 150, occupancy: 78, monthlyRevenue: 3650, competition: "High" }
+        },
+        { 
+          city: "Lakeland", state: "FL", medianPrice: 235000, medianRent: 1550, capRate: 8.2, rentGrowth: 16, inventory: 2.8, score: 87,
+          airbnb: { nightly: 125, occupancy: 72, monthlyRevenue: 2825, competition: "Medium" }
+        },
+        { 
+          city: "Kissimmee", state: "FL", medianPrice: 285000, medianRent: 1750, capRate: 7.6, rentGrowth: 17, inventory: 2.3, score: 86,
+          airbnb: { nightly: 145, occupancy: 80, monthlyRevenue: 3650, competition: "Very High" }
+        },
+        { 
+          city: "Cape Coral", state: "FL", medianPrice: 325000, medianRent: 1950, capRate: 7.1, rentGrowth: 14, inventory: 2.1, score: 82,
+          airbnb: { nightly: 155, occupancy: 76, monthlyRevenue: 3700, competition: "High" }
+        },
+        { 
+          city: "Port St. Lucie", state: "FL", medianPrice: 295000, medianRent: 1850, capRate: 7.4, rentGrowth: 15, inventory: 2.3, score: 84,
+          airbnb: { nightly: 140, occupancy: 74, monthlyRevenue: 3250, competition: "Medium" }
+        },
+        { 
           city: "Atlanta", state: "GA", medianPrice: 285000, medianRent: 1750, capRate: 7.8, rentGrowth: 13, inventory: 2.4, score: 85,
           airbnb: { nightly: 140, occupancy: 73, monthlyRevenue: 3200, competition: "High" }
         },
@@ -2267,11 +2327,8 @@ const AdvancedMarketIntel = () => {
 const Header = ({ view, setView, dealCount }) => {
   const tabs = [
     { id: "dashboard", label: "Dashboard", icon: <BarChart3 size={14} /> },
-    { id: "portfolio", label: "Portfolio", icon: <PieChart size={14} /> },
     { id: "analyzer", label: "Deal Analyzer", icon: <Calculator size={14} /> },
-    { id: "sourcing", label: "Deal Sourcing", icon: <Radar size={14} /> },
     { id: "market", label: "Market Intel", icon: <TrendingUp size={14} /> },
-    { id: "competition", label: "Competition", icon: <Users size={14} /> },
     { id: "education", label: "Education", icon: <BookOpen size={14} /> }
   ];
   
@@ -3252,35 +3309,8 @@ export default function BRRRRTracker() {
       {view === "education" && <EducationCenter />}
 
       {/* Simplified placeholder views for other sections */}
-      {view === "portfolio" && (
-        <div style={{ padding: 40, textAlign: "center", maxWidth: 1200, margin: "0 auto" }}>
-          <h2 style={{ fontSize: 28, marginBottom: 16 }}>Portfolio Analytics</h2>
-          <p style={{ color: THEME.textMuted, marginBottom: 32 }}>
-            Comprehensive portfolio tracking and analytics - Coming soon!
-          </p>
-          <MobileOptimizedButton onClick={onNewDeal} variant="primary">
-            Add New Deal to Portfolio
-          </MobileOptimizedButton>
-        </div>
-      )}
 
-      {view === "sourcing" && (
-        <div style={{ padding: 40, textAlign: "center", maxWidth: 1200, margin: "0 auto" }}>
-          <h2 style={{ fontSize: 28, marginBottom: 16 }}>Deal Sourcing</h2>
-          <p style={{ color: THEME.textMuted, marginBottom: 32 }}>
-            Automated deal sourcing and lead generation - Coming soon!
-          </p>
-        </div>
-      )}
 
-      {view === "competition" && (
-        <div style={{ padding: 40, textAlign: "center", maxWidth: 1200, margin: "0 auto" }}>
-          <h2 style={{ fontSize: 28, marginBottom: 16 }}>Competition Analysis</h2>
-          <p style={{ color: THEME.textMuted, marginBottom: 32 }}>
-            Track local investors and market competition - Coming soon!
-          </p>
-        </div>
-      )}
 
       <footer style={{
         marginTop: 60, padding: "20px 32px",
