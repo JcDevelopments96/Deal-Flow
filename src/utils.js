@@ -108,14 +108,20 @@ export const generatePDFReport = async (deal, metrics /* , type = "investor" */)
     const pageWidth = pdf.internal.pageSize.width;
     const margin = 20;
 
+    // Title — orange accent for a subtle warm note in an otherwise teal report
     pdf.setFontSize(24);
-    pdf.setTextColor(13, 148, 136);
+    pdf.setTextColor(234, 88, 12); // Orange-600
     pdf.text("DealTrack Investment Report", margin, 30);
+
+    // Thin orange rule under the title — a small, deliberate highlight
+    pdf.setDrawColor(234, 88, 12);
+    pdf.setLineWidth(0.8);
+    pdf.line(margin, 33, margin + 60, 33);
 
     pdf.setFontSize(16);
     pdf.setTextColor(51, 51, 51);
-    pdf.text(`${deal.address || 'Property Address'}`, margin, 45);
-    pdf.text(`${deal.city || 'City'}, ${deal.state || 'State'}`, margin, 55);
+    pdf.text(`${deal.address || 'Property Address'}`, margin, 48);
+    pdf.text(`${deal.city || 'City'}, ${deal.state || 'State'}`, margin, 58);
 
     pdf.setDrawColor(226, 232, 240);
     pdf.rect(margin, 70, pageWidth - 2 * margin, 40);

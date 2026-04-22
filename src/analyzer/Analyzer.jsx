@@ -137,7 +137,7 @@ export const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete, onPdfError,
                 formula="(Annual Cash Flow ÷ Total Invested) × 100"
               />
             </div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: THEME.orange }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: THEME.teal }}>
               {metrics.cashOnCash.toFixed(1)}%
             </div>
           </div>

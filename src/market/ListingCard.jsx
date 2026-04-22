@@ -111,7 +111,7 @@ export const ListingCard = ({ listing, type = "sale", onOpen, showWatchToggle = 
         {listing.formattedAddress}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-        <div className="mono" style={{ fontSize: 18, fontWeight: 700, color: isRental ? THEME.teal : THEME.orange }}>
+        <div className="mono" style={{ fontSize: 18, fontWeight: 700, color: isRental ? THEME.teal : THEME.accent }}>
           {fmtUSD(listing.price)}{isRental ? <span style={{ fontSize: 11, fontWeight: 500, color: THEME.textMuted }}> /mo</span> : null}
         </div>
         {listing.pricePerSqft && (

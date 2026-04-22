@@ -77,7 +77,7 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
 
         {onOpenCalculator && (
           <button
-            className="btn-accent-orange"
+            className="btn-accent-teal"
             onClick={onOpenCalculator}
             style={{ marginLeft: 4 }}
             aria-label="Open mortgage and affordability calculator"

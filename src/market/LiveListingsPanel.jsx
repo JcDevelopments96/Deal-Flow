@@ -234,7 +234,7 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
       {!apiKey && !showKeyInput && (
         <div style={{
           padding: 14, marginBottom: 16,
-          background: THEME.bgOrange,
+          background: THEME.bgTeal,
           border: `1px solid ${THEME.accent}`,
           borderRadius: 8,
           display: "flex", alignItems: "center", justifyContent: "space-between",
