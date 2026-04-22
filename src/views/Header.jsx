@@ -5,8 +5,33 @@ import React from "react";
 import {
   Building2, Layout, Calculator, MapPin, Star, GraduationCap, Plus
 } from "lucide-react";
+import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/react";
 import { THEME } from "../theme.js";
 import { isMobile } from "../utils.js";
+
+// Only render the auth slot when Clerk is actually configured — lets the app
+// keep working in its standalone (no-auth) mode if the env var isn't set.
+const authConfigured = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
+
+const AuthSlot = () => (
+  <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: 4 }}>
+    <Show when="signed-out">
+      <SignInButton mode="modal">
+        <button className="btn-secondary" style={{ padding: "7px 12px", fontSize: 12 }}>
+          Sign in
+        </button>
+      </SignInButton>
+      <SignUpButton mode="modal">
+        <button className="btn-primary" style={{ padding: "7px 12px", fontSize: 12 }}>
+          Sign up
+        </button>
+      </SignUpButton>
+    </Show>
+    <Show when="signed-in">
+      <UserButton appearance={{ elements: { userButtonAvatarBox: { width: 30, height: 30 } } }} />
+    </Show>
+  </div>
+);
 
 export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchlistCount = 0 }) => (
   <div style={{
@@ -92,6 +117,8 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
           <Plus size={14} />
           {!isMobile() && "New Deal"}
         </button>
+
+        {authConfigured && <AuthSlot />}
       </div>
     </div>
   </div>

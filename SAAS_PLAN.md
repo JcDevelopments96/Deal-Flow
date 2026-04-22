@@ -152,7 +152,7 @@ exactly as it does today.
 ### Phase 2 — Backend runtime (separate commit, after user signs up)
 
 New dependencies needed (approve before install):
-- `@clerk/clerk-react` — frontend auth components
+- `@clerk/react` — frontend auth components (already installed)
 - `@clerk/backend` — verify JWTs in serverless functions
 - `stripe` — server SDK (webhook signature verification)
 - `@supabase/supabase-js` — DB client
