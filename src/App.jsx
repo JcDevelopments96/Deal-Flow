@@ -25,27 +25,34 @@ const getJsPDF = () => (typeof window !== "undefined" && window.jspdf && window.
   || null;
 
 /* ============================================================================
-   THEME + FONTS (ORANGE PRIMARY + TEAL — clean light)
+   THEME + FONTS (WHITE PRIMARY · NAVY · TEAL · ORANGE accents)
    ============================================================================ */
 const THEME = {
   bg: "#FFFFFF",          // Pure white canvas
-  bgPanel: "#FAFAFA",     // Panel surfaces — subtle off-white
+  bgPanel: "#F8FAFC",     // Panel surfaces — slate-50
   bgInput: "#FFFFFF",     // Inputs match canvas
-  bgRaised: "#FFF7ED",    // Hover / raised — warm orange-50
+  bgRaised: "#EFF6FF",    // Hover / raised — blue-50 (harmonizes with navy)
+  bgTeal: "#F0FDFA",      // Teal-50 — soft teal surface
+  bgOrange: "#FFF7ED",    // Orange-50 — soft orange surface for highlights
   border: "#E2E8F0",      // Standard border (slate-200)
   borderLight: "#F1F5F9", // Subtle dividers
   text: "#0F172A",        // Primary text (slate-900)
   textMuted: "#475569",   // Secondary text (slate-600) — high-contrast for scanning
   textDim: "#94A3B8",     // Placeholders / tertiary (slate-400)
-  accent: "#EA580C",      // Orange-600 — primary CTA & active states
-  accentDim: "#C2410C",   // Orange-700 — hover
+  accent: "#1E3A8A",      // Navy-900 — primary CTA & active states
+  accentDim: "#1E40AF",   // Navy-800 — hover
+  navy: "#1E3A8A",        // Navy explicit reference
+  navyDim: "#1E40AF",     // Navy hover
   secondary: "#0D9488",   // Teal-600 — secondary emphasis
   secondaryDim: "#0F766E",// Teal-700 — hover
+  teal: "#0D9488",        // Teal explicit reference
+  tealDim: "#0F766E",     // Teal hover
   green: "#059669",       // Emerald-600 (positive cash flow)
   greenDim: "#D1FAE5",    // Emerald-100
   red: "#DC2626",         // Red-600 (negative / delete)
   redDim: "#FEE2E2",      // Red-100
-  orange: "#EA580C",
+  orange: "#EA580C",      // Orange-600 — tertiary highlight
+  orangeDim: "#C2410C",   // Orange-700 — orange hover
   blue: "#2563EB",
   purple: "#7C3AED"
 };
@@ -81,7 +88,7 @@ input, select, textarea {
 }
 input::placeholder, textarea::placeholder { color: ${THEME.textDim}; }
 input:focus, select:focus, textarea:focus {
-  border-color: ${THEME.accent}; box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.12);
+  border-color: ${THEME.accent}; box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.15);
 }
 input[type="checkbox"] { accent-color: ${THEME.accent}; }
 input[type="range"] { accent-color: ${THEME.accent}; }
@@ -119,6 +126,46 @@ button {
 .btn-ghost:hover { color: ${THEME.accent}; background: ${THEME.bgRaised}; }
 .btn-danger { color: ${THEME.red}; }
 .btn-danger:hover { color: #B91C1C; background: ${THEME.redDim}; }
+.btn-accent-orange {
+  background: ${THEME.orange}; color: #FFFFFF; font-weight: 600;
+  padding: 8px 14px; font-size: 13px; display: inline-flex;
+  align-items: center; gap: 6px; transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+.btn-accent-orange:hover { background: ${THEME.orangeDim}; }
+
+/* ── CalcTooltip: hover-revealed formula explanations ─────────────────── */
+.calc-tip { position: relative; display: inline-flex; align-items: center; }
+.calc-tip__icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 14px; height: 14px; border-radius: 50%;
+  color: ${THEME.textMuted}; cursor: help;
+  transition: color 0.15s ease;
+}
+.calc-tip__icon:hover { color: ${THEME.accent}; }
+.calc-tip__body {
+  position: absolute; z-index: 1000; top: 100%; left: 50%;
+  transform: translate(-50%, 6px);
+  background: ${THEME.text}; color: #fff;
+  padding: 10px 12px; border-radius: 6px;
+  font-size: 11px; line-height: 1.5; font-weight: 400;
+  width: max-content; max-width: 280px;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.15s ease;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.18);
+  text-align: left;
+}
+.calc-tip__body::before {
+  content: ""; position: absolute; top: -4px; left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 8px; height: 8px; background: ${THEME.text};
+}
+.calc-tip:hover .calc-tip__body,
+.calc-tip:focus-within .calc-tip__body { opacity: 1; }
+.calc-tip__title { font-weight: 700; color: ${THEME.orange}; margin-bottom: 4px; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
+.calc-tip__formula { font-family: 'JetBrains Mono', monospace; color: #fbbf24; margin-top: 4px; font-size: 10.5px; }
+
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 `;
 
 /* ============================================================================
@@ -292,7 +339,20 @@ const calcMetrics = (deal) => {
   const mgmtFee = n(deal.mgmtFee);
   const hoa = n(deal.hoa);
 
-  const totalInvested = purchasePrice * (downPayment / 100) + rehabBudget + closingCosts + holdingCosts;
+  const cashDown = purchasePrice * (downPayment / 100);
+  const totalInvested = cashDown + rehabBudget + closingCosts + holdingCosts;
+
+  // Refi closing costs (pulled from deal's refiCosts + 1% origination on projected new loan)
+  const refiCostsObj = deal.refiCosts || { appraisal: 500, title: 1200, legal: 800, origination: 0, misc: 500 };
+  const refiBaseCosts = Object.values(refiCostsObj).reduce((sum, cost) => sum + (Number(cost) || 0), 0);
+  const refiLtv = deal.refiLtv || 75;
+  const projectedNewLoan = arv * (refiLtv / 100);
+  const refiOrigination = projectedNewLoan * 0.01;
+  const totalRefiClosingCosts = refiBaseCosts + refiOrigination;
+
+  // All-in cost: the full capital project cost, including refi closing
+  const totalAllIn = purchasePrice + closingCosts + rehabBudget + holdingCosts + totalRefiClosingCosts;
+  const allInToArv = arv > 0 ? (totalAllIn / arv) * 100 : 0;
 
   const monthlyPI = loanAmount > 0 && interestRate > 0 ?
     loanAmount * (interestRate / 100 / 12 * Math.pow(1 + interestRate / 100 / 12, loanTermYears * 12)) /
@@ -328,7 +388,9 @@ const calcMetrics = (deal) => {
   return {
     totalInvested, monthlyPI, monthlyCosts, monthlyCashFlow, annualCashFlow,
     cashOnCash, capRate, seventyPercentRule, onePercentRule, score, grade,
-    vacancyLoss, mgmtCost, effectiveIncome, totalROI
+    vacancyLoss, mgmtCost, effectiveIncome, totalROI,
+    cashDown, totalRefiClosingCosts, refiOrigination, refiBaseCosts,
+    totalAllIn, allInToArv, projectedNewLoan
   };
 };
 
@@ -458,14 +520,17 @@ const SelectField = ({ label, value, onChange, options }) => (
   </div>
 );
 
-const StatRow = ({ label, value, valueColor, bold, mono = true, borderTop, sublabel }) => (
+const StatRow = ({ label, value, valueColor, bold, mono = true, borderTop, sublabel, tooltip }) => (
   <div style={{
     display: "flex", justifyContent: "space-between", alignItems: "center",
     padding: "9px 0",
     borderTop: borderTop ? `1px solid ${THEME.border}` : "none"
   }}>
     <div>
-      <div style={{ fontSize: 12, color: THEME.textMuted, fontWeight: bold ? 600 : 400 }}>{label}</div>
+      <div style={{ fontSize: 12, color: THEME.textMuted, fontWeight: bold ? 600 : 400, display: "inline-flex", alignItems: "center" }}>
+        {label}
+        {tooltip && <CalcTooltip size={12} {...tooltip} />}
+      </div>
       {sublabel && <div style={{ fontSize: 10, color: THEME.textDim, marginTop: 2 }}>{sublabel}</div>}
     </div>
     <div
@@ -504,6 +569,25 @@ const Panel = ({ title, icon, children, accent, action, style = {} }) => (
     )}
     <div style={{ padding: 18 }}>{children}</div>
   </div>
+);
+
+// CalcTooltip — hover an info icon to reveal the formula behind a calculated value
+const CalcTooltip = ({ title, description, formula, size = 13, inline = true }) => (
+  <span
+    className="calc-tip"
+    style={{ marginLeft: 6, verticalAlign: inline ? "middle" : "baseline" }}
+    tabIndex={0}
+    aria-label={title ? `How ${title} is calculated` : "Calculation details"}
+  >
+    <span className="calc-tip__icon">
+      <Info size={size} />
+    </span>
+    <span className="calc-tip__body">
+      {title && <div className="calc-tip__title">{title}</div>}
+      {description && <div>{description}</div>}
+      {formula && <div className="calc-tip__formula">{formula}</div>}
+    </span>
+  </span>
 );
 
 /* ============================================================================
@@ -670,19 +754,54 @@ const AcquisitionSection = ({ deal, onUpdate, metrics }) => {
       </Panel>
 
       <Panel title="Acquisition Summary" icon={<Calculator size={16} />}>
-        <StatRow label="Total Cash Required" value={fmtUSD(metrics.totalInvested)} bold valueColor={THEME.accent} />
-        <StatRow label="Loan Amount" value={fmtUSD(deal.purchasePrice * ((100 - deal.downPayment) / 100))} />
-        <StatRow label="Monthly P&I Payment" value={fmtUSD(metrics.monthlyPI)} />
+        <StatRow
+          label="Total Cash Required"
+          value={fmtUSD(metrics.totalInvested)}
+          bold valueColor={THEME.accent}
+          tooltip={{
+            title: "Total Cash Required",
+            description: "All-in cash needed to close and stabilize.",
+            formula: "(Purchase × Down %) + Rehab + Closing + Holding"
+          }}
+        />
+        <StatRow
+          label="Loan Amount"
+          value={fmtUSD(deal.purchasePrice * ((100 - deal.downPayment) / 100))}
+          tooltip={{
+            title: "Loan Amount",
+            description: "Portion of the purchase price financed by the lender.",
+            formula: "Purchase × (100 − Down %) ÷ 100"
+          }}
+        />
+        <StatRow
+          label="Monthly P&I Payment"
+          value={fmtUSD(metrics.monthlyPI)}
+          tooltip={{
+            title: "Monthly Principal & Interest",
+            description: "Standard amortized payment based on rate and term.",
+            formula: "L·r/(1 − (1+r)^-n)   r = rate/12, n = term·12"
+          }}
+        />
         <StatRow
           label="Purchase vs ARV"
           value={`${((deal.purchasePrice / deal.arv) * 100).toFixed(1)}%`}
           valueColor={deal.purchasePrice <= deal.arv * 0.7 ? THEME.green : THEME.orange}
+          tooltip={{
+            title: "Purchase-to-ARV Ratio",
+            description: "Lower is better. Under 70% leaves room for rehab + refi equity.",
+            formula: "(Purchase Price ÷ ARV) × 100"
+          }}
         />
         <StatRow
           label="70% Rule Status"
           value={metrics.seventyPercentRule ? "PASS" : "FAIL"}
           valueColor={metrics.seventyPercentRule ? THEME.green : THEME.red}
           bold
+          tooltip={{
+            title: "70% Rule",
+            description: "Classic flipper/BRRRR screen. Pass means you can likely pull most capital back at refi.",
+            formula: "(Purchase + Rehab) ≤ (ARV × 0.70)"
+          }}
         />
         <StatRow
           label="Due Diligence Progress"
@@ -1342,28 +1461,73 @@ const RefinanceSection = ({ deal, onUpdate, metrics }) => {
               <h5 style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 12, textTransform: "uppercase" }}>
                 Loan Details
               </h5>
-              <StatRow label="New Loan Amount" value={fmtUSD(scenarios[selectedScenario]?.newLoanAmount)} bold />
+              <StatRow
+                label="New Loan Amount"
+                value={fmtUSD(scenarios[selectedScenario]?.newLoanAmount)}
+                bold
+                tooltip={{
+                  title: "New Loan (Refi)",
+                  description: "Loan size at refinance, sized to ARV and LTV.",
+                  formula: "ARV × (LTV % ÷ 100)"
+                }}
+              />
               <StatRow label="Loan-to-Value Ratio" value={`${scenarios[selectedScenario]?.loanToValue}%`} />
               <StatRow label="Interest Rate" value={`${scenarios[selectedScenario]?.interestRate}%`} />
-              <StatRow label="New Monthly P&I" value={fmtUSD(scenarios[selectedScenario]?.newMonthlyPI)} valueColor={THEME.secondary} />
+              <StatRow
+                label="New Monthly P&I"
+                value={fmtUSD(scenarios[selectedScenario]?.newMonthlyPI)}
+                valueColor={THEME.secondary}
+                tooltip={{
+                  title: "New Monthly P&I",
+                  description: "Amortized payment on the refinanced loan (30-yr assumed).",
+                  formula: "L·r/(1 − (1+r)^-n)   30-year schedule"
+                }}
+              />
             </div>
 
             <div>
               <h5 style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 12, textTransform: "uppercase" }}>
                 Cash Out Analysis
               </h5>
-              <StatRow label="Gross Cash Out" value={fmtUSD(scenarios[selectedScenario]?.grossCashOut)} />
-              <StatRow label="Total Refi Costs" value={fmtUSD(scenarios[selectedScenario]?.totalRefiCosts)} valueColor={THEME.red} />
+              <StatRow
+                label="Gross Cash Out"
+                value={fmtUSD(scenarios[selectedScenario]?.grossCashOut)}
+                tooltip={{
+                  title: "Gross Cash Out",
+                  description: "Cash generated by refi before refi costs.",
+                  formula: "New Loan − Current Loan Balance"
+                }}
+              />
+              <StatRow
+                label="Total Refi Costs"
+                value={fmtUSD(scenarios[selectedScenario]?.totalRefiCosts)}
+                valueColor={THEME.red}
+                tooltip={{
+                  title: "Total Refinance Costs",
+                  description: "All closing costs on the new loan.",
+                  formula: "Appraisal + Title + Legal + Misc + (New Loan × 1%)"
+                }}
+              />
               <StatRow label="Net Cash Out"
                 value={fmtUSD(scenarios[selectedScenario]?.netCashOut)}
                 valueColor={scenarios[selectedScenario]?.netCashOut > 0 ? THEME.green : THEME.red}
                 bold
+                tooltip={{
+                  title: "Net Cash Out",
+                  description: "Cash in your hand after refi closing costs.",
+                  formula: "Gross Cash Out − Total Refi Costs"
+                }}
               />
               <StatRow label="Capital Recovery %"
                 value={`${scenarios[selectedScenario]?.capitalRecovery.toFixed(1)}%`}
                 valueColor={scenarios[selectedScenario]?.capitalRecovery >= 75 ? THEME.green :
                            scenarios[selectedScenario]?.capitalRecovery >= 50 ? THEME.orange : THEME.red}
                 bold
+                tooltip={{
+                  title: "Capital Recovery",
+                  description: "% of initial cash you pull back at refi. BRRRR targets 100%+.",
+                  formula: "(Net Cash Out ÷ Total Invested) × 100"
+                }}
               />
             </div>
           </div>
@@ -1537,6 +1701,300 @@ const ExitStrategyComparisons = ({ deal, metrics }) => {
         </div>
       </div>
     </Panel>
+  );
+};
+
+/* ============================================================================
+   COST BREAKDOWN — full all-in project cost summary
+   ============================================================================ */
+const CostRow = ({ label, value, amount, tooltip, highlight = false, muted = false, borderTop = false, subtotal = false }) => (
+  <div style={{
+    display: "flex", justifyContent: "space-between", alignItems: "center",
+    padding: subtotal ? "12px 0" : "10px 0",
+    borderTop: borderTop ? `1px solid ${THEME.border}` : "none"
+  }}>
+    <div style={{ display: "inline-flex", alignItems: "center" }}>
+      <span style={{
+        fontSize: subtotal ? 13 : 12.5,
+        fontWeight: subtotal ? 700 : highlight ? 600 : 500,
+        color: muted ? THEME.textMuted : THEME.text
+      }}>
+        {label}
+      </span>
+      {tooltip && <CalcTooltip size={12} {...tooltip} />}
+    </div>
+    <div className="mono" style={{
+      fontSize: subtotal ? 15 : 13,
+      fontWeight: subtotal ? 700 : highlight ? 700 : 500,
+      color: highlight ? THEME.accent : muted ? THEME.textMuted : THEME.text
+    }}>
+      {amount}
+    </div>
+  </div>
+);
+
+const CostBreakdown = ({ deal, metrics, onUpdate }) => {
+  const {
+    cashDown, totalInvested, totalRefiClosingCosts, refiOrigination,
+    refiBaseCosts, totalAllIn, allInToArv, projectedNewLoan
+  } = metrics;
+
+  const purchasePrice = n(deal.purchasePrice);
+  const closingCosts = n(deal.closingCosts);
+  const rehabBudget = n(deal.rehabBudget);
+  const holdingCosts = n(deal.holdingCosts);
+  const arv = n(deal.arv);
+
+  // Post-refi position
+  const equityAtARV = arv - totalAllIn;
+  const cashLeftInDeal = Math.max(0, totalInvested - (projectedNewLoan - (purchasePrice * (100 - deal.downPayment) / 100)));
+
+  const ratioColor =
+    allInToArv <= 70 ? THEME.green :
+    allInToArv <= 80 ? THEME.orange : THEME.red;
+
+  return (
+    <div>
+      <Panel
+        title="Cost Breakdown"
+        icon={<DollarSign size={16} />}
+        accent
+        style={{ marginBottom: 24 }}
+      >
+        <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 18, lineHeight: 1.5 }}>
+          Every dollar that goes into this deal — from the accepted offer through the cash-out refinance. Hover the info icons to see how each number is calculated.
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr", gap: 20 }}>
+          {/* LEFT: Editable cost inputs */}
+          <div>
+            <div className="label-xs" style={{ marginBottom: 10, color: THEME.accent }}>Edit Cost Inputs</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <NumberField
+                label="Purchase Price"
+                value={deal.purchasePrice}
+                onChange={(val) => onUpdate({ purchasePrice: val })}
+                prefix="$"
+              />
+              <NumberField
+                label="Closing Costs"
+                value={deal.closingCosts}
+                onChange={(val) => onUpdate({ closingCosts: val })}
+                prefix="$"
+                helper="Title, escrow, transfer tax"
+              />
+              <NumberField
+                label="Rehab Budget"
+                value={deal.rehabBudget}
+                onChange={(val) => onUpdate({ rehabBudget: val })}
+                prefix="$"
+              />
+              <NumberField
+                label="Holding Costs"
+                value={deal.holdingCosts}
+                onChange={(val) => onUpdate({ holdingCosts: val })}
+                prefix="$"
+                helper="Utilities, taxes, insurance during rehab"
+              />
+              <NumberField
+                label="ARV (After Repair Value)"
+                value={deal.arv}
+                onChange={(val) => onUpdate({ arv: val })}
+                prefix="$"
+              />
+              <NumberField
+                label="Down Payment %"
+                value={deal.downPayment}
+                onChange={(val) => onUpdate({ downPayment: val })}
+                prefix="%"
+              />
+            </div>
+          </div>
+
+          {/* RIGHT: Cost summary ledger */}
+          <div style={{
+            background: THEME.bg,
+            border: `1px solid ${THEME.border}`,
+            borderRadius: 8,
+            padding: 18
+          }}>
+            <div className="label-xs" style={{ marginBottom: 12, color: THEME.accent }}>
+              Project Cost Ledger
+            </div>
+
+            <CostRow
+              label="Purchase Price"
+              amount={fmtUSD(purchasePrice)}
+              tooltip={{
+                title: "Purchase Price",
+                description: "Final negotiated price paid to the seller at close.",
+                formula: "Accepted offer after negotiation"
+              }}
+            />
+            <CostRow
+              label="Closing Costs"
+              amount={fmtUSD(closingCosts)}
+              tooltip={{
+                title: "Acquisition Closing Costs",
+                description: "Title, escrow, recording, lender origination, transfer tax.",
+                formula: "Entered directly — typical 1.5–3% of purchase"
+              }}
+            />
+            <CostRow
+              label="Rehab Budget"
+              amount={fmtUSD(rehabBudget)}
+              tooltip={{
+                title: "Rehab Budget",
+                description: "All construction, materials, labor & contingency to reach ARV condition.",
+                formula: "Sum of rehab line items + contingency"
+              }}
+            />
+            <CostRow
+              label="Holding Costs"
+              amount={fmtUSD(holdingCosts)}
+              tooltip={{
+                title: "Holding Costs",
+                description: "Debt service, insurance, utilities and property taxes during rehab.",
+                formula: "Sum of carrying costs × Rehab Months"
+              }}
+            />
+            <CostRow
+              label="Refi Closing Costs"
+              amount={fmtUSD(totalRefiClosingCosts)}
+              muted
+              borderTop
+              tooltip={{
+                title: "Refinance Closing Costs",
+                description: "Appraisal, title, legal, misc + 1% origination on the new loan.",
+                formula: `Base (${fmtUSD(refiBaseCosts)}) + Origination (${fmtUSD(refiOrigination)})`
+              }}
+            />
+
+            <CostRow
+              label="Total All-In"
+              amount={fmtUSD(totalAllIn)}
+              highlight
+              subtotal
+              borderTop
+              tooltip={{
+                title: "Total All-In Cost",
+                description: "Every dollar out of pocket + financed, through the completed refi.",
+                formula: "Purchase + Closing + Rehab + Holding + Refi Closing"
+              }}
+            />
+
+            <div style={{
+              marginTop: 14, padding: 14,
+              background: THEME.bgRaised, borderRadius: 6,
+              border: `1px solid ${THEME.border}`
+            }}>
+              <CostRow
+                label="ARV"
+                amount={fmtUSD(arv)}
+                tooltip={{
+                  title: "After Repair Value",
+                  description: "Stabilized market value once rehab is complete.",
+                  formula: "Based on appraisal / recent comparable sales"
+                }}
+              />
+              <CostRow
+                label="All-In / ARV"
+                amount={`${allInToArv.toFixed(1)}%`}
+                tooltip={{
+                  title: "All-In to ARV Ratio",
+                  description: "BRRRR readiness: under 70% = strong refi, under 80% = acceptable, 80%+ risky.",
+                  formula: "(Total All-In ÷ ARV) × 100"
+                }}
+              />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: `1px solid ${THEME.border}` }}>
+                <div style={{ fontSize: 12, color: THEME.textMuted, display: "inline-flex", alignItems: "center" }}>
+                  Projected Equity @ ARV
+                  <CalcTooltip
+                    size={12}
+                    title="Equity at ARV"
+                    description="Value created after rehab, before you pull any cash out."
+                    formula="ARV − Total All-In"
+                  />
+                </div>
+                <div className="mono" style={{ fontWeight: 700, color: equityAtARV >= 0 ? THEME.green : THEME.red }}>
+                  {fmtUSD(equityAtARV)}
+                </div>
+              </div>
+            </div>
+
+            <div style={{
+              marginTop: 14, padding: "10px 14px",
+              background: ratioColor === THEME.green ? THEME.greenDim :
+                          ratioColor === THEME.orange ? THEME.bgOrange : THEME.redDim,
+              borderRadius: 6,
+              fontSize: 12, color: ratioColor, fontWeight: 600,
+              textAlign: "center"
+            }}>
+              {allInToArv <= 70
+                ? `Strong — ${allInToArv.toFixed(1)}% of ARV, healthy refi margin`
+                : allInToArv <= 80
+                ? `Acceptable — ${allInToArv.toFixed(1)}% of ARV, some capital will stay in the deal`
+                : `Risky — ${allInToArv.toFixed(1)}% of ARV, limited BRRRR recovery`}
+            </div>
+          </div>
+        </div>
+      </Panel>
+
+      <Panel title="Cash Position Summary" icon={<PiggyBank size={16} />}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr 1fr" : "repeat(4, 1fr)", gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4, display: "inline-flex", alignItems: "center" }}>
+              CASH DOWN
+              <CalcTooltip
+                size={12}
+                title="Cash Down at Acquisition"
+                description="Equity portion you bring at closing."
+                formula="Purchase × (Down % ÷ 100)"
+              />
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: THEME.navy }}>{fmtUSD(cashDown)}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4, display: "inline-flex", alignItems: "center" }}>
+              TOTAL CASH IN
+              <CalcTooltip
+                size={12}
+                title="Total Cash Invested"
+                description="Actual cash required through rehab (pre-refi)."
+                formula="Cash Down + Rehab + Closing + Holding"
+              />
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: THEME.teal }}>{fmtUSD(totalInvested)}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4, display: "inline-flex", alignItems: "center" }}>
+              TOTAL ALL-IN
+              <CalcTooltip
+                size={12}
+                title="Total Project Cost"
+                description="Full cost of the project including refi closing costs."
+                formula="Purchase + Closing + Rehab + Holding + Refi Closing"
+              />
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: THEME.accent }}>{fmtUSD(totalAllIn)}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4, display: "inline-flex", alignItems: "center" }}>
+              ALL-IN / ARV
+              <CalcTooltip
+                size={12}
+                title="All-In to ARV"
+                description="The BRRRR margin — lower is better."
+                formula="(Total All-In ÷ ARV) × 100"
+              />
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: ratioColor }}>
+              {allInToArv.toFixed(1)}%
+            </div>
+          </div>
+        </div>
+      </Panel>
+    </div>
   );
 };
 
@@ -1825,6 +2283,402 @@ const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyCli
 /* ============================================================================
    ADVANCED MARKET INTEL WITH LOCATION PREFERENCES
    ============================================================================ */
+/* ============================================================================
+   LIVE LISTINGS & COMPARABLES — RentCast integration + demo fallback
+   Docs: https://developers.rentcast.io
+   Signup (free tier 50 req/mo): https://app.rentcast.io/app/api
+   ============================================================================ */
+const RENTCAST_STORAGE_KEY = "dealtrack-rentcast-key";
+
+const buildDemoListings = (state, city, marketRef) => {
+  if (!marketRef) return [];
+  const base = marketRef.medianPrice || 275000;
+  const streets = ["Oak Ave", "Maple St", "Sunset Blvd", "Palm Dr", "Magnolia Ln", "Pine Ct", "Harbor Rd", "Laurel Way"];
+  return Array.from({ length: 6 }).map((_, i) => {
+    const variation = 0.78 + (i * 0.08);
+    const price = Math.round(base * variation / 1000) * 1000;
+    const sqft = 1000 + i * 220;
+    return {
+      id: `demo-${state}-${city}-${i}`,
+      formattedAddress: `${1200 + i * 37} ${streets[i % streets.length]}, ${city}, ${state}`,
+      addressLine1: `${1200 + i * 37} ${streets[i % streets.length]}`,
+      city,
+      state,
+      price,
+      bedrooms: 2 + (i % 3),
+      bathrooms: 1.5 + (i % 3) * 0.5,
+      squareFootage: sqft,
+      propertyType: i % 4 === 3 ? "Multi-Family" : "Single Family",
+      yearBuilt: 1960 + ((i * 7) % 55),
+      listedDate: new Date(Date.now() - i * 86400000 * 9).toISOString(),
+      pricePerSqft: Math.round(price / sqft),
+      daysOnMarket: 7 + i * 9,
+      status: "Active",
+      demo: true
+    };
+  });
+};
+
+const buildDemoComps = (state, city, marketRef) => {
+  if (!marketRef) return [];
+  const baseRent = marketRef.medianRent || 1800;
+  const streets = ["Cypress Rd", "Mariner Way", "Lakeshore Dr", "Coral Ave", "Orchid Ln", "Heron Ct"];
+  return Array.from({ length: 6 }).map((_, i) => {
+    const variation = 0.85 + (i * 0.06);
+    const rent = Math.round(baseRent * variation / 25) * 25;
+    const sqft = 950 + i * 180;
+    return {
+      id: `demo-rent-${state}-${city}-${i}`,
+      formattedAddress: `${800 + i * 44} ${streets[i % streets.length]}, ${city}, ${state}`,
+      addressLine1: `${800 + i * 44} ${streets[i % streets.length]}`,
+      city,
+      state,
+      price: rent,
+      bedrooms: 2 + (i % 3),
+      bathrooms: 1 + (i % 2) * 0.5 + 1,
+      squareFootage: sqft,
+      propertyType: i % 3 === 2 ? "Condo" : "Single Family",
+      listedDate: new Date(Date.now() - i * 86400000 * 6).toISOString(),
+      pricePerSqft: +(rent / sqft).toFixed(2),
+      daysOnMarket: 5 + i * 7,
+      status: "Active",
+      demo: true
+    };
+  });
+};
+
+const formatRentCastListing = (raw) => ({
+  id: raw.id || `${raw.addressLine1}-${raw.zipCode}`,
+  formattedAddress: raw.formattedAddress || `${raw.addressLine1 || ""}, ${raw.city || ""}, ${raw.state || ""}`,
+  addressLine1: raw.addressLine1,
+  city: raw.city,
+  state: raw.state,
+  price: raw.price,
+  bedrooms: raw.bedrooms,
+  bathrooms: raw.bathrooms,
+  squareFootage: raw.squareFootage,
+  propertyType: raw.propertyType,
+  yearBuilt: raw.yearBuilt,
+  listedDate: raw.listedDate,
+  pricePerSqft: raw.price && raw.squareFootage ? Math.round(raw.price / raw.squareFootage) : null,
+  daysOnMarket: raw.daysOnMarket,
+  status: raw.status || "Active",
+  latitude: raw.latitude,
+  longitude: raw.longitude
+});
+
+const ListingCard = ({ listing, type = "sale", onUseInDeal }) => {
+  const isRental = type === "rental";
+  return (
+    <div style={{
+      padding: 14,
+      border: `1px solid ${THEME.border}`,
+      borderRadius: 8,
+      background: THEME.bg,
+      position: "relative"
+    }}>
+      {listing.demo && (
+        <div style={{
+          position: "absolute", top: 8, right: 8,
+          padding: "2px 7px", fontSize: 9, fontWeight: 700,
+          background: THEME.bgOrange, color: THEME.orange,
+          borderRadius: 4, letterSpacing: "0.06em", textTransform: "uppercase"
+        }}>
+          Demo
+        </div>
+      )}
+      <div style={{ fontSize: 13, fontWeight: 700, color: THEME.text, marginBottom: 4, paddingRight: 48 }}>
+        {listing.formattedAddress}
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+        <div className="mono" style={{ fontSize: 18, fontWeight: 700, color: isRental ? THEME.teal : THEME.accent }}>
+          {fmtUSD(listing.price)}{isRental ? <span style={{ fontSize: 11, fontWeight: 500, color: THEME.textMuted }}> /mo</span> : null}
+        </div>
+        {listing.pricePerSqft && (
+          <div style={{ fontSize: 11, color: THEME.textMuted }}>
+            {isRental ? `$${listing.pricePerSqft}/sqft` : `${fmtUSD(listing.pricePerSqft)}/sqft`}
+          </div>
+        )}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, fontSize: 11, marginBottom: 10 }}>
+        <div>
+          <div style={{ color: THEME.textDim }}>BEDS</div>
+          <div style={{ fontWeight: 600 }}>{listing.bedrooms || "—"}</div>
+        </div>
+        <div>
+          <div style={{ color: THEME.textDim }}>BATHS</div>
+          <div style={{ fontWeight: 600 }}>{listing.bathrooms || "—"}</div>
+        </div>
+        <div>
+          <div style={{ color: THEME.textDim }}>SQFT</div>
+          <div style={{ fontWeight: 600 }}>{listing.squareFootage ? listing.squareFootage.toLocaleString() : "—"}</div>
+        </div>
+        <div>
+          <div style={{ color: THEME.textDim }}>DOM</div>
+          <div style={{ fontWeight: 600 }}>{listing.daysOnMarket ?? "—"}</div>
+        </div>
+      </div>
+      <div style={{
+        fontSize: 10, color: THEME.textMuted,
+        paddingTop: 8, borderTop: `1px solid ${THEME.borderLight}`,
+        display: "flex", justifyContent: "space-between"
+      }}>
+        <span>{listing.propertyType || "—"}</span>
+        {listing.yearBuilt && <span>Built {listing.yearBuilt}</span>}
+      </div>
+      {onUseInDeal && !isRental && (
+        <button
+          onClick={() => onUseInDeal(listing)}
+          className="btn-secondary"
+          style={{ width: "100%", marginTop: 10, padding: "6px 10px", fontSize: 11 }}
+        >
+          <Plus size={12} /> Use in Deal Analyzer
+        </button>
+      )}
+    </div>
+  );
+};
+
+const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarkets }) => {
+  const [apiKey, setApiKey] = useState(() => {
+    try {
+      return (typeof window !== "undefined" && window.localStorage.getItem(RENTCAST_STORAGE_KEY)) || "";
+    } catch { return ""; }
+  });
+  const [keyDraft, setKeyDraft] = useState("");
+  const [showKeyInput, setShowKeyInput] = useState(false);
+  const [listings, setListings] = useState([]);
+  const [rentComps, setRentComps] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [liveMode, setLiveMode] = useState(false);
+
+  // Primary reference market for demo defaults
+  const referenceMarket = useMemo(() => {
+    if (!selectedState) return null;
+    if (selectedCity) {
+      const match = (stateMarkets || []).find(m => m.city.toLowerCase() === selectedCity.toLowerCase());
+      if (match) return match;
+    }
+    return (stateMarkets && stateMarkets[0]) || null;
+  }, [selectedState, selectedCity, stateMarkets]);
+
+  const targetCity = selectedCity || (referenceMarket && referenceMarket.city);
+
+  const loadData = useCallback(async () => {
+    if (!selectedState || !targetCity) return;
+
+    if (!apiKey) {
+      setListings(buildDemoListings(selectedState, targetCity, referenceMarket));
+      setRentComps(buildDemoComps(selectedState, targetCity, referenceMarket));
+      setLiveMode(false);
+      setError("");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    try {
+      const params = new URLSearchParams({
+        city: targetCity,
+        state: selectedState,
+        limit: "10"
+      });
+      const [saleRes, rentRes] = await Promise.all([
+        fetch(`https://api.rentcast.io/v1/listings/sale?${params.toString()}`, {
+          headers: { "X-Api-Key": apiKey, "accept": "application/json" }
+        }),
+        fetch(`https://api.rentcast.io/v1/listings/rental/long-term?${params.toString()}`, {
+          headers: { "X-Api-Key": apiKey, "accept": "application/json" }
+        })
+      ]);
+
+      if (!saleRes.ok) throw new Error(`Listings request failed (${saleRes.status}). Check your API key.`);
+      const saleJson = await saleRes.json();
+      const rentJson = rentRes.ok ? await rentRes.json() : [];
+
+      const saleList = Array.isArray(saleJson) ? saleJson : (saleJson.listings || []);
+      const rentList = Array.isArray(rentJson) ? rentJson : (rentJson.listings || []);
+
+      if (saleList.length === 0 && rentList.length === 0) {
+        setListings(buildDemoListings(selectedState, targetCity, referenceMarket));
+        setRentComps(buildDemoComps(selectedState, targetCity, referenceMarket));
+        setLiveMode(false);
+        setError("No live results for this area — showing demo data.");
+      } else {
+        setListings(saleList.map(formatRentCastListing));
+        setRentComps(rentList.map(formatRentCastListing));
+        setLiveMode(true);
+      }
+    } catch (err) {
+      console.warn("RentCast fetch failed:", err);
+      setListings(buildDemoListings(selectedState, targetCity, referenceMarket));
+      setRentComps(buildDemoComps(selectedState, targetCity, referenceMarket));
+      setLiveMode(false);
+      setError(err.message || "Live data unavailable — showing demo data.");
+    } finally {
+      setLoading(false);
+    }
+  }, [apiKey, selectedState, targetCity, referenceMarket]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const saveKey = (val) => {
+    const trimmed = (val || "").trim();
+    setApiKey(trimmed);
+    try {
+      if (trimmed) window.localStorage.setItem(RENTCAST_STORAGE_KEY, trimmed);
+      else window.localStorage.removeItem(RENTCAST_STORAGE_KEY);
+    } catch {}
+    setShowKeyInput(false);
+    setKeyDraft("");
+  };
+
+  if (!selectedState) return null;
+
+  return (
+    <Panel
+      title="Live Listings & Comparables"
+      icon={<Home size={16} />}
+      accent
+      style={{ marginBottom: 24 }}
+      action={
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <span style={{
+            padding: "3px 9px",
+            fontSize: 10, fontWeight: 700,
+            letterSpacing: "0.08em", textTransform: "uppercase",
+            borderRadius: 4,
+            background: liveMode ? THEME.greenDim : THEME.bgOrange,
+            color: liveMode ? THEME.green : THEME.orange
+          }}>
+            {liveMode ? "Live" : "Demo"}
+          </span>
+          <button
+            onClick={() => setShowKeyInput(s => !s)}
+            className="btn-ghost"
+            style={{ padding: "4px 10px", fontSize: 11 }}
+          >
+            <Settings size={12} /> {apiKey ? "API Key" : "Connect"}
+          </button>
+          <button
+            onClick={loadData}
+            className="btn-ghost"
+            style={{ padding: "4px 10px", fontSize: 11 }}
+            disabled={loading}
+          >
+            <RefreshCw size={12} /> Refresh
+          </button>
+        </div>
+      }
+    >
+      <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 14, lineHeight: 1.5 }}>
+        Properties currently for sale and recent rental comparables in <strong>{targetCity}, {selectedState}</strong>
+        {stateName && ` (${stateName})`}. Click the "Use in Deal Analyzer" button to pre-populate a new deal.
+      </div>
+
+      {showKeyInput && (
+        <div style={{
+          padding: 14, marginBottom: 16,
+          background: THEME.bgRaised, borderRadius: 6, border: `1px solid ${THEME.border}`
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8, color: THEME.text }}>
+            RentCast API Key
+          </div>
+          <div style={{ fontSize: 11, color: THEME.textMuted, marginBottom: 10, lineHeight: 1.5 }}>
+            Paste your RentCast API key to pull live MLS data. Free tier = 50 requests/month.{" "}
+            <a href="https://app.rentcast.io/app/api" target="_blank" rel="noopener noreferrer" style={{ color: THEME.accent }}>
+              Get a key →
+            </a>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              type="password"
+              value={keyDraft}
+              onChange={(e) => setKeyDraft(e.target.value)}
+              placeholder={apiKey ? "••••••••••••••" : "Paste API key"}
+              style={{ flex: 1, padding: "8px 10px", fontSize: 12 }}
+            />
+            <button onClick={() => saveKey(keyDraft)} className="btn-primary" style={{ padding: "6px 12px", fontSize: 12 }}>
+              Save
+            </button>
+            {apiKey && (
+              <button onClick={() => saveKey("")} className="btn-danger" style={{ padding: "6px 12px", fontSize: 12 }}>
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div style={{
+          padding: "8px 12px", marginBottom: 14, fontSize: 12,
+          background: THEME.bgOrange, color: THEME.orange,
+          borderRadius: 6, border: `1px solid ${THEME.orange}`
+        }}>
+          <AlertTriangle size={12} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
+          {error}
+        </div>
+      )}
+
+      {loading && (
+        <div style={{ textAlign: "center", padding: 30, color: THEME.textMuted, fontSize: 13 }}>
+          <RefreshCw size={16} className="mono" style={{ animation: "spin 1s linear infinite" }} /> Loading live data…
+        </div>
+      )}
+
+      {!loading && (
+        <>
+          <div style={{
+            fontSize: 12, fontWeight: 700, color: THEME.accent,
+            textTransform: "uppercase", letterSpacing: "0.1em",
+            marginBottom: 10, display: "flex", alignItems: "center", gap: 8
+          }}>
+            <Building2 size={13} />
+            Properties For Sale ({listings.length})
+          </div>
+          {listings.length === 0 ? (
+            <div style={{ padding: 20, textAlign: "center", color: THEME.textMuted, fontSize: 12 }}>
+              No active listings found for this area.
+            </div>
+          ) : (
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: isMobile() ? "1fr" : "repeat(auto-fill, minmax(260px, 1fr))",
+              gap: 10, marginBottom: 24
+            }}>
+              {listings.map(l => <ListingCard key={l.id} listing={l} type="sale" />)}
+            </div>
+          )}
+
+          <div style={{
+            fontSize: 12, fontWeight: 700, color: THEME.teal,
+            textTransform: "uppercase", letterSpacing: "0.1em",
+            marginBottom: 10, display: "flex", alignItems: "center", gap: 8
+          }}>
+            <Home size={13} />
+            Rental Comparables ({rentComps.length})
+          </div>
+          {rentComps.length === 0 ? (
+            <div style={{ padding: 20, textAlign: "center", color: THEME.textMuted, fontSize: 12 }}>
+              No rental comparables found for this area.
+            </div>
+          ) : (
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: isMobile() ? "1fr" : "repeat(auto-fill, minmax(260px, 1fr))",
+              gap: 10
+            }}>
+              {rentComps.map(l => <ListingCard key={l.id} listing={l} type="rental" />)}
+            </div>
+          )}
+        </>
+      )}
+    </Panel>
+  );
+};
+
 const AdvancedMarketIntel = () => {
   const [selectedMetric, setSelectedMetric] = useState("capRate");
   const [investmentGoal, setInvestmentGoal] = useState("cashFlow");
@@ -2949,9 +3803,155 @@ const AdvancedMarketIntel = () => {
     </div>
   );
 
+  // City drill-down when a specific search match is active (used by Live Listings)
+  const liveListingsCity = useMemo(() => {
+    if (searchResults.length === 1) return searchResults[0].city;
+    if (selectedState && stateMarkets.length > 0) return stateMarkets[0].city;
+    return null;
+  }, [searchResults, selectedState, stateMarkets]);
+
+  const liveListingsStateMarkets = useMemo(() => {
+    if (selectedState) return stateMarkets;
+    if (searchResults.length === 1) return allMarkets.filter(m => m.state === searchResults[0].state);
+    return [];
+  }, [selectedState, stateMarkets, searchResults, allMarkets]);
+
+  const liveListingsState = selectedState || (searchResults.length === 1 ? searchResults[0].state : "");
+
   return (
     <div>
-      <Panel title="Investment Goal & Recommendations" icon={<Target size={16} />} accent style={{ marginBottom: 24 }}>
+      {/* 1. STATE FILTER — first thing the user sees */}
+      <Panel title="Filter by State" icon={<Filter size={16} />} accent style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 14, lineHeight: 1.5 }}>
+          Start by picking a state to narrow the map, then browse the live listings and comparables for that area.
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "2fr 3fr", gap: 16 }}>
+          <div>
+            <div className="label-xs" style={{ marginBottom: 8 }}>Browse by State</div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <select
+                value={selectedState}
+                onChange={(e) => handleStateChange(e.target.value)}
+                style={{ flex: 1, padding: "10px 12px", fontSize: 14 }}
+              >
+                <option value="">Select a state...</option>
+                {availableStates.map(state => {
+                  const info = getStateInfo(state);
+                  return (
+                    <option key={state} value={state}>
+                      {info.name} ({info.cityCount} {info.cityCount === 1 ? "city" : "cities"})
+                    </option>
+                  );
+                })}
+              </select>
+              {selectedState && (
+                <button
+                  onClick={clearStateSelection}
+                  className="btn-ghost"
+                  style={{ padding: "8px 12px", fontSize: 12 }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <div className="label-xs" style={{ marginBottom: 8 }}>Or search by city / county</div>
+            <div style={{ position: "relative" }}>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder="Search by city, state, or county (e.g. Columbus, OH, Tampa)"
+                style={{
+                  width: "100%", padding: "10px 36px 10px 12px", fontSize: 14,
+                  border: `1px solid ${THEME.border}`, borderRadius: 6
+                }}
+              />
+              {searchQuery && (
+                <button
+                  onClick={clearSearch}
+                  style={{
+                    position: "absolute", right: 8, top: "50%",
+                    transform: "translateY(-50%)", background: "transparent",
+                    color: THEME.textMuted, padding: 4
+                  }}
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 11, color: THEME.textDim, marginBottom: 6 }}>Quick picks</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {["FL", "OH", "TX", "Columbus OH", "Tampa FL", "Detroit MI", "Memphis TN"].map(suggestion => (
+              <button
+                key={suggestion}
+                onClick={() => handleSearchChange(suggestion)}
+                style={{
+                  padding: "4px 10px", fontSize: 11,
+                  background: THEME.bg, border: `1px solid ${THEME.border}`,
+                  borderRadius: 12, color: THEME.textMuted, cursor: "pointer"
+                }}
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
+        </div>
+      </Panel>
+
+      {/* 2. MAP — below the filter */}
+      <Panel title="Market Map — US Counties" icon={<MapPin size={16} />} accent style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 14 }}>
+          Every tracked market, color-coded by overall deal score on a red-yellow-green heatmap. Red indicates weaker markets, yellow is average, and green represents the strongest investment conditions. Click a county to drill in.
+        </div>
+        <USCountyMap
+          allMarkets={allMarkets}
+          selectedState={mapFocusState}
+          highlightedMarket={mapHighlight}
+          onCountyClick={handleMapCountyClick}
+        />
+      </Panel>
+
+      {/* 3. LIVE LISTINGS & COMPARABLES — when a state / area is active */}
+      {liveListingsState && (
+        <LiveListingsPanel
+          selectedState={liveListingsState}
+          selectedCity={liveListingsCity}
+          stateName={stateInfo ? stateInfo.name : null}
+          stateMarkets={liveListingsStateMarkets}
+        />
+      )}
+
+      {/* 4. SEARCH / STATE RESULT CARDS */}
+      {showSearchResults && searchResults.length > 0 && (
+        <Panel title={`Search Results (${searchResults.length})`} icon={<Search size={16} />} style={{ marginBottom: 24 }}>
+          {searchResults.map(market => renderMarketCard(market))}
+        </Panel>
+      )}
+
+      {showSearchResults && searchResults.length === 0 && searchQuery.trim() && (
+        <Panel title="Search Results" icon={<Search size={16} />} style={{ marginBottom: 24 }}>
+          <div style={{ padding: 20, textAlign: "center", color: THEME.textMuted, fontSize: 13 }}>
+            No markets found matching "{searchQuery}". Try a city or state name.
+          </div>
+        </Panel>
+      )}
+
+      {showStateResults && stateInfo && (
+        <Panel title={`${stateInfo.name} Markets (${stateInfo.cityCount})`} icon={<MapPin size={16} />} style={{ marginBottom: 24 }}>
+          {stateMarkets.map(market => renderMarketCard(market))}
+        </Panel>
+      )}
+
+      {/* 5. GOAL & RECOMMENDATIONS */}
+      <Panel title="Investment Goal & Recommendations" icon={<Target size={16} />} style={{ marginBottom: 24 }}>
         <div style={{ marginBottom: 20 }}>
           <div className="label-xs" style={{ marginBottom: 10 }}>What's your primary investment goal?</div>
           <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr 1fr" : "repeat(4, 1fr)", gap: 10 }}>
@@ -2988,124 +3988,7 @@ const AdvancedMarketIntel = () => {
         </div>
       </Panel>
 
-      <Panel title="Market Map — US Counties" icon={<MapPin size={16} />} accent style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 14 }}>
-          Every tracked market, color-coded by overall deal score on a red-yellow-green heatmap. Red indicates weaker markets, yellow is average, and green represents the strongest investment conditions. Click a county to drill in.
-        </div>
-        <USCountyMap
-          allMarkets={allMarkets}
-          selectedState={mapFocusState}
-          highlightedMarket={mapHighlight}
-          onCountyClick={handleMapCountyClick}
-        />
-      </Panel>
-
-      <Panel title="Market Search" icon={<Search size={16} />} style={{ marginBottom: 24 }}>
-        <div style={{ position: "relative", marginBottom: 16 }}>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder="Search by city, state, or county (e.g. Columbus, OH, Tampa)"
-            style={{
-              width: "100%", padding: "10px 36px 10px 12px", fontSize: 14,
-              border: `1px solid ${THEME.border}`, borderRadius: 6
-            }}
-          />
-          {searchQuery && (
-            <button
-              onClick={clearSearch}
-              style={{
-                position: "absolute", right: 8, top: "50%",
-                transform: "translateY(-50%)", background: "transparent",
-                color: THEME.textMuted, padding: 4
-              }}
-            >
-              <X size={16} />
-            </button>
-          )}
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          <div className="label-xs" style={{ marginBottom: 8 }}>Try searching:</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {["FL", "OH", "TX", "Columbus OH", "Tampa FL", "Detroit MI", "Memphis TN"].map(suggestion => (
-              <button
-                key={suggestion}
-                onClick={() => handleSearchChange(suggestion)}
-                style={{
-                  padding: "4px 10px", fontSize: 11,
-                  background: THEME.bgPanel, border: `1px solid ${THEME.border}`,
-                  borderRadius: 12, color: THEME.textMuted, cursor: "pointer"
-                }}
-              >
-                {suggestion}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", margin: "16px 0" }}>
-          <div style={{ flex: 1, height: 1, background: THEME.border }} />
-          <span style={{ padding: "0 12px", fontSize: 11, color: THEME.textMuted }}>OR</span>
-          <div style={{ flex: 1, height: 1, background: THEME.border }} />
-        </div>
-
-        <div>
-          <div className="label-xs" style={{ marginBottom: 8 }}>Browse by State</div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <select
-              value={selectedState}
-              onChange={(e) => handleStateChange(e.target.value)}
-              style={{ flex: 1, padding: "10px 12px", fontSize: 14 }}
-            >
-              <option value="">Select a state...</option>
-              {availableStates.map(state => {
-                const info = getStateInfo(state);
-                return (
-                  <option key={state} value={state}>
-                    {info.name} ({info.cityCount} {info.cityCount === 1 ? "city" : "cities"})
-                  </option>
-                );
-              })}
-            </select>
-            {selectedState && (
-              <button
-                onClick={clearStateSelection}
-                className="btn-ghost"
-                style={{ padding: "8px 12px", fontSize: 12 }}
-              >
-                Clear
-              </button>
-            )}
-          </div>
-        </div>
-
-        {showSearchResults && searchResults.length > 0 && (
-          <div style={{ marginTop: 20 }}>
-            <div className="label-xs-accent" style={{ marginBottom: 12 }}>
-              Search Results ({searchResults.length})
-            </div>
-            {searchResults.map(market => renderMarketCard(market))}
-          </div>
-        )}
-
-        {showSearchResults && searchResults.length === 0 && searchQuery.trim() && (
-          <div style={{ marginTop: 20, padding: 20, textAlign: "center", color: THEME.textMuted, fontSize: 13 }}>
-            No markets found matching "{searchQuery}". Try a city or state name.
-          </div>
-        )}
-
-        {showStateResults && stateInfo && (
-          <div style={{ marginTop: 20 }}>
-            <div className="label-xs-accent" style={{ marginBottom: 12 }}>
-              {stateInfo.name} Markets ({stateInfo.cityCount})
-            </div>
-            {stateMarkets.map(market => renderMarketCard(market))}
-          </div>
-        )}
-      </Panel>
-
+      {/* 6. TOP 5 MARKETS */}
       <Panel title="Top 5 Markets" icon={<Trophy size={16} />}>
         <div style={{ marginBottom: 16 }}>
           <div className="label-xs" style={{ marginBottom: 8 }}>Rank by:</div>
@@ -3157,7 +4040,7 @@ const Header = ({ view, onChangeView, onNewDeal }) => (
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <div style={{
           width: 36, height: 36, borderRadius: 8,
-          background: `linear-gradient(135deg, ${THEME.accent}, ${THEME.accentDim})`,
+          background: `linear-gradient(135deg, ${THEME.navy}, ${THEME.teal})`,
           display: "flex", alignItems: "center", justifyContent: "center"
         }}>
           <Building2 size={20} color="white" />
@@ -3214,6 +4097,7 @@ const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete }) => {
   const sections = [
     { key: "acquisition", label: "Acquisition", icon: <Search size={14} /> },
     { key: "rehab", label: "Rehab", icon: <Hammer size={14} /> },
+    { key: "costs", label: "Costs", icon: <DollarSign size={14} /> },
     { key: "rent", label: "Rent", icon: <Home size={14} /> },
     { key: "refinance", label: "Refinance", icon: <PiggyBank size={14} /> },
     { key: "exit", label: "Exit", icon: <Target size={14} /> }
@@ -3264,31 +4148,71 @@ const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete }) => {
       <Panel style={{ marginBottom: 24 }} title="Key Metrics" icon={<BarChart3 size={16} />} accent>
         <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr 1fr" : "repeat(5, 1fr)", gap: 16 }}>
           <div>
-            <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4 }}>MONTHLY CASH FLOW</div>
+            <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4, display: "inline-flex", alignItems: "center" }}>
+              MONTHLY CASH FLOW
+              <CalcTooltip
+                size={12}
+                title="Monthly Cash Flow"
+                description="Effective rent after vacancy and management, minus all operating costs and the mortgage payment."
+                formula="(Rent − Vacancy − Mgmt) − (P&I + Tax/Ins + CapEx + Maint + HOA)"
+              />
+            </div>
             <div style={{ fontSize: 22, fontWeight: 700, color: metrics.monthlyCashFlow > 0 ? THEME.green : THEME.red }}>
               {fmtUSD(metrics.monthlyCashFlow)}
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4 }}>CAP RATE</div>
+            <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4, display: "inline-flex", alignItems: "center" }}>
+              CAP RATE
+              <CalcTooltip
+                size={12}
+                title="Capitalization Rate"
+                description="Annual cash flow divided by purchase price. Measures unlevered yield of the property."
+                formula="(Annual Cash Flow ÷ Purchase Price) × 100"
+              />
+            </div>
             <div style={{ fontSize: 22, fontWeight: 700, color: THEME.accent }}>
               {metrics.capRate.toFixed(1)}%
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4 }}>CASH ON CASH</div>
+            <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4, display: "inline-flex", alignItems: "center" }}>
+              CASH ON CASH
+              <CalcTooltip
+                size={12}
+                title="Cash-on-Cash Return"
+                description="Yearly return on the actual cash you put in. Favored by cash-flow investors."
+                formula="(Annual Cash Flow ÷ Total Invested) × 100"
+              />
+            </div>
             <div style={{ fontSize: 22, fontWeight: 700, color: THEME.secondary }}>
               {metrics.cashOnCash.toFixed(1)}%
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4 }}>TOTAL INVESTED</div>
+            <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4, display: "inline-flex", alignItems: "center" }}>
+              TOTAL INVESTED
+              <CalcTooltip
+                size={12}
+                title="Total Cash Invested"
+                description="All cash required to acquire and stabilize the property before refinancing."
+                formula="Down Payment + Rehab + Closing Costs + Holding Costs"
+              />
+            </div>
             <div style={{ fontSize: 22, fontWeight: 700 }}>
               {fmtUSD(metrics.totalInvested, { short: true })}
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4 }}>DEAL SCORE</div>
+            <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4, display: "inline-flex", alignItems: "center" }}>
+              DEAL SCORE
+              <CalcTooltip
+                size={12}
+                title="Deal Score (0-100)"
+                description="Composite score combining the 70% rule, 1% rule, cash flow, cap rate and cash-on-cash thresholds. 80+ = A grade."
+                formula="70%·25 + 1%·15 + CF>0·20 + CoC>8%·15 + Cap>6%·10 + CF>$200·10 + CoC>12%·5"
+              />
+            </div>
             <div style={{ fontSize: 22, fontWeight: 700, color: THEME.accent }}>
               {metrics.score}/100 <span style={{ fontSize: 14 }}>({metrics.grade})</span>
             </div>
@@ -3318,6 +4242,7 @@ const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete }) => {
 
       {section === "acquisition" && <AcquisitionSection deal={deal} onUpdate={onUpdate} metrics={metrics} />}
       {section === "rehab" && <RehabSection deal={deal} onUpdate={onUpdate} />}
+      {section === "costs" && <CostBreakdown deal={deal} metrics={metrics} onUpdate={onUpdate} />}
       {section === "rent" && (
         <Panel title="Rental Income Analysis" icon={<Home size={16} />} accent>
           <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "repeat(2, 1fr)", gap: 16 }}>
@@ -3375,20 +4300,67 @@ const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete }) => {
           <div style={{ marginTop: 24, padding: 16, background: THEME.bgRaised, borderRadius: 6 }}>
             <h4 style={{ fontSize: 14, marginBottom: 12 }}>Rent Analysis</h4>
             <StatRow label="Gross Monthly Rent" value={fmtUSD(deal.rentEstimate)} />
-            <StatRow label="Vacancy Loss" value={`-${fmtUSD(metrics.vacancyLoss)}`} valueColor={THEME.red} />
-            <StatRow label="Management Cost" value={`-${fmtUSD(metrics.mgmtCost)}`} valueColor={THEME.red} />
-            <StatRow label="Effective Income" value={fmtUSD(metrics.effectiveIncome)} bold valueColor={THEME.green} />
-            <StatRow label="Operating Expenses" value={`-${fmtUSD(metrics.monthlyCosts)}`} valueColor={THEME.red} borderTop />
+            <StatRow
+              label="Vacancy Loss"
+              value={`-${fmtUSD(metrics.vacancyLoss)}`}
+              valueColor={THEME.red}
+              tooltip={{
+                title: "Vacancy Allowance",
+                description: "Reserve for months the unit is empty between tenants.",
+                formula: "Gross Rent × (Vacancy % ÷ 100)"
+              }}
+            />
+            <StatRow
+              label="Management Cost"
+              value={`-${fmtUSD(metrics.mgmtCost)}`}
+              valueColor={THEME.red}
+              tooltip={{
+                title: "Property Management",
+                description: "Monthly fee paid to a PM company (typical 8–10% of gross rent).",
+                formula: "Gross Rent × (Mgmt Fee % ÷ 100)"
+              }}
+            />
+            <StatRow
+              label="Effective Income"
+              value={fmtUSD(metrics.effectiveIncome)}
+              bold valueColor={THEME.green}
+              tooltip={{
+                title: "Effective Gross Income",
+                description: "Rent that actually lands in your account.",
+                formula: "Gross Rent − Vacancy − Management"
+              }}
+            />
+            <StatRow
+              label="Operating Expenses"
+              value={`-${fmtUSD(metrics.monthlyCosts)}`}
+              valueColor={THEME.red}
+              borderTop
+              tooltip={{
+                title: "Monthly Operating Costs",
+                description: "All costs to own and service the loan.",
+                formula: "P&I + (Tax + Ins)/12 + CapEx + Maint + HOA"
+              }}
+            />
             <StatRow label="Net Monthly Cash Flow"
               value={fmtUSD(metrics.monthlyCashFlow)}
               bold
               valueColor={metrics.monthlyCashFlow > 0 ? THEME.green : THEME.red}
+              tooltip={{
+                title: "Net Monthly Cash Flow",
+                description: "What remains after all operating costs.",
+                formula: "Effective Income − Operating Expenses"
+              }}
             />
             <StatRow label="1% Rule Status"
               value={metrics.onePercentRule ? "PASS" : "FAIL"}
               valueColor={metrics.onePercentRule ? THEME.green : THEME.red}
               bold
               borderTop
+              tooltip={{
+                title: "1% Rule",
+                description: "Fast-screen heuristic for rental viability.",
+                formula: "Monthly Rent ≥ Purchase × 1%"
+              }}
             />
           </div>
         </Panel>
@@ -5650,9 +6622,11 @@ const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal }) => {
                 <div style={{
                   padding: "4px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700,
                   background: metrics.grade === "A" ? THEME.greenDim :
-                             metrics.grade.startsWith("B") ? "#FFEDD5" : THEME.redDim,
+                             metrics.grade.startsWith("B") ? THEME.bgOrange :
+                             metrics.grade === "C" ? THEME.bgTeal : THEME.redDim,
                   color: metrics.grade === "A" ? THEME.green :
-                         metrics.grade.startsWith("B") ? THEME.secondary : THEME.red
+                         metrics.grade.startsWith("B") ? THEME.orange :
+                         metrics.grade === "C" ? THEME.teal : THEME.red
                 }}>
                   {metrics.grade}
                 </div>
