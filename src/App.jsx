@@ -75,17 +75,29 @@ button {
   background: ${THEME.accent}; color: ${THEME.bg}; font-weight: 600;
   padding: 8px 14px; font-size: 13px; display: inline-flex;
   align-items: center; gap: 6px; transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(13, 148, 136, 0.15);
 }
-.btn-primary:hover { background: ${THEME.accentDim}; }
+.btn-primary:hover {
+  background: linear-gradient(135deg, ${THEME.accent} 0%, ${THEME.secondary} 100%);
+  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.25);
+}
 .btn-secondary {
   border: 1px solid ${THEME.accent};
   color: ${THEME.accent}; padding: 8px 14px; font-size: 13px;
   display: inline-flex; align-items: center; gap: 6px;
 }
 .btn-secondary:hover {
-  background: linear-gradient(135deg, ${THEME.accent} 0%, #14B8A6 100%);
+  background: ${THEME.secondary};
+  border-color: ${THEME.secondary};
   color: ${THEME.bg};
 }
+.btn-accent-orange {
+  background: ${THEME.secondary}; color: ${THEME.bg}; font-weight: 600;
+  padding: 8px 14px; font-size: 13px; display: inline-flex;
+  align-items: center; gap: 6px; transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(234, 88, 12, 0.2);
+}
+.btn-accent-orange:hover { background: ${THEME.secondaryDim}; }
 .btn-ghost { color: ${THEME.textMuted}; }
 .btn-ghost:hover { color: ${THEME.accent}; background: ${THEME.bgRaised}; }
 .btn-danger { color: ${THEME.red}; }
@@ -457,8 +469,18 @@ const Panel = ({ title, icon, children, accent, action, style = {} }) => (
     background: THEME.bgPanel,
     border: `1px solid ${THEME.border}`,
     borderRadius: 8,
+    overflow: "hidden",
+    position: "relative",
     ...style
   }}>
+    {accent && (
+      <div style={{
+        position: "absolute",
+        top: 0, left: 0, right: 0,
+        height: 3,
+        background: `linear-gradient(90deg, ${THEME.accent} 0%, ${THEME.secondary} 100%)`
+      }} />
+    )}
     {title && (
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -2528,9 +2550,11 @@ const AdvancedMarketIntel = () => {
             {showRank && (
               <div style={{
                 width: 24, height: 24, borderRadius: "50%",
-                background: THEME.accent, color: "white",
+                background: `linear-gradient(135deg, ${THEME.accent} 0%, ${THEME.secondary} 100%)`,
+                color: "white",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 12, fontWeight: 700
+                fontSize: 12, fontWeight: 700,
+                boxShadow: "0 1px 3px rgba(234, 88, 12, 0.3)"
               }}>
                 {rank}
               </div>
@@ -2813,8 +2837,9 @@ const Header = ({ view, onChangeView, onNewDeal }) => (
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <div style={{
           width: 36, height: 36, borderRadius: 8,
-          background: `linear-gradient(135deg, ${THEME.accent}, ${THEME.accentDim})`,
-          display: "flex", alignItems: "center", justifyContent: "center"
+          background: `linear-gradient(135deg, ${THEME.accent} 0%, ${THEME.secondary} 100%)`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          boxShadow: `0 2px 8px rgba(234, 88, 12, 0.25)`
         }}>
           <Building2 size={20} color="white" />
         </div>
@@ -2843,6 +2868,7 @@ const Header = ({ view, onChangeView, onNewDeal }) => (
               background: view === tab.key ? THEME.bgRaised : "transparent",
               color: view === tab.key ? THEME.accent : THEME.textMuted,
               borderRadius: 6,
+              borderBottom: view === tab.key ? `2px solid ${THEME.secondary}` : "2px solid transparent",
               display: "flex", alignItems: "center", gap: 6, cursor: "pointer"
             }}
           >
@@ -2945,7 +2971,7 @@ const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete }) => {
           </div>
           <div>
             <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4 }}>BRRRR SCORE</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: THEME.accent }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: THEME.secondary }}>
               {metrics.score}/100 <span style={{ fontSize: 14 }}>({metrics.grade})</span>
             </div>
           </div>
@@ -3230,10 +3256,12 @@ const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal }) => {
       }}>
         <div style={{
           width: 72, height: 72, margin: "0 auto 20px",
-          borderRadius: "50%", background: THEME.bgRaised,
-          display: "flex", alignItems: "center", justifyContent: "center"
+          borderRadius: "50%",
+          background: `linear-gradient(135deg, ${THEME.bgRaised} 0%, #FFF7ED 100%)`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          border: `1px solid ${THEME.secondary}33`
         }}>
-          <Building2 size={32} color={THEME.accent} />
+          <Building2 size={32} color={THEME.secondary} />
         </div>
         <h2 className="serif" style={{ fontSize: 28, marginBottom: 8 }}>
           No Deals Yet
@@ -3283,12 +3311,14 @@ const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal }) => {
                 cursor: "pointer", transition: "all 0.15s ease"
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.borderColor = THEME.accent;
-                e.currentTarget.style.transform = "translateY(-1px)";
+                e.currentTarget.style.borderColor = THEME.secondary;
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = "0 4px 12px rgba(234, 88, 12, 0.12)";
               }}
               onMouseLeave={e => {
                 e.currentTarget.style.borderColor = THEME.border;
                 e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
@@ -3303,9 +3333,9 @@ const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal }) => {
                 <div style={{
                   padding: "4px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700,
                   background: metrics.grade === "A" ? THEME.greenDim :
-                             metrics.grade.startsWith("B") ? "#FEF3C7" : THEME.redDim,
+                             metrics.grade.startsWith("B") ? "#FED7AA" : THEME.redDim,
                   color: metrics.grade === "A" ? THEME.green :
-                         metrics.grade.startsWith("B") ? "#B45309" : THEME.red
+                         metrics.grade.startsWith("B") ? THEME.secondary : THEME.red
                 }}>
                   {metrics.grade}
                 </div>
@@ -3641,11 +3671,18 @@ export default function BRRRRTracker() {
         display: "flex", justifyContent: "space-between", alignItems: "center",
         fontSize: 11, color: THEME.textMuted, flexWrap: "wrap", gap: 8
       }}>
-        <div>DealTrack v3.0 Professional</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{
+            width: 6, height: 6, borderRadius: "50%",
+            background: `linear-gradient(135deg, ${THEME.accent} 0%, ${THEME.secondary} 100%)`
+          }} />
+          DealTrack v3.0 Professional
+        </div>
         <div>© 2026 DealTrack</div>
       </div>
     </div>
   );
 }
+
 
 
