@@ -1582,58 +1582,224 @@ const AdvancedMarketIntel = () => {
   const [selectedRegion, setSelectedRegion] = useState("midwest");
   const [selectedMetric, setSelectedMetric] = useState("capRate");
   const [investmentGoal, setInvestmentGoal] = useState("cashFlow");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearchResults, setShowSearchResults] = useState(false);
 
   const marketData = {
     northeast: {
       name: "Northeast",
       markets: [
-        { city: "Buffalo", state: "NY", medianPrice: 165000, medianRent: 1200, capRate: 9.8, rentGrowth: 10, inventory: 4.2, score: 85 },
-        { city: "Rochester", state: "NY", medianPrice: 145000, medianRent: 1100, capRate: 10.1, rentGrowth: 11, inventory: 3.8, score: 88 },
-        { city: "Syracuse", state: "NY", medianPrice: 135000, medianRent: 1050, capRate: 10.5, rentGrowth: 12, inventory: 4.5, score: 90 },
-        { city: "Philadelphia", state: "PA", medianPrice: 195000, medianRent: 1450, capRate: 8.9, rentGrowth: 9, inventory: 3.2, score: 78 },
-        { city: "Pittsburgh", state: "PA", medianPrice: 145000, medianRent: 1150, capRate: 9.7, rentGrowth: 10, inventory: 3.9, score: 82 }
+        { 
+          city: "Buffalo", state: "NY", medianPrice: 165000, medianRent: 1200, capRate: 9.8, rentGrowth: 10, inventory: 4.2, score: 85,
+          airbnb: { nightly: 95, occupancy: 65, monthlyRevenue: 1900, competition: "Medium" }
+        },
+        { 
+          city: "Rochester", state: "NY", medianPrice: 145000, medianRent: 1100, capRate: 10.1, rentGrowth: 11, inventory: 3.8, score: 88,
+          airbnb: { nightly: 85, occupancy: 62, monthlyRevenue: 1650, competition: "Low" }
+        },
+        { 
+          city: "Syracuse", state: "NY", medianPrice: 135000, medianRent: 1050, capRate: 10.5, rentGrowth: 12, inventory: 4.5, score: 90,
+          airbnb: { nightly: 80, occupancy: 58, monthlyRevenue: 1450, competition: "Low" }
+        },
+        { 
+          city: "Philadelphia", state: "PA", medianPrice: 195000, medianRent: 1450, capRate: 8.9, rentGrowth: 9, inventory: 3.2, score: 78,
+          airbnb: { nightly: 125, occupancy: 72, monthlyRevenue: 2800, competition: "High" }
+        },
+        { 
+          city: "Pittsburgh", state: "PA", medianPrice: 145000, medianRent: 1150, capRate: 9.7, rentGrowth: 10, inventory: 3.9, score: 82,
+          airbnb: { nightly: 110, occupancy: 68, monthlyRevenue: 2350, competition: "Medium" }
+        },
+        { 
+          city: "Newark", state: "NJ", medianPrice: 285000, medianRent: 2100, capRate: 7.2, rentGrowth: 8, inventory: 2.8, score: 75,
+          airbnb: { nightly: 135, occupancy: 75, monthlyRevenue: 3200, competition: "High" }
+        },
+        { 
+          city: "Camden", state: "NJ", medianPrice: 125000, medianRent: 1200, capRate: 11.5, rentGrowth: 11, inventory: 4.8, score: 89,
+          airbnb: { nightly: 90, occupancy: 55, monthlyRevenue: 1550, competition: "Low" }
+        }
       ]
     },
     southeast: {
       name: "Southeast", 
       markets: [
-        { city: "Orlando", state: "FL", medianPrice: 320000, medianRent: 1850, capRate: 7.2, rentGrowth: 18, inventory: 2.1, score: 85 },
-        { city: "Tampa", state: "FL", medianPrice: 365000, medianRent: 2100, capRate: 6.8, rentGrowth: 14, inventory: 1.9, score: 82 },
-        { city: "Jacksonville", state: "FL", medianPrice: 285000, medianRent: 1650, capRate: 8.1, rentGrowth: 16, inventory: 2.8, score: 88 },
-        { city: "Atlanta", state: "GA", medianPrice: 285000, medianRent: 1750, capRate: 7.8, rentGrowth: 13, inventory: 2.4, score: 85 },
-        { city: "Charlotte", state: "NC", medianPrice: 265000, medianRent: 1550, capRate: 8.2, rentGrowth: 12, inventory: 2.6, score: 86 }
+        { 
+          city: "Orlando", state: "FL", medianPrice: 320000, medianRent: 1850, capRate: 7.2, rentGrowth: 18, inventory: 2.1, score: 85,
+          airbnb: { nightly: 165, occupancy: 78, monthlyRevenue: 4050, competition: "Very High" }
+        },
+        { 
+          city: "Tampa", state: "FL", medianPrice: 365000, medianRent: 2100, capRate: 6.8, rentGrowth: 14, inventory: 1.9, score: 82,
+          airbnb: { nightly: 155, occupancy: 74, monthlyRevenue: 3600, competition: "High" }
+        },
+        { 
+          city: "Jacksonville", state: "FL", medianPrice: 285000, medianRent: 1650, capRate: 8.1, rentGrowth: 16, inventory: 2.8, score: 88,
+          airbnb: { nightly: 135, occupancy: 71, monthlyRevenue: 3000, competition: "Medium" }
+        },
+        { 
+          city: "Miami", state: "FL", medianPrice: 485000, medianRent: 2650, capRate: 5.9, rentGrowth: 9, inventory: 1.5, score: 72,
+          airbnb: { nightly: 195, occupancy: 82, monthlyRevenue: 5000, competition: "Very High" }
+        },
+        { 
+          city: "Fort Lauderdale", state: "FL", medianPrice: 385000, medianRent: 2100, capRate: 6.5, rentGrowth: 12, inventory: 1.8, score: 78,
+          airbnb: { nightly: 175, occupancy: 79, monthlyRevenue: 4350, competition: "Very High" }
+        },
+        { 
+          city: "St. Petersburg", state: "FL", medianPrice: 295000, medianRent: 1750, capRate: 7.8, rentGrowth: 17, inventory: 2.4, score: 86,
+          airbnb: { nightly: 145, occupancy: 76, monthlyRevenue: 3450, competition: "High" }
+        },
+        { 
+          city: "Atlanta", state: "GA", medianPrice: 285000, medianRent: 1750, capRate: 7.8, rentGrowth: 13, inventory: 2.4, score: 85,
+          airbnb: { nightly: 140, occupancy: 73, monthlyRevenue: 3200, competition: "High" }
+        },
+        { 
+          city: "Savannah", state: "GA", medianPrice: 245000, medianRent: 1450, capRate: 8.5, rentGrowth: 15, inventory: 3.1, score: 87,
+          airbnb: { nightly: 150, occupancy: 75, monthlyRevenue: 3500, competition: "High" }
+        },
+        { 
+          city: "Charlotte", state: "NC", medianPrice: 265000, medianRent: 1550, capRate: 8.2, rentGrowth: 12, inventory: 2.6, score: 86,
+          airbnb: { nightly: 130, occupancy: 70, monthlyRevenue: 2850, competition: "Medium" }
+        },
+        { 
+          city: "Raleigh", state: "NC", medianPrice: 295000, medianRent: 1650, capRate: 7.9, rentGrowth: 11, inventory: 2.3, score: 83,
+          airbnb: { nightly: 125, occupancy: 69, monthlyRevenue: 2700, competition: "Medium" }
+        },
+        { 
+          city: "Charleston", state: "SC", medianPrice: 425000, medianRent: 2250, capRate: 6.8, rentGrowth: 10, inventory: 2.0, score: 79,
+          airbnb: { nightly: 185, occupancy: 81, monthlyRevenue: 4700, competition: "Very High" }
+        },
+        { 
+          city: "Columbia", state: "SC", medianPrice: 185000, medianRent: 1250, capRate: 9.1, rentGrowth: 14, inventory: 3.6, score: 88,
+          airbnb: { nightly: 105, occupancy: 64, monthlyRevenue: 2100, competition: "Low" }
+        },
+        { 
+          city: "Nashville", state: "TN", medianPrice: 385000, medianRent: 2100, capRate: 7.1, rentGrowth: 11, inventory: 2.2, score: 81,
+          airbnb: { nightly: 160, occupancy: 77, monthlyRevenue: 3850, competition: "Very High" }
+        },
+        { 
+          city: "Memphis", state: "TN", medianPrice: 145000, medianRent: 1150, capRate: 10.2, rentGrowth: 13, inventory: 4.2, score: 90,
+          airbnb: { nightly: 95, occupancy: 62, monthlyRevenue: 1850, competition: "Medium" }
+        }
       ]
     },
     midwest: {
       name: "Midwest",
       markets: [
-        { city: "Detroit", state: "MI", medianPrice: 85000, medianRent: 950, capRate: 13.1, rentGrowth: 14, inventory: 6.2, score: 95 },
-        { city: "Toledo", state: "OH", medianPrice: 95000, medianRent: 850, capRate: 11.8, rentGrowth: 13, inventory: 5.8, score: 92 },
-        { city: "Cleveland", state: "OH", medianPrice: 165000, medianRent: 1150, capRate: 10.1, rentGrowth: 12, inventory: 4.5, score: 89 },
-        { city: "Columbus", state: "OH", medianPrice: 215000, medianRent: 1350, capRate: 9.2, rentGrowth: 11, inventory: 3.8, score: 85 },
-        { city: "Indianapolis", state: "IN", medianPrice: 165000, medianRent: 1200, capRate: 9.8, rentGrowth: 12, inventory: 4.1, score: 87 }
+        { 
+          city: "Detroit", state: "MI", medianPrice: 85000, medianRent: 950, capRate: 13.1, rentGrowth: 14, inventory: 6.2, score: 95,
+          airbnb: { nightly: 75, occupancy: 55, monthlyRevenue: 1300, competition: "Low" }
+        },
+        { 
+          city: "Toledo", state: "OH", medianPrice: 95000, medianRent: 850, capRate: 11.8, rentGrowth: 13, inventory: 5.8, score: 92,
+          airbnb: { nightly: 70, occupancy: 52, monthlyRevenue: 1150, competition: "Low" }
+        },
+        { 
+          city: "Cleveland", state: "OH", medianPrice: 165000, medianRent: 1150, capRate: 10.1, rentGrowth: 12, inventory: 4.5, score: 89,
+          airbnb: { nightly: 85, occupancy: 58, monthlyRevenue: 1550, competition: "Medium" }
+        },
+        { 
+          city: "Columbus", state: "OH", medianPrice: 215000, medianRent: 1350, capRate: 9.2, rentGrowth: 11, inventory: 3.8, score: 85,
+          airbnb: { nightly: 105, occupancy: 65, monthlyRevenue: 2150, competition: "Medium" }
+        },
+        { 
+          city: "Cincinnati", state: "OH", medianPrice: 185000, medianRent: 1250, capRate: 9.5, rentGrowth: 10, inventory: 4.1, score: 84,
+          airbnb: { nightly: 95, occupancy: 63, monthlyRevenue: 1900, competition: "Medium" }
+        },
+        { 
+          city: "Indianapolis", state: "IN", medianPrice: 165000, medianRent: 1200, capRate: 9.8, rentGrowth: 12, inventory: 4.1, score: 87,
+          airbnb: { nightly: 100, occupancy: 64, monthlyRevenue: 2000, competition: "Medium" }
+        },
+        { 
+          city: "Fort Wayne", state: "IN", medianPrice: 135000, medianRent: 1050, capRate: 10.4, rentGrowth: 13, inventory: 4.8, score: 89,
+          airbnb: { nightly: 80, occupancy: 56, monthlyRevenue: 1400, competition: "Low" }
+        },
+        { 
+          city: "Grand Rapids", state: "MI", medianPrice: 195000, medianRent: 1350, capRate: 9.3, rentGrowth: 11, inventory: 3.9, score: 85,
+          airbnb: { nightly: 90, occupancy: 60, monthlyRevenue: 1700, competition: "Low" }
+        },
+        { 
+          city: "Chicago", state: "IL", medianPrice: 285000, medianRent: 1850, capRate: 7.8, rentGrowth: 7, inventory: 3.2, score: 76,
+          airbnb: { nightly: 145, occupancy: 74, monthlyRevenue: 3350, competition: "Very High" }
+        },
+        { 
+          city: "Rockford", state: "IL", medianPrice: 125000, medianRent: 950, capRate: 10.7, rentGrowth: 12, inventory: 5.2, score: 88,
+          airbnb: { nightly: 75, occupancy: 54, monthlyRevenue: 1275, competition: "Low" }
+        }
       ]
     },
     west: {
       name: "West",
       markets: [
-        { city: "Houston", state: "TX", medianPrice: 245000, medianRent: 1650, capRate: 8.1, rentGrowth: 10, inventory: 3.5, score: 82 },
-        { city: "San Antonio", state: "TX", medianPrice: 195000, medianRent: 1450, capRate: 8.9, rentGrowth: 11, inventory: 3.8, score: 85 },
-        { city: "Phoenix", state: "AZ", medianPrice: 385000, medianRent: 2100, capRate: 6.9, rentGrowth: 11, inventory: 2.2, score: 78 },
-        { city: "Tucson", state: "AZ", medianPrice: 285000, medianRent: 1550, capRate: 7.8, rentGrowth: 12, inventory: 3.1, score: 82 },
-        { city: "Colorado Springs", state: "CO", medianPrice: 385000, medianRent: 1950, capRate: 6.8, rentGrowth: 10, inventory: 2.5, score: 76 }
+        { 
+          city: "Houston", state: "TX", medianPrice: 245000, medianRent: 1650, capRate: 8.1, rentGrowth: 10, inventory: 3.5, score: 82,
+          airbnb: { nightly: 120, occupancy: 68, monthlyRevenue: 2550, competition: "Medium" }
+        },
+        { 
+          city: "Dallas", state: "TX", medianPrice: 285000, medianRent: 1850, capRate: 7.6, rentGrowth: 9, inventory: 3.1, score: 79,
+          airbnb: { nightly: 135, occupancy: 71, monthlyRevenue: 3000, competition: "High" }
+        },
+        { 
+          city: "San Antonio", state: "TX", medianPrice: 195000, medianRent: 1450, capRate: 8.9, rentGrowth: 11, inventory: 3.8, score: 85,
+          airbnb: { nightly: 110, occupancy: 66, monthlyRevenue: 2275, competition: "Medium" }
+        },
+        { 
+          city: "Austin", state: "TX", medianPrice: 465000, medianRent: 2350, capRate: 6.2, rentGrowth: 8, inventory: 2.1, score: 73,
+          airbnb: { nightly: 175, occupancy: 79, monthlyRevenue: 4350, competition: "Very High" }
+        },
+        { 
+          city: "Fort Worth", state: "TX", medianPrice: 225000, medianRent: 1550, capRate: 8.4, rentGrowth: 10, inventory: 3.4, score: 83,
+          airbnb: { nightly: 125, occupancy: 69, monthlyRevenue: 2700, competition: "Medium" }
+        },
+        { 
+          city: "Phoenix", state: "AZ", medianPrice: 385000, medianRent: 2100, capRate: 6.9, rentGrowth: 11, inventory: 2.2, score: 78,
+          airbnb: { nightly: 150, occupancy: 73, monthlyRevenue: 3450, competition: "High" }
+        },
+        { 
+          city: "Tucson", state: "AZ", medianPrice: 285000, medianRent: 1550, capRate: 7.8, rentGrowth: 12, inventory: 3.1, score: 82,
+          airbnb: { nightly: 125, occupancy: 70, monthlyRevenue: 2750, competition: "Medium" }
+        },
+        { 
+          city: "Denver", state: "CO", medianPrice: 485000, medianRent: 2450, capRate: 6.1, rentGrowth: 9, inventory: 1.9, score: 75,
+          airbnb: { nightly: 165, occupancy: 76, monthlyRevenue: 3950, competition: "Very High" }
+        },
+        { 
+          city: "Colorado Springs", state: "CO", medianPrice: 385000, medianRent: 1950, capRate: 6.8, rentGrowth: 10, inventory: 2.5, score: 76,
+          airbnb: { nightly: 140, occupancy: 72, monthlyRevenue: 3150, competition: "High" }
+        }
       ]
     }
   };
 
+  // Get all markets for search
+  const allMarkets = useMemo(() => {
+    return Object.values(marketData).flatMap(region => region.markets);
+  }, []);
+
+  // Search functionality
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    
+    const query = searchQuery.toLowerCase().trim();
+    return allMarkets.filter(market => {
+      const cityMatch = market.city.toLowerCase().includes(query);
+      const stateMatch = market.state.toLowerCase().includes(query);
+      const fullMatch = `${market.city.toLowerCase()}, ${market.state.toLowerCase()}`.includes(query);
+      const reverseMatch = `${market.state.toLowerCase()} ${market.city.toLowerCase()}`.includes(query);
+      
+      return cityMatch || stateMatch || fullMatch || reverseMatch;
+    }).slice(0, 8); // Limit to 8 results
+  }, [searchQuery, allMarkets]);
+
+  const getDisplayMarkets = () => {
+    if (showSearchResults && searchQuery.trim()) {
+      return searchResults;
+    }
+    return Object.values(marketData[selectedRegion].markets || []);
+  };
+
   const getTopMarkets = (metric, count = 5) => {
-    const allMarkets = Object.values(marketData).flatMap(region => region.markets);
     return allMarkets.sort((a, b) => b[metric] - a[metric]).slice(0, count);
   };
 
   const getRecommendedMarkets = (goal) => {
-    const allMarkets = Object.values(marketData).flatMap(region => region.markets);
-    
     switch (goal) {
       case "cashFlow":
         return allMarkets.filter(m => m.capRate >= 9.0).sort((a, b) => b.capRate - a.capRate).slice(0, 6);
@@ -1646,15 +1812,181 @@ const AdvancedMarketIntel = () => {
     }
   };
 
+  const displayMarkets = getDisplayMarkets();
   const topMarkets = getTopMarkets(selectedMetric);
   const recommendedMarkets = getRecommendedMarkets(investmentGoal);
 
+  const clearSearch = () => {
+    setSearchQuery("");
+    setShowSearchResults(false);
+  };
+
+  const handleSearchChange = (value) => {
+    setSearchQuery(value);
+    setShowSearchResults(value.trim().length > 0);
+  };
+
   return (
     <div style={{ maxWidth: 1400, margin: "0 auto", padding: "40px 32px" }}>
-      <h1 style={{ fontSize: 28, marginBottom: 8 }}>Advanced Market Intelligence</h1>
+      <h1 style={{ fontSize: 28, marginBottom: 8 }}>Real Estate Market Intelligence</h1>
       <p style={{ color: THEME.textMuted, marginBottom: 32, fontSize: 16 }}>
-        AI-powered market analysis for strategic BRRRR investing
+        Complete market analysis for both long-term and short-term rental investments across all US markets
       </p>
+
+      {/* Market Search */}
+      <div style={{ marginBottom: 32 }}>
+        <Panel title="Market Search" icon={<Search size={16} />}>
+          <div style={{ position: "relative" }}>
+            <div style={{ 
+              display: "flex", 
+              alignItems: "center",
+              position: "relative"
+            }}>
+              <Search 
+                size={18} 
+                style={{ 
+                  position: "absolute", 
+                  left: 12, 
+                  color: THEME.textMuted,
+                  zIndex: 1
+                }} 
+              />
+              <input
+                type="text"
+                placeholder="Search for any city... (e.g. 'Columbus OH', 'Tampa', 'Detroit MI')"
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "12px 16px 12px 45px",
+                  fontSize: 16,
+                  border: `2px solid ${searchQuery.trim() ? THEME.accent : THEME.border}`,
+                  borderRadius: 8,
+                  background: THEME.bgInput,
+                  transition: "all 0.2s ease"
+                }}
+              />
+              {searchQuery && (
+                <button
+                  onClick={clearSearch}
+                  style={{
+                    position: "absolute",
+                    right: 12,
+                    background: "none",
+                    border: "none",
+                    color: THEME.textMuted,
+                    cursor: "pointer",
+                    padding: 4,
+                    borderRadius: 4,
+                    display: "flex",
+                    alignItems: "center"
+                  }}
+                >
+                  <X size={18} />
+                </button>
+              )}
+            </div>
+            
+            {/* Search Results Preview */}
+            {showSearchResults && searchResults.length > 0 && (
+              <div style={{
+                position: "absolute",
+                top: "100%",
+                left: 0,
+                right: 0,
+                background: THEME.bg,
+                border: `1px solid ${THEME.border}`,
+                borderRadius: 6,
+                marginTop: 4,
+                boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                zIndex: 10,
+                maxHeight: 200,
+                overflowY: "auto"
+              }}>
+                {searchResults.map((market, index) => (
+                  <div 
+                    key={`${market.city}-${market.state}`}
+                    style={{
+                      padding: "8px 12px",
+                      borderBottom: index < searchResults.length - 1 ? `1px solid ${THEME.borderLight}` : "none",
+                      fontSize: 14,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center"
+                    }}
+                  >
+                    <div>
+                      <span style={{ fontWeight: 600 }}>{market.city}, {market.state}</span>
+                      <div style={{ color: THEME.textMuted, fontSize: 12, marginTop: 2 }}>
+                        LTR: {market.capRate}% cap • {fmtUSD(market.medianPrice)} | 
+                        STR: ${market.airbnb.nightly}/night • {market.airbnb.occupancy}% occ
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 12, color: THEME.accent, textAlign: "right" }}>
+                      <div>Score: {market.score}/100</div>
+                      <div style={{ color: THEME.secondary, fontSize: 11 }}>
+                        {fmtUSD(market.airbnb.monthlyRevenue, { short: true })}/mo STR
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {showSearchResults && searchQuery && searchResults.length === 0 && (
+              <div style={{
+                position: "absolute",
+                top: "100%",
+                left: 0,
+                right: 0,
+                background: THEME.bg,
+                border: `1px solid ${THEME.border}`,
+                borderRadius: 6,
+                marginTop: 4,
+                padding: 16,
+                textAlign: "center",
+                color: THEME.textMuted,
+                fontSize: 14
+              }}>
+                No markets found for "{searchQuery}". Try searching for cities like "Columbus", "Tampa", or "Detroit".
+              </div>
+            )}
+          </div>
+          
+          {/* Quick Search Suggestions */}
+          <div style={{ marginTop: 16 }}>
+            <div className="label-xs" style={{ marginBottom: 8 }}>POPULAR SEARCHES</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {["Columbus OH", "Tampa FL", "Detroit MI", "Memphis TN", "Toledo OH", "Buffalo NY"].map(suggestion => (
+                <button
+                  key={suggestion}
+                  onClick={() => handleSearchChange(suggestion)}
+                  style={{
+                    padding: "4px 12px",
+                    fontSize: 12,
+                    background: THEME.bgRaised,
+                    border: `1px solid ${THEME.border}`,
+                    borderRadius: 16,
+                    color: THEME.textMuted,
+                    cursor: "pointer",
+                    transition: "all 0.15s ease"
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.background = THEME.accent;
+                    e.target.style.color = "white";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.background = THEME.bgRaised;
+                    e.target.style.color = THEME.textMuted;
+                  }}
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          </div>
+        </Panel>
+      </div>
 
       {/* Investment Goal Selection */}
       <div style={{ marginBottom: 32 }}>
@@ -1709,74 +2041,195 @@ const AdvancedMarketIntel = () => {
         </Panel>
       </div>
 
-      {/* Regional Breakdown */}
-      <div style={{ marginBottom: 32 }}>
-        <div style={{ display: "flex", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
-          <div>
-            <div className="label-xs" style={{ marginBottom: 6 }}>REGION</div>
-            <select
-              value={selectedRegion}
-              onChange={(e) => setSelectedRegion(e.target.value)}
-              style={{
-                padding: "8px 12px",
-                border: `1px solid ${THEME.border}`,
-                borderRadius: 4,
-                background: THEME.bgInput,
-                fontSize: 14,
-                minWidth: 150
-              }}
-            >
-              {Object.entries(marketData).map(([key, region]) => (
-                <option key={key} value={key}>{region.name}</option>
+      {/* Regional Breakdown / Search Results */}
+      {!showSearchResults && (
+        <div style={{ marginBottom: 32 }}>
+          <div style={{ display: "flex", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
+            <div>
+              <div className="label-xs" style={{ marginBottom: 6 }}>REGION</div>
+              <select
+                value={selectedRegion}
+                onChange={(e) => setSelectedRegion(e.target.value)}
+                style={{
+                  padding: "8px 12px",
+                  border: `1px solid ${THEME.border}`,
+                  borderRadius: 4,
+                  background: THEME.bgInput,
+                  fontSize: 14,
+                  minWidth: 150
+                }}
+              >
+                {Object.entries(marketData).map(([key, region]) => (
+                  <option key={key} value={key}>{region.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <div className="label-xs" style={{ marginBottom: 6 }}>SORT BY</div>
+              <select
+                value={selectedMetric}
+                onChange={(e) => setSelectedMetric(e.target.value)}
+                style={{
+                  padding: "8px 12px",
+                  border: `1px solid ${THEME.border}`,
+                  borderRadius: 4,
+                  background: THEME.bgInput,
+                  fontSize: 14,
+                  minWidth: 150
+                }}
+              >
+                <option value="capRate">Cap Rate</option>
+                <option value="rentGrowth">Rent Growth</option>
+                <option value="score">DealTrack Score</option>
+                <option value="medianPrice">Median Price</option>
+              </select>
+            </div>
+          </div>
+
+          <Panel title={`${marketData[selectedRegion].name} Markets`} icon={<MapPin size={16} />}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "repeat(auto-fit, minmax(320px, 1fr))", gap: 20 }}>
+              {marketData[selectedRegion].markets.map(market => (
+                <div key={`${market.city}-${market.state}`} style={{
+                  padding: 16,
+                  border: `1px solid ${THEME.border}`,
+                  borderRadius: 8,
+                  background: THEME.bgPanel
+                }}>
+                  <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>
+                    {market.city}, {market.state}
+                  </h3>
+                  
+                  {/* Long-Term Rental Stats */}
+                  <div style={{ marginBottom: 12 }}>
+                    <div className="label-xs" style={{ marginBottom: 8, color: THEME.blue }}>LONG-TERM RENTAL</div>
+                    <StatRow label="Median Price" value={fmtUSD(market.medianPrice)} />
+                    <StatRow label="Median Rent" value={fmtUSD(market.medianRent)} />
+                    <StatRow label="Cap Rate" value={`${market.capRate}%`} valueColor={market.capRate >= 9 ? THEME.green : THEME.text} />
+                    <StatRow label="Rent Growth" value={`+${market.rentGrowth}%`} valueColor={market.rentGrowth >= 12 ? THEME.green : THEME.text} />
+                  </div>
+
+                  {/* Short-Term Rental Stats */}
+                  <div style={{ marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${THEME.borderLight}` }}>
+                    <div className="label-xs" style={{ marginBottom: 8, color: THEME.secondary }}>SHORT-TERM RENTAL (AIRBNB)</div>
+                    <StatRow label="Avg Nightly Rate" value={`$${market.airbnb.nightly}`} valueColor={THEME.secondary} />
+                    <StatRow label="Occupancy Rate" value={`${market.airbnb.occupancy}%`} valueColor={market.airbnb.occupancy >= 70 ? THEME.green : THEME.text} />
+                    <StatRow label="Monthly Revenue" value={fmtUSD(market.airbnb.monthlyRevenue)} valueColor={THEME.secondary} bold />
+                    <StatRow 
+                      label="Competition Level" 
+                      value={market.airbnb.competition} 
+                      valueColor={
+                        market.airbnb.competition === "Low" ? THEME.green :
+                        market.airbnb.competition === "Medium" ? THEME.orange :
+                        market.airbnb.competition === "High" ? THEME.red :
+                        THEME.purple
+                      }
+                    />
+                  </div>
+
+                  {/* Comparison & Score */}
+                  <div style={{ paddingTop: 12, borderTop: `1px solid ${THEME.borderLight}` }}>
+                    <StatRow 
+                      label="STR vs LTR Revenue" 
+                      value={`${((market.airbnb.monthlyRevenue / market.medianRent) * 100).toFixed(0)}%`}
+                      valueColor={market.airbnb.monthlyRevenue > market.medianRent * 1.5 ? THEME.green : 
+                                 market.airbnb.monthlyRevenue > market.medianRent ? THEME.orange : THEME.red}
+                      bold
+                    />
+                    <StatRow label="Inventory (Months)" value={market.inventory} />
+                    <StatRow label="DealTrack Score" value={`${market.score}/100`} valueColor={THEME.accent} bold />
+                  </div>
+                </div>
               ))}
-            </select>
-          </div>
-
-          <div>
-            <div className="label-xs" style={{ marginBottom: 6 }}>SORT BY</div>
-            <select
-              value={selectedMetric}
-              onChange={(e) => setSelectedMetric(e.target.value)}
-              style={{
-                padding: "8px 12px",
-                border: `1px solid ${THEME.border}`,
-                borderRadius: 4,
-                background: THEME.bgInput,
-                fontSize: 14,
-                minWidth: 150
-              }}
-            >
-              <option value="capRate">Cap Rate</option>
-              <option value="rentGrowth">Rent Growth</option>
-              <option value="score">DealTrack Score</option>
-              <option value="medianPrice">Median Price</option>
-            </select>
-          </div>
+            </div>
+          </Panel>
         </div>
+      )}
 
-        <Panel title={`${marketData[selectedRegion].name} Markets`} icon={<MapPin size={16} />}>
-          <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
-            {marketData[selectedRegion].markets.map(market => (
-              <div key={`${market.city}-${market.state}`} style={{
-                padding: 16,
-                border: `1px solid ${THEME.border}`,
-                borderRadius: 8,
-                background: THEME.bgPanel
-              }}>
-                <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>
-                  {market.city}, {market.state}
-                </h3>
-                <StatRow label="Median Price" value={fmtUSD(market.medianPrice)} />
-                <StatRow label="Median Rent" value={fmtUSD(market.medianRent)} />
-                <StatRow label="Cap Rate" value={`${market.capRate}%`} valueColor={market.capRate >= 9 ? THEME.green : THEME.text} />
-                <StatRow label="Rent Growth" value={`+${market.rentGrowth}%`} valueColor={market.rentGrowth >= 12 ? THEME.green : THEME.text} />
-                <StatRow label="Inventory (Months)" value={market.inventory} />
-                <StatRow label="DealTrack Score" value={`${market.score}/100`} valueColor={THEME.accent} bold />
+      {/* Search Results Section */}
+      {showSearchResults && searchQuery && (
+        <div style={{ marginBottom: 32 }}>
+          <Panel 
+            title={`Search Results for "${searchQuery}" (${searchResults.length} markets found)`} 
+            icon={<Search size={16} />}
+            accent
+          >
+            {searchResults.length > 0 ? (
+              <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "repeat(auto-fit, minmax(320px, 1fr))", gap: 20 }}>
+                {searchResults.map(market => (
+                  <div key={`${market.city}-${market.state}`} style={{
+                    padding: 16,
+                    border: `2px solid ${THEME.accent}40`,
+                    borderRadius: 8,
+                    background: THEME.bgRaised
+                  }}>
+                    <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: THEME.accent }}>
+                      {market.city}, {market.state}
+                    </h3>
+                    
+                    {/* Long-Term Rental Stats */}
+                    <div style={{ marginBottom: 12 }}>
+                      <div className="label-xs" style={{ marginBottom: 8, color: THEME.blue }}>LONG-TERM RENTAL</div>
+                      <StatRow label="Median Price" value={fmtUSD(market.medianPrice)} />
+                      <StatRow label="Median Rent" value={fmtUSD(market.medianRent)} />
+                      <StatRow label="Cap Rate" value={`${market.capRate}%`} valueColor={market.capRate >= 9 ? THEME.green : THEME.text} bold />
+                      <StatRow label="Rent Growth" value={`+${market.rentGrowth}%`} valueColor={market.rentGrowth >= 12 ? THEME.green : THEME.text} bold />
+                    </div>
+
+                    {/* Short-Term Rental Stats */}
+                    <div style={{ marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${THEME.borderLight}` }}>
+                      <div className="label-xs" style={{ marginBottom: 8, color: THEME.secondary }}>SHORT-TERM RENTAL (AIRBNB)</div>
+                      <StatRow label="Avg Nightly Rate" value={`$${market.airbnb.nightly}`} valueColor={THEME.secondary} bold />
+                      <StatRow label="Occupancy Rate" value={`${market.airbnb.occupancy}%`} valueColor={market.airbnb.occupancy >= 70 ? THEME.green : THEME.text} bold />
+                      <StatRow label="Monthly Revenue" value={fmtUSD(market.airbnb.monthlyRevenue)} valueColor={THEME.secondary} bold />
+                      <StatRow 
+                        label="Competition Level" 
+                        value={market.airbnb.competition} 
+                        valueColor={
+                          market.airbnb.competition === "Low" ? THEME.green :
+                          market.airbnb.competition === "Medium" ? THEME.orange :
+                          market.airbnb.competition === "High" ? THEME.red :
+                          THEME.purple
+                        }
+                      />
+                    </div>
+
+                    {/* Comparison & Score */}
+                    <div style={{ paddingTop: 12, borderTop: `1px solid ${THEME.borderLight}` }}>
+                      <StatRow 
+                        label="STR vs LTR Revenue" 
+                        value={`${((market.airbnb.monthlyRevenue / market.medianRent) * 100).toFixed(0)}%`}
+                        valueColor={market.airbnb.monthlyRevenue > market.medianRent * 1.5 ? THEME.green : 
+                                   market.airbnb.monthlyRevenue > market.medianRent ? THEME.orange : THEME.red}
+                        bold
+                      />
+                      <StatRow label="Inventory (Months)" value={market.inventory} />
+                      <StatRow label="DealTrack Score" value={`${market.score}/100`} valueColor={THEME.accent} bold />
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </Panel>
-      </div>
+            ) : (
+              <div style={{ textAlign: "center", padding: 40 }}>
+                <Search size={48} style={{ color: THEME.textMuted, marginBottom: 16 }} />
+                <h3 style={{ fontSize: 18, marginBottom: 8, color: THEME.textMuted }}>
+                  No markets found for "{searchQuery}"
+                </h3>
+                <p style={{ color: THEME.textDim, marginBottom: 20 }}>
+                  Try searching for cities like "Columbus", "Tampa", "Detroit", or "Memphis"
+                </p>
+                <button
+                  onClick={clearSearch}
+                  className="btn-primary"
+                  style={{ background: THEME.accent, color: "white" }}
+                >
+                  Clear Search
+                </button>
+              </div>
+            )}
+          </Panel>
+        </div>
+      )}
 
       {/* Top Markets Summary */}
       <Panel title={`Top 5 Markets by ${selectedMetric === 'capRate' ? 'Cap Rate' : selectedMetric === 'rentGrowth' ? 'Rent Growth' : selectedMetric === 'score' ? 'DealTrack Score' : 'Median Price'}`} icon={<Trophy size={16} />}>
