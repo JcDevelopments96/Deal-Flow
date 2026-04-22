@@ -166,6 +166,14 @@ button {
 .calc-tip__formula { font-family: 'JetBrains Mono', monospace; color: #fbbf24; margin-top: 4px; font-size: 10.5px; }
 
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes toastSlideIn {
+  from { transform: translateX(12px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes modalFadeIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
 `;
 
 /* ============================================================================
@@ -589,6 +597,101 @@ const CalcTooltip = ({ title, description, formula, size = 13, inline = true }) 
     </span>
   </span>
 );
+
+/* ============================================================================
+   APP ACTIONS CONTEXT — exposes cross-cutting actions (watchlist, use-as-deal)
+   to deeply-nested components without prop drilling.
+   ============================================================================ */
+const AppActionsContext = React.createContext({
+  useListingAsDeal: () => {},
+  isWatched: () => false,
+  toggleWatch: () => {},
+  removeWatch: () => {},
+  watchlist: [],
+  openListingDetail: () => {}
+});
+const useAppActions = () => React.useContext(AppActionsContext);
+
+/* ============================================================================
+   TOAST SYSTEM — global non-blocking notifications
+   ============================================================================ */
+const ToastContext = React.createContext({ push: () => {}, dismiss: () => {} });
+const useToast = () => React.useContext(ToastContext);
+
+const TOAST_STYLES = {
+  success: { bg: THEME.greenDim, color: THEME.green, icon: <CheckCircle2 size={14} /> },
+  info:    { bg: THEME.bgRaised, color: THEME.accent, icon: <Info size={14} /> },
+  warn:    { bg: THEME.bgOrange, color: THEME.orange, icon: <AlertTriangle size={14} /> },
+  error:   { bg: THEME.redDim,  color: THEME.red,   icon: <AlertTriangle size={14} /> }
+};
+
+const ToastHost = ({ children }) => {
+  const [toasts, setToasts] = useState([]);
+
+  const dismiss = useCallback((id) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  const push = useCallback((msg, type = "info", durationMs = 3500) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    setToasts(prev => [...prev, { id, msg, type }]);
+    if (durationMs > 0) {
+      setTimeout(() => {
+        setToasts(prev => prev.filter(t => t.id !== id));
+      }, durationMs);
+    }
+    return id;
+  }, []);
+
+  const value = useMemo(() => ({ push, dismiss }), [push, dismiss]);
+
+  return (
+    <ToastContext.Provider value={value}>
+      {children}
+      <div
+        style={{
+          position: "fixed",
+          top: 16, right: 16,
+          display: "flex", flexDirection: "column", gap: 8,
+          zIndex: 2000,
+          pointerEvents: "none"
+        }}
+        aria-live="polite"
+        aria-atomic="false"
+      >
+        {toasts.map(t => {
+          const s = TOAST_STYLES[t.type] || TOAST_STYLES.info;
+          return (
+            <div
+              key={t.id}
+              role="status"
+              onClick={() => dismiss(t.id)}
+              style={{
+                pointerEvents: "auto",
+                minWidth: 260, maxWidth: 380,
+                padding: "10px 14px",
+                background: s.bg, color: s.color,
+                border: `1px solid ${s.color}`,
+                borderRadius: 8,
+                boxShadow: "0 6px 20px rgba(15, 23, 42, 0.08)",
+                fontSize: 13, fontWeight: 600,
+                display: "flex", alignItems: "center", gap: 10,
+                cursor: "pointer",
+                animation: "toastSlideIn 0.18s ease-out"
+              }}
+            >
+              <span style={{ display: "inline-flex" }}>{s.icon}</span>
+              <span style={{ flex: 1 }}>{t.msg}</span>
+              <span aria-label="Dismiss" style={{ opacity: 0.55, display: "inline-flex" }}>
+                <X size={12} />
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </ToastContext.Provider>
+  );
+};
 
 /* ============================================================================
    ACQUISITION ANALYSIS SECTION
@@ -2582,19 +2685,63 @@ const ListingImage = ({ url, demo }) => {
   );
 };
 
-const ListingCard = ({ listing, type = "sale", onUseInDeal }) => {
+const ListingCard = ({ listing, type = "sale", onOpen, showWatchToggle = true }) => {
   const isRental = type === "rental";
+  const { isWatched, toggleWatch, useListingAsDeal } = useAppActions();
+  const watched = isWatched(listing.id);
+
   return (
-    <div style={{
-      padding: 12,
-      border: `1px solid ${THEME.border}`,
-      borderRadius: 8,
-      background: THEME.bg,
-      position: "relative",
-      display: "flex",
-      flexDirection: "column"
-    }}>
-      <ListingImage url={listing.imageUrl} demo={listing.demo} />
+    <div
+      onClick={() => onOpen && onOpen(listing, type)}
+      role={onOpen ? "button" : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+      onKeyDown={(e) => {
+        if (onOpen && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          onOpen(listing, type);
+        }
+      }}
+      style={{
+        padding: 12,
+        border: `1px solid ${THEME.border}`,
+        borderRadius: 8,
+        background: THEME.bg,
+        position: "relative",
+        display: "flex",
+        flexDirection: "column",
+        cursor: onOpen ? "pointer" : "default",
+        transition: "border-color 0.15s ease, transform 0.15s ease"
+      }}
+      onMouseEnter={e => {
+        if (onOpen) e.currentTarget.style.borderColor = THEME.accent;
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.borderColor = THEME.border;
+      }}
+    >
+      <div style={{ position: "relative" }}>
+        <ListingImage url={listing.imageUrl} demo={listing.demo} />
+        {showWatchToggle && (
+          <button
+            type="button"
+            aria-label={watched ? "Remove from watchlist" : "Save to watchlist"}
+            title={watched ? "Remove from watchlist" : "Save to watchlist"}
+            onClick={(e) => { e.stopPropagation(); toggleWatch(listing); }}
+            style={{
+              position: "absolute", top: 8, left: 8,
+              width: 30, height: 30, borderRadius: "50%",
+              background: watched ? THEME.accent : "rgba(255,255,255,0.92)",
+              color: watched ? "#fff" : THEME.textMuted,
+              border: `1px solid ${watched ? THEME.accent : THEME.border}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer",
+              boxShadow: "0 2px 6px rgba(15,23,42,0.12)"
+            }}
+          >
+            <Star size={14} fill={watched ? "#fff" : "none"} />
+          </button>
+        )}
+      </div>
 
       <div style={{ fontSize: 13, fontWeight: 700, color: THEME.text, marginBottom: 4 }}>
         {listing.formattedAddress}
@@ -2640,6 +2787,7 @@ const ListingCard = ({ listing, type = "sale", onUseInDeal }) => {
           href={listing.externalUrl}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
           style={{
             marginTop: 8, fontSize: 11, color: THEME.accent,
             textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4
@@ -2648,15 +2796,220 @@ const ListingCard = ({ listing, type = "sale", onUseInDeal }) => {
           <ExternalLink size={11} /> View full listing
         </a>
       )}
-      {onUseInDeal && !isRental && (
+      {!isRental && (
         <button
-          onClick={() => onUseInDeal(listing)}
+          onClick={(e) => { e.stopPropagation(); useListingAsDeal(listing); }}
           className="btn-secondary"
           style={{ width: "100%", marginTop: 10, padding: "6px 10px", fontSize: 11 }}
         >
           <Plus size={12} /> Use in Deal Analyzer
         </button>
       )}
+    </div>
+  );
+};
+
+/* ============================================================================
+   LISTING DETAIL MODAL — expanded view for a single listing
+   ============================================================================ */
+const ListingDetailModal = ({ listing, type = "sale", onClose }) => {
+  const { isWatched, toggleWatch, useListingAsDeal } = useAppActions();
+  const watched = isWatched(listing.id);
+  const isRental = type === "rental";
+
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const listedAgo = listing.listedDate
+    ? Math.max(0, Math.round((Date.now() - new Date(listing.listedDate).getTime()) / 86400000))
+    : null;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="listing-title"
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0,
+        background: "rgba(15, 23, 42, 0.6)",
+        display: "flex", alignItems: "flex-start", justifyContent: "center",
+        zIndex: 150, padding: 16,
+        overflowY: "auto"
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: THEME.bg, borderRadius: 12,
+          maxWidth: 720, width: "100%",
+          marginTop: 40, marginBottom: 40,
+          boxShadow: "0 20px 60px rgba(15, 23, 42, 0.22)",
+          animation: "modalFadeIn 0.2s ease-out",
+          overflow: "hidden"
+        }}
+      >
+        {/* Hero image */}
+        <div style={{ position: "relative" }}>
+          <div style={{ aspectRatio: "16 / 9", background: THEME.bgPanel, overflow: "hidden" }}>
+            {listing.imageUrl ? (
+              <img
+                src={listing.imageUrl}
+                alt=""
+                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+              />
+            ) : (
+              <div style={{
+                width: "100%", height: "100%",
+                background: `linear-gradient(135deg, ${THEME.bgTeal}, ${THEME.bgRaised})`,
+                display: "flex", alignItems: "center", justifyContent: "center"
+              }}>
+                <Building2 size={64} color={THEME.textDim} />
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close listing details"
+            style={{
+              position: "absolute", top: 12, right: 12,
+              width: 34, height: 34, borderRadius: "50%",
+              background: "rgba(15,23,42,0.72)", color: "#fff",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              border: "none", cursor: "pointer"
+            }}
+          >
+            <X size={16} />
+          </button>
+          <button
+            type="button"
+            aria-label={watched ? "Remove from watchlist" : "Save to watchlist"}
+            onClick={() => toggleWatch(listing)}
+            style={{
+              position: "absolute", top: 12, right: 56,
+              padding: "6px 12px", fontSize: 12, fontWeight: 700,
+              background: watched ? THEME.accent : "rgba(255,255,255,0.92)",
+              color: watched ? "#fff" : THEME.text,
+              border: `1px solid ${watched ? THEME.accent : THEME.border}`,
+              borderRadius: 6,
+              display: "inline-flex", alignItems: "center", gap: 6,
+              cursor: "pointer"
+            }}
+          >
+            <Star size={13} fill={watched ? "#fff" : "none"} />
+            {watched ? "Saved" : "Save"}
+          </button>
+        </div>
+
+        <div style={{ padding: 24 }}>
+          {/* Header */}
+          <h2 id="listing-title" className="serif" style={{ fontSize: 22, fontWeight: 700, margin: "0 0 4px" }}>
+            {listing.formattedAddress}
+          </h2>
+          <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 16 }}>
+            {listing.propertyType || "—"}
+            {listing.yearBuilt && <> &middot; Built {listing.yearBuilt}</>}
+            {listedAgo !== null && <> &middot; Listed {listedAgo} day{listedAgo === 1 ? "" : "s"} ago</>}
+          </div>
+
+          {/* Price row */}
+          <div style={{ display: "flex", alignItems: "baseline", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
+            <div className="mono" style={{ fontSize: 34, fontWeight: 700, color: isRental ? THEME.teal : THEME.accent }}>
+              {fmtUSD(listing.price)}{isRental && <span style={{ fontSize: 16, fontWeight: 500, color: THEME.textMuted }}> /mo</span>}
+            </div>
+            {listing.pricePerSqft && (
+              <div style={{ fontSize: 13, color: THEME.textMuted }}>
+                {isRental ? `$${listing.pricePerSqft}` : fmtUSD(listing.pricePerSqft)} / sqft
+              </div>
+            )}
+            {listing.status && (
+              <div style={{
+                padding: "3px 10px", fontSize: 11, fontWeight: 700,
+                letterSpacing: "0.08em", textTransform: "uppercase",
+                background: THEME.greenDim, color: THEME.green, borderRadius: 4
+              }}>
+                {listing.status}
+              </div>
+            )}
+          </div>
+
+          {/* Stats grid */}
+          <div style={{
+            display: "grid", gridTemplateColumns: "repeat(4, 1fr)",
+            gap: 12, marginBottom: 20,
+            padding: 16, background: THEME.bgPanel, borderRadius: 8
+          }}>
+            <div>
+              <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 2 }}>BEDROOMS</div>
+              <div style={{ fontSize: 18, fontWeight: 700 }}>{listing.bedrooms ?? "—"}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 2 }}>BATHROOMS</div>
+              <div style={{ fontSize: 18, fontWeight: 700 }}>{listing.bathrooms ?? "—"}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 2 }}>SQFT</div>
+              <div style={{ fontSize: 18, fontWeight: 700 }}>
+                {listing.squareFootage ? listing.squareFootage.toLocaleString() : "—"}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 2 }}>DAYS ON MARKET</div>
+              <div style={{ fontSize: 18, fontWeight: 700 }}>{listing.daysOnMarket ?? "—"}</div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {!isRental && (
+              <button
+                onClick={() => { useListingAsDeal(listing); onClose(); }}
+                className="btn-primary"
+                style={{ flex: 1, minWidth: 180, padding: "10px 14px", fontSize: 13 }}
+              >
+                <Calculator size={14} /> Analyze this Deal
+              </button>
+            )}
+            <button
+              onClick={() => toggleWatch(listing)}
+              className={watched ? "btn-accent-teal" : "btn-secondary"}
+              style={{ flex: 1, minWidth: 150, padding: "10px 14px", fontSize: 13 }}
+            >
+              <Star size={14} fill={watched ? "#fff" : "none"} />
+              {watched ? "Saved to Watchlist" : "Save to Watchlist"}
+            </button>
+            {listing.externalUrl && (
+              <a
+                href={listing.externalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-secondary"
+                style={{
+                  padding: "10px 14px", fontSize: 13,
+                  textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6
+                }}
+              >
+                <ExternalLink size={14} /> Full Listing
+              </a>
+            )}
+          </div>
+
+          {listing.demo && (
+            <div style={{
+              marginTop: 16, padding: "10px 12px",
+              background: THEME.bgOrange, color: THEME.orange,
+              borderRadius: 6, fontSize: 11, lineHeight: 1.5
+            }}>
+              <AlertTriangle size={12} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
+              This is sample data. Connect a RentCast or Zillow API key in the Live Listings panel to see real properties.
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
@@ -2732,6 +3085,9 @@ const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarket
   const initial = useMemo(loadProviderPrefs, []);
   const [provider, setProvider] = useState(initial.provider);
   const [keys, setKeys] = useState(initial.keys);
+  const [detail, setDetail] = useState(null); // { listing, type } — opens the listing detail modal
+  const openDetail = useCallback((listing, type) => setDetail({ listing, type }), []);
+  const closeDetail = useCallback(() => setDetail(null), []);
   const [keyDrafts, setKeyDrafts] = useState({ rentcast: "", zillow: "" });
   const [showKeyInput, setShowKeyInput] = useState(!initial.keys[initial.provider]);
   const [listings, setListings] = useState([]);
@@ -3096,7 +3452,7 @@ const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarket
               gridTemplateColumns: isMobile() ? "1fr" : "repeat(auto-fill, minmax(260px, 1fr))",
               gap: 10, marginBottom: 24
             }}>
-              {filteredListings.map(l => <ListingCard key={l.id} listing={l} type="sale" />)}
+              {filteredListings.map(l => <ListingCard key={l.id} listing={l} type="sale" onOpen={openDetail} />)}
             </div>
           )}
 
@@ -3120,10 +3476,18 @@ const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarket
               gridTemplateColumns: isMobile() ? "1fr" : "repeat(auto-fill, minmax(260px, 1fr))",
               gap: 10
             }}>
-              {filteredComps.map(l => <ListingCard key={l.id} listing={l} type="rental" />)}
+              {filteredComps.map(l => <ListingCard key={l.id} listing={l} type="rental" onOpen={openDetail} />)}
             </div>
           )}
         </>
+      )}
+
+      {detail && (
+        <ListingDetailModal
+          listing={detail.listing}
+          type={detail.type}
+          onClose={closeDetail}
+        />
       )}
     </Panel>
   );
@@ -4592,7 +4956,7 @@ const AdvancedMarketIntel = () => {
 /* ============================================================================
    HEADER
    ============================================================================ */
-const Header = ({ view, onChangeView, onNewDeal }) => (
+const Header = ({ view, onChangeView, onNewDeal, watchlistCount = 0 }) => (
   <div style={{
     borderBottom: `1px solid ${THEME.border}`,
     background: THEME.bg,
@@ -4627,25 +4991,39 @@ const Header = ({ view, onChangeView, onNewDeal }) => (
           { key: "dashboard", label: "Dashboard", icon: <Layout size={14} /> },
           { key: "analyzer", label: "Analyzer", icon: <Calculator size={14} /> },
           { key: "market", label: "Market Intel", icon: <MapPin size={14} /> },
+          { key: "watchlist", label: "Watchlist", icon: <Star size={14} />, badge: watchlistCount || null },
           { key: "education", label: "Learn", icon: <GraduationCap size={14} /> }
         ].map(tab => (
           <button
             key={tab.key}
             onClick={() => onChangeView(tab.key)}
+            aria-label={tab.label}
             style={{
               padding: "8px 14px", fontSize: 13, fontWeight: 600,
               background: view === tab.key ? THEME.bgRaised : "transparent",
               color: view === tab.key ? THEME.accent : THEME.textMuted,
               borderRadius: 6,
-              display: "flex", alignItems: "center", gap: 6, cursor: "pointer"
+              display: "flex", alignItems: "center", gap: 6, cursor: "pointer",
+              position: "relative"
             }}
           >
             {tab.icon}
             {!isMobile() && tab.label}
+            {tab.badge ? (
+              <span style={{
+                minWidth: 18, height: 18, padding: "0 5px",
+                background: THEME.accent, color: "#fff",
+                borderRadius: 9, fontSize: 10, fontWeight: 700,
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                marginLeft: 2
+              }}>
+                {tab.badge}
+              </span>
+            ) : null}
           </button>
         ))}
 
-        <button className="btn-primary" onClick={onNewDeal} style={{ marginLeft: 8 }}>
+        <button className="btn-primary" onClick={onNewDeal} style={{ marginLeft: 8 }} aria-label="New deal">
           <Plus size={14} />
           {!isMobile() && "New Deal"}
         </button>
@@ -4657,7 +5035,7 @@ const Header = ({ view, onChangeView, onNewDeal }) => (
 /* ============================================================================
    ANALYZER
    ============================================================================ */
-const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete }) => {
+const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete, onPdfError, onPdfSuccess, isDirty }) => {
   const [section, setSection] = useState("acquisition");
   const metrics = useMemo(() => calcMetrics(deal), [deal]);
 
@@ -4673,7 +5051,9 @@ const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete }) => {
   const handleExportPDF = async () => {
     const result = await generatePDFReport(deal, metrics, "investor");
     if (!result.success) {
-      alert(result.error || "PDF generation failed.");
+      onPdfError?.(result.error || "PDF generation failed.");
+    } else {
+      onPdfSuccess?.(`PDF exported — ${result.filename}`);
     }
   };
 
@@ -4687,15 +5067,39 @@ const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete }) => {
           <button onClick={onBack} className="btn-ghost" style={{ marginBottom: 8, fontSize: 12 }}>
             <ChevronRight size={14} style={{ transform: "rotate(180deg)" }} /> Back to Dashboard
           </button>
-          <h1 className="serif" style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>
-            {deal.address || "New Deal Analysis"}
-          </h1>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <h1 className="serif" style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>
+              {deal.address || "New Deal Analysis"}
+            </h1>
+            <StatusChip status={getDealStatus(deal)} size="md" />
+            {isDirty && (
+              <span style={{
+                padding: "3px 8px", fontSize: 10, fontWeight: 700,
+                letterSpacing: "0.08em", textTransform: "uppercase",
+                background: THEME.bgOrange, color: THEME.orange, borderRadius: 4
+              }}>
+                Unsaved
+              </span>
+            )}
+          </div>
           <div style={{ fontSize: 13, color: THEME.textMuted, marginTop: 4 }}>
             {deal.city}, {deal.state} • {deal.propertyType}
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 11, color: THEME.textMuted }}>Status</span>
+            <select
+              value={getDealStatus(deal)}
+              onChange={(e) => onUpdate({ status: e.target.value })}
+              style={{ padding: "7px 10px", fontSize: 12, borderRadius: 6 }}
+            >
+              {DEAL_STATUS_ORDER.map(key => (
+                <option key={key} value={key}>{DEAL_STATUSES[key].label}</option>
+              ))}
+            </select>
+          </label>
           <button className="btn-secondary" onClick={handleExportPDF}>
             <FileDown size={14} />
             Export PDF
@@ -4705,7 +5109,7 @@ const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete }) => {
             Save Deal
           </button>
           {onDelete && (
-            <button className="btn-danger" onClick={onDelete} style={{ padding: "8px 12px" }}>
+            <button className="btn-danger" onClick={onDelete} style={{ padding: "8px 12px" }} aria-label="Delete deal">
               <Trash2 size={14} />
             </button>
           )}
@@ -7108,7 +7512,54 @@ const EducationCenter = () => {
 /* ============================================================================
    DASHBOARD
    ============================================================================ */
+const DASHBOARD_SORT_OPTIONS = [
+  { key: "updated", label: "Last Updated" },
+  { key: "created", label: "Newest Created" },
+  { key: "grade", label: "Deal Grade" },
+  { key: "cashflow", label: "Monthly Cash Flow" },
+  { key: "coc", label: "Cash-on-Cash %" }
+];
+
 const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal }) => {
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [sortKey, setSortKey] = useState("updated");
+
+  // Status counts for the filter chip labels
+  const statusCounts = useMemo(() => {
+    const counts = { all: deals.length };
+    DEAL_STATUS_ORDER.forEach(k => { counts[k] = 0; });
+    deals.forEach(d => {
+      const s = getDealStatus(d);
+      counts[s] = (counts[s] || 0) + 1;
+    });
+    return counts;
+  }, [deals]);
+
+  const filteredSorted = useMemo(() => {
+    const q = query.toLowerCase().trim();
+    let list = deals.filter(d => {
+      if (statusFilter !== "all" && getDealStatus(d) !== statusFilter) return false;
+      if (!q) return true;
+      return (d.address || "").toLowerCase().includes(q) ||
+             (d.city || "").toLowerCase().includes(q) ||
+             (d.state || "").toLowerCase().includes(q);
+    });
+    const withMetrics = list.map(d => ({ d, m: calcMetrics(d) }));
+    const gradeOrder = { A: 4, "B+": 3, B: 2, C: 1, D: 0 };
+    withMetrics.sort((a, b) => {
+      switch (sortKey) {
+        case "created":   return new Date(b.d.createdAt || 0) - new Date(a.d.createdAt || 0);
+        case "grade":     return (gradeOrder[b.m.grade] || 0) - (gradeOrder[a.m.grade] || 0);
+        case "cashflow":  return (b.m.monthlyCashFlow || 0) - (a.m.monthlyCashFlow || 0);
+        case "coc":       return (b.m.cashOnCash || 0) - (a.m.cashOnCash || 0);
+        case "updated":
+        default:          return new Date(b.d.updatedAt || 0) - new Date(a.d.updatedAt || 0);
+      }
+    });
+    return withMetrics;
+  }, [deals, query, statusFilter, sortKey]);
+
   if (!deals.length) {
     return (
       <div style={{
@@ -7148,18 +7599,98 @@ const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal }) => {
           </h1>
           <div style={{ fontSize: 13, color: THEME.textMuted, marginTop: 4 }}>
             {deals.length} {deals.length === 1 ? "deal" : "deals"} tracked
+            {filteredSorted.length !== deals.length && (
+              <> &middot; showing {filteredSorted.length}</>
+            )}
           </div>
         </div>
       </div>
 
+      {/* Toolbar — search + sort + status filter chips */}
       <div style={{
+        marginBottom: 18, padding: 14,
+        background: THEME.bgPanel, border: `1px solid ${THEME.border}`,
+        borderRadius: 8,
         display: "grid",
-        gridTemplateColumns: isMobile() ? "1fr" : "repeat(auto-fill, minmax(320px, 1fr))",
-        gap: 16
+        gridTemplateColumns: isMobile() ? "1fr" : "2fr 1fr",
+        gap: 12, alignItems: "end"
       }}>
-        {deals.map(deal => {
-          const metrics = calcMetrics(deal);
-          return (
+        <div>
+          <div className="label-xs" style={{ marginBottom: 6 }}>Search</div>
+          <div style={{ position: "relative" }}>
+            <Search size={14} style={{
+              position: "absolute", left: 10, top: "50%",
+              transform: "translateY(-50%)", color: THEME.textDim
+            }} />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Filter by address, city, or state..."
+              style={{ width: "100%", padding: "9px 12px 9px 32px", fontSize: 13 }}
+            />
+          </div>
+        </div>
+        <div>
+          <div className="label-xs" style={{ marginBottom: 6 }}>Sort by</div>
+          <select
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value)}
+            style={{ width: "100%", padding: "9px 10px", fontSize: 13 }}
+          >
+            {DASHBOARD_SORT_OPTIONS.map(o => (
+              <option key={o.key} value={o.key}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Status filter chips */}
+      <div style={{
+        display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20
+      }}>
+        {[{ key: "all", label: "All" }, ...DEAL_STATUS_ORDER.map(k => ({ key: k, label: DEAL_STATUSES[k].label }))]
+          .filter(opt => opt.key === "all" || statusCounts[opt.key] > 0)
+          .map(opt => {
+            const active = statusFilter === opt.key;
+            return (
+              <button
+                key={opt.key}
+                onClick={() => setStatusFilter(opt.key)}
+                style={{
+                  padding: "5px 12px", fontSize: 12, fontWeight: 600,
+                  background: active ? THEME.accent : THEME.bg,
+                  color: active ? "#fff" : THEME.textMuted,
+                  border: `1px solid ${active ? THEME.accent : THEME.border}`,
+                  borderRadius: 14, cursor: "pointer",
+                  display: "inline-flex", alignItems: "center", gap: 6
+                }}
+              >
+                {opt.label}
+                <span style={{
+                  minWidth: 18, padding: "0 5px", fontSize: 10, fontWeight: 700,
+                  background: active ? "rgba(255,255,255,0.25)" : THEME.borderLight,
+                  color: active ? "#fff" : THEME.textDim,
+                  borderRadius: 9, textAlign: "center"
+                }}>
+                  {statusCounts[opt.key] ?? 0}
+                </span>
+              </button>
+            );
+          })}
+      </div>
+
+      {filteredSorted.length === 0 ? (
+        <div style={{ padding: 40, textAlign: "center", color: THEME.textMuted, fontSize: 13 }}>
+          No deals match the current filters.
+        </div>
+      ) : (
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: isMobile() ? "1fr" : "repeat(auto-fill, minmax(320px, 1fr))",
+          gap: 16
+        }}>
+          {filteredSorted.map(({ d: deal, m: metrics }) => (
             <div
               key={deal.id}
               onClick={() => onOpenDeal(deal.id)}
@@ -7177,7 +7708,7 @@ const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal }) => {
                 e.currentTarget.style.transform = "translateY(0)";
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {deal.address || "Untitled Deal"}
@@ -7197,6 +7728,10 @@ const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal }) => {
                 }}>
                   {metrics.grade}
                 </div>
+              </div>
+
+              <div style={{ marginBottom: 12 }}>
+                <StatusChip status={getDealStatus(deal)} size="sm" />
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 12 }}>
@@ -7234,14 +7769,15 @@ const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal }) => {
                   }}
                   className="btn-danger"
                   style={{ padding: "4px 8px", fontSize: 11 }}
+                  aria-label="Delete deal"
                 >
                   <Trash2 size={12} />
                 </button>
               </div>
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
@@ -7329,6 +7865,185 @@ const TemplatePicker = ({ onSelect, onClose }) => (
 );
 
 /* ============================================================================
+   WATCHLIST VIEW — saved listings from Market Intel
+   ============================================================================ */
+const WatchlistView = () => {
+  const { watchlist, removeWatch, useListingAsDeal } = useAppActions();
+  const [detail, setDetail] = useState(null);
+  const [filter, setFilter] = useState("");
+
+  const filtered = useMemo(() => {
+    if (!filter.trim()) return watchlist;
+    const q = filter.toLowerCase().trim();
+    return watchlist.filter(l =>
+      (l.formattedAddress || "").toLowerCase().includes(q) ||
+      (l.city || "").toLowerCase().includes(q) ||
+      (l.state || "").toLowerCase().includes(q)
+    );
+  }, [watchlist, filter]);
+
+  return (
+    <div style={{ maxWidth: 1400, margin: "0 auto", padding: isMobile() ? "16px" : "24px 28px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
+        <div>
+          <h1 className="serif" style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>
+            Watchlist
+          </h1>
+          <div style={{ fontSize: 13, color: THEME.textMuted, marginTop: 4 }}>
+            {watchlist.length} {watchlist.length === 1 ? "property" : "properties"} saved from Market Intel
+          </div>
+        </div>
+        {watchlist.length > 0 && (
+          <input
+            type="text"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Filter by address, city, or state..."
+            style={{ width: 280, padding: "9px 12px", fontSize: 13 }}
+          />
+        )}
+      </div>
+
+      {watchlist.length === 0 ? (
+        <div style={{
+          maxWidth: 520, margin: "60px auto 0", padding: 40, textAlign: "center",
+          background: THEME.bgPanel, border: `1px solid ${THEME.border}`, borderRadius: 12
+        }}>
+          <div style={{
+            width: 64, height: 64, margin: "0 auto 16px",
+            borderRadius: "50%", background: THEME.bgRaised,
+            display: "flex", alignItems: "center", justifyContent: "center"
+          }}>
+            <Star size={28} color={THEME.accent} />
+          </div>
+          <h3 className="serif" style={{ fontSize: 20, margin: "0 0 8px" }}>
+            No saved properties yet
+          </h3>
+          <p style={{ fontSize: 13, color: THEME.textMuted, lineHeight: 1.5, marginBottom: 0 }}>
+            Head to <strong>Market Intel</strong>, click the star on any listing, and it'll land here.
+            Your watchlist is stored locally in this browser.
+          </p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div style={{ padding: 40, textAlign: "center", color: THEME.textMuted, fontSize: 13 }}>
+          No saved properties match "{filter}". Clear the filter to see them all.
+        </div>
+      ) : (
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: isMobile() ? "1fr" : "repeat(auto-fill, minmax(280px, 1fr))",
+          gap: 14
+        }}>
+          {filtered.map(listing => (
+            <div key={listing.id} style={{ position: "relative" }}>
+              <ListingCard
+                listing={listing}
+                type="sale"
+                onOpen={(l, t) => setDetail({ listing: l, type: t })}
+              />
+              <button
+                onClick={(e) => { e.stopPropagation(); removeWatch(listing.id); }}
+                aria-label="Remove from watchlist"
+                title="Remove"
+                className="btn-ghost"
+                style={{
+                  position: "absolute", top: 18, right: 18,
+                  width: 30, height: 30, padding: 0,
+                  background: "rgba(255,255,255,0.92)",
+                  borderRadius: "50%", border: `1px solid ${THEME.border}`,
+                  display: "flex", alignItems: "center", justifyContent: "center"
+                }}
+              >
+                <X size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {detail && (
+        <ListingDetailModal
+          listing={detail.listing}
+          type={detail.type}
+          onClose={() => setDetail(null)}
+        />
+      )}
+    </div>
+  );
+};
+
+/* ============================================================================
+   UNSAVED CHANGES MODAL — shown when leaving an analyzer draft with edits
+   ============================================================================ */
+const UnsavedChangesModal = ({ onSave, onDiscard, onCancel }) => {
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") onCancel(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onCancel]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="unsaved-title"
+      onClick={onCancel}
+      style={{
+        position: "fixed", inset: 0,
+        background: "rgba(15, 23, 42, 0.5)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        zIndex: 200, padding: 16
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: THEME.bg, borderRadius: 12, padding: 24,
+          maxWidth: 440, width: "100%",
+          animation: "modalFadeIn 0.18s ease-out",
+          boxShadow: "0 20px 60px rgba(15, 23, 42, 0.22)"
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: "50%",
+            background: THEME.bgOrange, color: THEME.orange,
+            display: "flex", alignItems: "center", justifyContent: "center"
+          }}>
+            <AlertTriangle size={18} />
+          </div>
+          <div>
+            <h3 id="unsaved-title" className="serif" style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>
+              Unsaved changes
+            </h3>
+            <div style={{ fontSize: 12, color: THEME.textMuted, marginTop: 2 }}>
+              You have edits on this deal that haven't been saved.
+            </div>
+          </div>
+        </div>
+
+        <p style={{ fontSize: 13, color: THEME.textMuted, lineHeight: 1.5, margin: "16px 0 20px" }}>
+          Save the draft before leaving, or discard and continue. You can always undo by
+          editing the deal later.
+        </p>
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
+          <button onClick={onCancel} className="btn-ghost" style={{ padding: "8px 14px", fontSize: 13 }}>
+            Keep Editing
+          </button>
+          <button onClick={onDiscard} className="btn-danger" style={{ padding: "8px 14px", fontSize: 13 }}>
+            <Trash2 size={13} /> Discard
+          </button>
+          <button onClick={onSave} className="btn-primary" style={{ padding: "8px 14px", fontSize: 13 }}>
+            <Save size={13} /> Save & Continue
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ============================================================================
    MAIN APP — BRRRRTracker
    ============================================================================ */
 const STORAGE_KEY = "dealtrack-deals";
@@ -7347,7 +8062,8 @@ const createBlankDeal = (template = null) => {
     closingCosts: 0, holdingCosts: 0,
     propertyTax: 0, insurance: 0, capex: 0, repairMaintenance: 0,
     vacancy: 8, mgmtFee: 10, hoa: 0,
-    notes: ""
+    notes: "",
+    status: "lead"
   };
   if (template && DEAL_TEMPLATES[template]) {
     return { ...base, ...DEAL_TEMPLATES[template].defaults };
@@ -7355,13 +8071,60 @@ const createBlankDeal = (template = null) => {
   return base;
 };
 
-export default function BRRRRTracker() {
+const WATCHLIST_STORAGE_KEY = "dealtrack-watchlist";
+
+/* ============================================================================
+   DEAL PIPELINE STATUSES — workflow states a saved deal passes through
+   ============================================================================ */
+const DEAL_STATUSES = {
+  lead:          { label: "Lead",            color: THEME.textMuted, bg: THEME.borderLight },
+  analyzing:     { label: "Analyzing",       color: THEME.navy,      bg: THEME.bgRaised },
+  offer:         { label: "Offer Made",      color: THEME.orange,    bg: THEME.bgOrange },
+  underContract: { label: "Under Contract",  color: THEME.teal,      bg: THEME.bgTeal },
+  closed:        { label: "Closed",          color: THEME.green,     bg: THEME.greenDim },
+  rehab:         { label: "Rehab",           color: THEME.orange,    bg: THEME.bgOrange },
+  rented:        { label: "Rented",          color: THEME.green,     bg: THEME.greenDim },
+  exited:        { label: "Exited",          color: THEME.textDim,   bg: THEME.borderLight }
+};
+const DEAL_STATUS_ORDER = ["lead", "analyzing", "offer", "underContract", "closed", "rehab", "rented", "exited"];
+
+const getDealStatus = (deal) => {
+  const s = deal && deal.status;
+  return DEAL_STATUSES[s] ? s : "analyzing";
+};
+
+const StatusChip = ({ status, size = "sm", onClick }) => {
+  const s = DEAL_STATUSES[status] || DEAL_STATUSES.analyzing;
+  const padding = size === "sm" ? "3px 8px" : "5px 12px";
+  const fontSize = size === "sm" ? 10 : 11;
+  return (
+    <span
+      onClick={onClick}
+      style={{
+        display: "inline-flex", alignItems: "center",
+        padding, fontSize, fontWeight: 700,
+        letterSpacing: "0.06em", textTransform: "uppercase",
+        background: s.bg, color: s.color,
+        borderRadius: 4,
+        cursor: onClick ? "pointer" : "default"
+      }}
+    >
+      {s.label}
+    </span>
+  );
+};
+
+function BRRRRTrackerInner() {
+  const toast = useToast();
   const [deals, setDeals] = useState([]);
   const [view, setView] = useState("dashboard");
   const [activeDealId, setActiveDealId] = useState(null);
   const [draftDeal, setDraftDeal] = useState(null);
+  const [isDraftDirty, setIsDraftDirty] = useState(false);
+  const [pendingNav, setPendingNav] = useState(null); // { type: "view"|"back", payload }
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [watchlist, setWatchlist] = useState([]);
 
   // Load deals from localStorage on mount
   useEffect(() => {
@@ -7391,6 +8154,33 @@ export default function BRRRRTracker() {
     }
   }, [deals, loaded]);
 
+  // Load watchlist from localStorage once on mount
+  useEffect(() => {
+    try {
+      const raw = typeof window !== "undefined" && window.localStorage
+        ? window.localStorage.getItem(WATCHLIST_STORAGE_KEY)
+        : null;
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setWatchlist(parsed);
+      }
+    } catch (err) {
+      console.warn("Could not load watchlist:", err);
+    }
+  }, []);
+
+  // Persist watchlist
+  useEffect(() => {
+    if (!loaded) return;
+    try {
+      if (typeof window !== "undefined" && window.localStorage) {
+        window.localStorage.setItem(WATCHLIST_STORAGE_KEY, JSON.stringify(watchlist));
+      }
+    } catch (err) {
+      console.warn("Could not save watchlist:", err);
+    }
+  }, [watchlist, loaded]);
+
   const activeDeal = useMemo(() => {
     if (draftDeal) return draftDeal;
     return deals.find(d => d.id === activeDealId) || null;
@@ -7404,6 +8194,7 @@ export default function BRRRRTracker() {
     const fresh = createBlankDeal(templateKey);
     setDraftDeal(fresh);
     setActiveDealId(null);
+    setIsDraftDirty(false);
     setShowTemplatePicker(false);
     setView("analyzer");
   }, []);
@@ -7411,12 +8202,14 @@ export default function BRRRRTracker() {
   const handleOpenDeal = useCallback((dealId) => {
     setActiveDealId(dealId);
     setDraftDeal(null);
+    setIsDraftDirty(false);
     setView("analyzer");
   }, []);
 
   const handleUpdateDraft = useCallback((updates) => {
     if (draftDeal) {
       setDraftDeal({ ...draftDeal, ...updates, updatedAt: new Date().toISOString() });
+      setIsDraftDirty(true);
     } else if (activeDealId) {
       setDeals(prev => prev.map(d =>
         d.id === activeDealId
@@ -7432,33 +8225,140 @@ export default function BRRRRTracker() {
       setActiveDealId(draftDeal.id);
       setDraftDeal(null);
     }
-    alert("Deal saved successfully.");
-  }, [draftDeal]);
+    setIsDraftDirty(false);
+    toast.push("Deal saved", "success");
+  }, [draftDeal, toast]);
 
   const handleDeleteDeal = useCallback((dealId) => {
     setDeals(prev => prev.filter(d => d.id !== dealId));
     if (activeDealId === dealId) {
       setActiveDealId(null);
       setDraftDeal(null);
+      setIsDraftDirty(false);
       setView("dashboard");
     }
-  }, [activeDealId]);
+    toast.push("Deal deleted", "info");
+  }, [activeDealId, toast]);
 
-  const handleBack = useCallback(() => {
-    setDraftDeal(null);
-    setActiveDealId(null);
-    setView("dashboard");
-  }, []);
-
-  const handleChangeView = useCallback((next) => {
+  // Core nav helpers — forced = bypass the dirty guard (used after save/discard resolves)
+  const performChangeView = useCallback((next) => {
     setView(next);
     if (next !== "analyzer") {
       setDraftDeal(null);
       setActiveDealId(null);
+      setIsDraftDirty(false);
     }
   }, []);
 
+  const performBack = useCallback(() => {
+    setDraftDeal(null);
+    setActiveDealId(null);
+    setIsDraftDirty(false);
+    setView("dashboard");
+  }, []);
+
+  // Gated versions: if there's an unsaved draft, stash the intent and ask the user
+  const handleChangeView = useCallback((next) => {
+    if (view === "analyzer" && draftDeal && isDraftDirty && next !== "analyzer") {
+      setPendingNav({ type: "view", payload: next });
+      return;
+    }
+    performChangeView(next);
+  }, [view, draftDeal, isDraftDirty, performChangeView]);
+
+  const handleBack = useCallback(() => {
+    if (draftDeal && isDraftDirty) {
+      setPendingNav({ type: "back" });
+      return;
+    }
+    performBack();
+  }, [draftDeal, isDraftDirty, performBack]);
+
+  // Resolve the pending nav action (called by the Unsaved modal)
+  const resolvePendingNav = useCallback((decision) => {
+    if (!pendingNav) return;
+    const pn = pendingNav;
+    if (decision === "cancel") {
+      setPendingNav(null);
+      return;
+    }
+    if (decision === "save") {
+      handleSaveDeal();
+    }
+    // Clear draft dirtiness and execute the stashed intent
+    setIsDraftDirty(false);
+    setPendingNav(null);
+    if (pn.type === "view") performChangeView(pn.payload);
+    else if (pn.type === "back") performBack();
+  }, [pendingNav, handleSaveDeal, performChangeView, performBack]);
+
+  /* ── Watchlist + cross-cutting app actions ─────────────────────────── */
+  const isWatched = useCallback(
+    (id) => watchlist.some(w => w.id === id),
+    [watchlist]
+  );
+
+  const toggleWatch = useCallback((listing) => {
+    setWatchlist(prev => {
+      const already = prev.some(w => w.id === listing.id);
+      if (already) {
+        toast.push("Removed from Watchlist", "info");
+        return prev.filter(w => w.id !== listing.id);
+      }
+      toast.push("Saved to Watchlist", "success");
+      return [...prev, { ...listing, addedAt: new Date().toISOString() }];
+    });
+  }, [toast]);
+
+  const removeWatch = useCallback((id) => {
+    setWatchlist(prev => prev.filter(w => w.id !== id));
+    toast.push("Removed from Watchlist", "info");
+  }, [toast]);
+
+  const useListingAsDeal = useCallback((listing) => {
+    const parseAddress = (formatted) => {
+      const parts = (formatted || "").split(",").map(s => s.trim());
+      return {
+        address: parts[0] || "",
+        city: parts[1] || "",
+        state: (parts[2] || "").split(" ")[0] || ""
+      };
+    };
+    const parsed = parseAddress(listing.formattedAddress);
+    const price = n(listing.price);
+    const fresh = {
+      ...createBlankDeal(),
+      address: listing.addressLine1 || parsed.address || listing.formattedAddress || "",
+      city: listing.city || parsed.city || "",
+      state: listing.state || parsed.state || "",
+      propertyType: listing.propertyType || "Single Family",
+      bedrooms: listing.bedrooms || 3,
+      bathrooms: listing.bathrooms || 2,
+      sqft: listing.squareFootage || 1500,
+      purchasePrice: price,
+      offerPrice: price,
+      listPrice: price,
+      // Conservative defaults so the first screen is populated:
+      arv: Math.round(price * 1.12),
+      closingCosts: Math.round(price * 0.02),
+      rentEstimate: Math.round(price * 0.008), // 0.8%-rule placeholder
+      status: "analyzing",
+      sourceListingId: listing.id || null,
+      sourceListingUrl: listing.externalUrl || null
+    };
+    setDraftDeal(fresh);
+    setActiveDealId(null);
+    setIsDraftDirty(true);
+    setView("analyzer");
+    toast.push(`Loaded ${parsed.address || "listing"} into Deal Analyzer`, "success");
+  }, [toast]);
+
+  const appActions = useMemo(() => ({
+    isWatched, toggleWatch, removeWatch, useListingAsDeal, watchlist
+  }), [isWatched, toggleWatch, removeWatch, useListingAsDeal, watchlist]);
+
   return (
+    <AppActionsContext.Provider value={appActions}>
     <div className="brrrr-root">
       <style>{STYLE_TAG}</style>
 
@@ -7466,6 +8366,7 @@ export default function BRRRRTracker() {
         view={view}
         onChangeView={handleChangeView}
         onNewDeal={handleNewDeal}
+        watchlistCount={watchlist.length}
       />
 
       {view === "dashboard" && (
@@ -7483,6 +8384,9 @@ export default function BRRRRTracker() {
           onUpdate={handleUpdateDraft}
           onSave={handleSaveDeal}
           onBack={handleBack}
+          isDirty={isDraftDirty}
+          onPdfError={(msg) => toast.push(msg, "error")}
+          onPdfSuccess={(msg) => toast.push(msg, "success")}
           onDelete={activeDealId ? () => {
             if (confirm("Delete this deal permanently?")) handleDeleteDeal(activeDealId);
           } : null}
@@ -7513,12 +8417,22 @@ export default function BRRRRTracker() {
         <AdvancedMarketIntel />
       </div>}
 
+      {view === "watchlist" && <WatchlistView />}
+
       {view === "education" && <EducationCenter />}
 
       {showTemplatePicker && (
         <TemplatePicker
           onSelect={handleTemplateSelect}
           onClose={() => setShowTemplatePicker(false)}
+        />
+      )}
+
+      {pendingNav && (
+        <UnsavedChangesModal
+          onSave={() => resolvePendingNav("save")}
+          onDiscard={() => resolvePendingNav("discard")}
+          onCancel={() => resolvePendingNav("cancel")}
         />
       )}
 
@@ -7533,6 +8447,15 @@ export default function BRRRRTracker() {
         <div>© 2026 DealTrack</div>
       </div>
     </div>
+    </AppActionsContext.Provider>
+  );
+}
+
+export default function BRRRRTracker() {
+  return (
+    <ToastHost>
+      <BRRRRTrackerInner />
+    </ToastHost>
   );
 }
 
