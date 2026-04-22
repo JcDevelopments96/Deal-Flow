@@ -44,3 +44,6 @@ coverage/
 
 # Local development
 .cache/
+
+# Claude Code — user-specific permission/hook config
+.claude/settings.local.json
