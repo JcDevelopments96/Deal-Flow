@@ -25,22 +25,22 @@ const getJsPDF = () => (typeof window !== "undefined" && window.jspdf && window.
   || null;
 
 /* ============================================================================
-   THEME + FONTS (TEAL & ORANGE — clean light)
+   THEME + FONTS (ORANGE PRIMARY + TEAL — clean light)
    ============================================================================ */
 const THEME = {
   bg: "#FFFFFF",          // Pure white canvas
   bgPanel: "#FAFAFA",     // Panel surfaces — subtle off-white
   bgInput: "#FFFFFF",     // Inputs match canvas
-  bgRaised: "#F1F5F9",    // Hover / raised (slate-100)
+  bgRaised: "#FFF7ED",    // Hover / raised — warm orange-50
   border: "#E2E8F0",      // Standard border (slate-200)
   borderLight: "#F1F5F9", // Subtle dividers
   text: "#0F172A",        // Primary text (slate-900)
   textMuted: "#475569",   // Secondary text (slate-600) — high-contrast for scanning
   textDim: "#94A3B8",     // Placeholders / tertiary (slate-400)
-  accent: "#0D9488",      // Teal-600 — primary CTA & active states
-  accentDim: "#0F766E",   // Teal-700 — hover
-  secondary: "#EA580C",   // Orange-600 — highlights & secondary emphasis
-  secondaryDim: "#C2410C",// Orange-700 — hover
+  accent: "#EA580C",      // Orange-600 — primary CTA & active states
+  accentDim: "#C2410C",   // Orange-700 — hover
+  secondary: "#0D9488",   // Teal-600 — secondary emphasis
+  secondaryDim: "#0F766E",// Teal-700 — hover
   green: "#059669",       // Emerald-600 (positive cash flow)
   greenDim: "#D1FAE5",    // Emerald-100
   red: "#DC2626",         // Red-600 (negative / delete)
@@ -81,7 +81,7 @@ input, select, textarea {
 }
 input::placeholder, textarea::placeholder { color: ${THEME.textDim}; }
 input:focus, select:focus, textarea:focus {
-  border-color: ${THEME.accent}; box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+  border-color: ${THEME.accent}; box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.12);
 }
 input[type="checkbox"] { accent-color: ${THEME.accent}; }
 input[type="range"] { accent-color: ${THEME.accent}; }
@@ -108,13 +108,13 @@ button {
   color: ${THEME.accent};
   background: ${THEME.bgRaised};
 }
-.btn-accent-orange {
+.btn-accent-teal {
   background: ${THEME.secondary}; color: #FFFFFF; font-weight: 600;
   padding: 8px 14px; font-size: 13px; display: inline-flex;
   align-items: center; gap: 6px; transition: all 0.15s ease;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
-.btn-accent-orange:hover { background: ${THEME.secondaryDim}; }
+.btn-accent-teal:hover { background: ${THEME.secondaryDim}; }
 .btn-ghost { color: ${THEME.textMuted}; }
 .btn-ghost:hover { color: ${THEME.accent}; background: ${THEME.bgRaised}; }
 .btn-danger { color: ${THEME.red}; }
@@ -1576,15 +1576,34 @@ const COUNTIES_TOPOJSON = "https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.
 const normalizeCountyName = (name) =>
   (name || "").toLowerCase().replace(/\s+county$/i, "").trim();
 
-// Return a teal fill whose opacity scales with the score.
-// Low score -> pale teal, high score -> deep teal.
-// t is normalized 0..1 (score position within dataset min..max).
-const scoreToTealFill = (t) => {
+// Return a red→yellow→green heatmap fill based on normalized score (0..1).
+// Low score = red, mid = yellow/amber, high = green. Classic performance heatmap.
+const scoreToHeatFill = (t) => {
   const clamped = Math.max(0, Math.min(1, t));
-  // Opacity 0.20 at low end, 0.95 at high end
-  const alpha = 0.20 + clamped * 0.75;
-  // Teal RGB (13, 148, 136) — matches THEME.accent
-  return `rgba(13, 148, 136, ${alpha.toFixed(2)})`;
+  // Interpolate through three stops:
+  //   0.0 = red    (220, 38, 38)
+  //   0.5 = amber  (245, 158, 11)
+  //   1.0 = green  (5, 150, 105)
+  let r, g, b;
+  if (clamped < 0.5) {
+    const k = clamped / 0.5; // 0..1 within red→amber band
+    r = Math.round(220 + (245 - 220) * k);
+    g = Math.round(38 + (158 - 38) * k);
+    b = Math.round(38 + (11 - 38) * k);
+  } else {
+    const k = (clamped - 0.5) / 0.5; // 0..1 within amber→green band
+    r = Math.round(245 + (5 - 245) * k);
+    g = Math.round(158 + (150 - 158) * k);
+    b = Math.round(11 + (105 - 11) * k);
+  }
+  return `rgba(${r}, ${g}, ${b}, 0.80)`;
+};
+
+const scoreToHeatStroke = (t) => {
+  const clamped = Math.max(0, Math.min(1, t));
+  if (clamped < 0.5) return "#DC2626"; // red-600
+  if (clamped < 0.75) return "#D97706"; // amber-600
+  return "#059669"; // emerald-600
 };
 
 const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyClick }) => {
@@ -1667,13 +1686,13 @@ const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyCli
                     const score = getScore(market);
                     const range = maxScore - minScore;
                     const t = range > 0 ? (score - minScore) / range : 1;
-                    fill = scoreToTealFill(t);
-                    stroke = THEME.accent;
+                    fill = scoreToHeatFill(t);
+                    stroke = scoreToHeatStroke(t);
                     strokeWidth = 0.5;
                   }
                   if (isHighlighted) {
-                    fill = THEME.secondary;
-                    stroke = THEME.secondaryDim;
+                    fill = THEME.accent;
+                    stroke = THEME.accentDim;
                     strokeWidth = 1.4;
                   }
 
@@ -1687,7 +1706,7 @@ const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyCli
                       style={{
                         default: { outline: "none", transition: "fill 0.2s" },
                         hover: {
-                          fill: isMarket ? THEME.secondary : (isInSelectedState ? THEME.border : THEME.bgRaised),
+                          fill: isMarket ? THEME.accent : (isInSelectedState ? THEME.border : THEME.bgRaised),
                           outline: "none",
                           cursor: isMarket ? "pointer" : "default"
                         },
@@ -1719,13 +1738,13 @@ const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyCli
           justifyContent: "space-between",
           marginBottom: 6
         }}>
-          <span className="label-xs">BRRRR Score</span>
+          <span className="label-xs">BRRRR Score Heatmap</span>
           <span style={{ fontSize: 10, color: THEME.textDim }}>
             {allMarkets.length} markets &bull; range {minScore}-{maxScore}
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span className="mono" style={{ fontSize: 11, color: THEME.textMuted, minWidth: 22 }}>
+          <span className="mono" style={{ fontSize: 11, color: THEME.red, minWidth: 22, fontWeight: 600 }}>
             {minScore}
           </span>
           <div style={{
@@ -1733,11 +1752,24 @@ const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyCli
             height: 10,
             borderRadius: 2,
             border: `1px solid ${THEME.border}`,
-            background: `linear-gradient(90deg, ${scoreToTealFill(0)} 0%, ${scoreToTealFill(0.5)} 50%, ${scoreToTealFill(1)} 100%)`
+            background: `linear-gradient(90deg, ${scoreToHeatFill(0)} 0%, ${scoreToHeatFill(0.5)} 50%, ${scoreToHeatFill(1)} 100%)`
           }} />
-          <span className="mono" style={{ fontSize: 11, color: THEME.textMuted, minWidth: 22, textAlign: "right" }}>
+          <span className="mono" style={{ fontSize: 11, color: THEME.green, minWidth: 22, textAlign: "right", fontWeight: 600 }}>
             {maxScore}
           </span>
+        </div>
+        <div style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginTop: 4,
+          fontSize: 10,
+          color: THEME.textDim,
+          paddingLeft: 32,
+          paddingRight: 32
+        }}>
+          <span>Weak</span>
+          <span>Average</span>
+          <span>Strong</span>
         </div>
       </div>
 
@@ -1754,27 +1786,27 @@ const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyCli
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{
             width: 14, height: 14, borderRadius: 2,
-            background: scoreToTealFill(0.7),
-            border: `1px solid ${THEME.accent}`
+            background: scoreToHeatFill(0.75),
+            border: `1px solid ${scoreToHeatStroke(0.75)}`
           }} />
           <span>Tracked Market</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{
             width: 14, height: 14, borderRadius: 2,
-            background: THEME.secondary
+            background: THEME.accent
           }} />
           <span>Selected</span>
         </div>
         {highlightedMarket && (
-          <div style={{ color: THEME.secondary, fontWeight: 600 }}>
+          <div style={{ color: THEME.accent, fontWeight: 600 }}>
             {highlightedMarket.city}, {highlightedMarket.state} &mdash; {highlightedMarket.county}
             &nbsp;&bull;&nbsp;
             Score {getScore(highlightedMarket)}
           </div>
         )}
         <div style={{ color: THEME.textDim, marginLeft: "auto", fontSize: 10 }}>
-          Click a teal county &bull; Scroll to zoom &bull; Drag to pan
+          Click a market &bull; Scroll to zoom &bull; Drag to pan
         </div>
       </div>
     </div>
@@ -2949,7 +2981,7 @@ const AdvancedMarketIntel = () => {
 
       <Panel title="Market Map — US Counties" icon={<MapPin size={16} />} accent style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 14 }}>
-          Every tracked market, color-coded by BRRRR score. Deeper teal indicates stronger overall investment conditions. Click a county to open its profile, or use the controls below to zoom and filter.
+          Every tracked market, color-coded by BRRRR score on a red-yellow-green heatmap. Red indicates weaker markets, yellow is average, and green represents the strongest investment conditions. Click a county to drill in.
         </div>
         <USCountyMap
           allMarkets={allMarkets}
@@ -3359,134 +3391,807 @@ const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete }) => {
 };
 
 /* ============================================================================
-   EDUCATION CENTER
+   EDUCATION CENTER — comprehensive real estate investment curriculum
    ============================================================================ */
 const EducationCenter = () => {
+  const [activeCategory, setActiveCategory] = useState("brrrr");
   const [activeTopic, setActiveTopic] = useState("brrrr-basics");
+  const [glossarySearch, setGlossarySearch] = useState("");
 
-  const topics = {
-    "brrrr-basics": {
-      title: "BRRRR Method Basics",
-      icon: <BookOpen size={16} />,
-      content: [
-        {
-          heading: "What is BRRRR?",
-          body: "BRRRR stands for Buy, Rehab, Rent, Refinance, Repeat. It's a real estate investment strategy that allows you to recycle your capital by pulling out your initial investment after renovating and stabilizing a property, then using those funds to acquire the next deal."
+  const curriculum = {
+    brrrr: {
+      title: "BRRRR Strategy",
+      icon: <RepeatIcon size={16} />,
+      topics: {
+        "brrrr-basics": {
+          title: "The BRRRR Method: Complete Overview",
+          icon: <BookOpen size={14} />,
+          sections: [
+            {
+              heading: "What BRRRR Stands For",
+              body: "BRRRR is an acronym for Buy, Rehab, Rent, Refinance, Repeat. Coined and popularized by Brandon Turner of BiggerPockets, it describes a five-step strategy for building a rental portfolio without continually injecting new capital into each deal. Each completed cycle recycles most or all of your initial investment so you can redeploy into the next property. Over 5-10 years, a disciplined investor can scale from zero to 10+ rental properties using the same working capital that would otherwise buy only one or two traditional rentals."
+            },
+            {
+              heading: "Why The Strategy Exists",
+              body: "Traditional buy-and-hold investing requires a fresh 20-25% down payment on every property, which caps growth at the rate you can save capital. BRRRR gets around this by (1) buying properties below market value, (2) forcing appreciation through strategic renovation, and (3) refinancing against the new higher appraised value to pull your original capital back out. If you bought at $150K, put $40K into rehab, and the ARV (After Repair Value) is $275K, a 75% LTV cash-out refinance gives you a $206K loan — recovering your $190K total basis and leaving you with a cash-flowing property."
+            },
+            {
+              heading: "Step 1 — Buy",
+              body: "The deal is made at acquisition. You must purchase at a discount large enough that purchase + rehab is well under 75% of ARV (the 70% Rule is a common guideline, with 5% additional buffer for refi costs). Sources of discounted properties include: MLS stale listings, foreclosure auctions, tax lien sales, probate sales, direct-to-seller mail and SMS marketing, wholesaler relationships, driving for dollars, expired listings, and FSBO properties. Hard money, private money, HELOC, or cash are typical acquisition financing vehicles because conventional lenders won't finance properties in poor condition."
+            },
+            {
+              heading: "Step 2 — Rehab",
+              body: "The rehab scope must achieve three goals simultaneously: (1) bring the property to rent-ready condition, (2) meet lender condition requirements for the eventual refinance (typically habitable with functional mechanicals), and (3) force the appraisal high enough to support the refinance. Over-renovating for the neighborhood destroys ROI; under-renovating leaves ARV on the table. Target the 'rental-grade' finish level: durable flooring (LVP), quartz or mid-grade granite, stainless appliances, neutral paint. Skip premium finishes unless the comps demand them."
+            },
+            {
+              heading: "Step 3 — Rent",
+              body: "You must have a qualified tenant in place (ideally with a 12-month lease) before refinancing with most lenders. DSCR lenders specifically underwrite the loan to the rental income, so weak rents directly reduce your loan amount. Price the rental slightly below market rent to fill quickly — every month of vacancy on a distressed-acquisition property crushes your returns. Screen tenants rigorously: credit 620+, 3x monthly rent in verifiable income, no evictions, clean criminal background. A bad tenant during the seasoning period can torpedo the whole deal."
+            },
+            {
+              heading: "Step 4 — Refinance",
+              body: "Wait out the lender's seasoning period (typically 6 months for conventional, 3-6 months for DSCR) then refinance with a cash-out loan. Standard cash-out LTV on investment properties is 70-75%. Your lender will order a new appraisal — this is the moment of truth. The new loan pays off your acquisition loan and returns the remaining cash to you. Refinance closing costs typically run 2-3% of the loan amount, so budget for them in your deal analysis. If the appraisal comes in short, you have three choices: bring cash to close the gap, wait and appeal, or keep the property as a traditional rental and accept cash tied up."
+            },
+            {
+              heading: "Step 5 — Repeat",
+              body: "Take the cash pulled from refinance and deploy it into the next BRRRR. Experienced operators run 2-6 deals per year on staggered timelines so there's always money working. The compounding effect is powerful: in year one you complete one deal; in year three you might complete four simultaneously because each new rental adds cash flow and equity that supports the next acquisition. Build systems before you scale — contractors, property managers, lenders, inspectors, and title companies you trust make the difference between scaling and burning out."
+            },
+            {
+              heading: "The Mathematical Foundation",
+              body: "BRRRR math centers on a single question: can you buy + rehab for less than or equal to 75% of ARV? If yes, a 75% LTV refinance recovers all invested capital. Worked example: ARV $300,000; target all-in cost $225,000 (75% of $300K). If rehab is $40K, max purchase price is $185K. Refinance at 75% LTV = $225K cash out, minus 2% closing costs ($4.5K) = $220.5K net. Your $225K basis is recovered within $4.5K, and you now own a $300K asset with ~$75K equity and (hopefully) positive cash flow. The 'infinite return' pitch of BRRRR rests on this math working out — which it won't if you overpay on acquisition or the appraisal underperforms."
+            },
+            {
+              heading: "Realistic Expectations vs. Influencer Hype",
+              body: "Social media BRRRR content is survivorship-biased. Deals that go sideways rarely get posted. Real-world BRRRR outcomes usually fall into one of three buckets: (1) 'Clean BRRRR' where you pull out 90-100% of invested capital — maybe 25% of deals; (2) 'Partial BRRRR' where 10-40% of your cash stays trapped in equity — the most common outcome; (3) 'Failed BRRRR' where the appraisal comes in low, rehab overruns crush margins, or market shifts sink comps. Plan for partial BRRRRs as the baseline and treat clean BRRRRs as a bonus."
+            }
+          ]
         },
-        {
-          heading: "Why BRRRR Works",
-          body: "The strategy works because you force appreciation through rehab work, then leverage the new (higher) appraised value to refinance out most or all of your original cash. Done right, you end up with a cash-flowing rental and most of your capital back to deploy again."
+        "brrrr-pitfalls": {
+          title: "BRRRR Pitfalls and How to Avoid Them",
+          icon: <AlertTriangle size={14} />,
+          sections: [
+            {
+              heading: "Pitfall 1 — Buying Too Close to ARV",
+              body: "The single most common BRRRR failure. Excitement, competition, or 'falling in love' with a deal leads investors to pay 80-90% of ARV minus rehab, leaving no margin for appraisal softness or rehab overruns. The fix: write your maximum allowable offer (MAO) on a piece of paper BEFORE negotiating, and don't exceed it. MAO = (ARV x 0.70) − Rehab − Closing Costs − Holding Costs − Desired Minimum Equity."
+            },
+            {
+              heading: "Pitfall 2 — Underestimating Rehab",
+              body: "First-time BRRRR investors routinely underbid rehab by 25-50%. Reasons include: not seeing hidden damage at walk-through (knob-and-tube wiring, failed sewer lines, asbestos, mold behind walls), not accounting for permit costs, not budgeting for holding costs (taxes, utilities, insurance during rehab), ignoring contractor draw schedules and change orders. The fix: add a 15-20% contingency to every rehab budget, walk the property with a licensed GC before closing, and get written quotes (not verbal estimates) for major systems."
+            },
+            {
+              heading: "Pitfall 3 — Appraisal Comes in Short",
+              body: "Even well-executed rehabs can face appraisals that come in 5-15% below your ARV estimate. Common reasons: appraiser used weak comps, market softened between contract and refi, unique property features weren't fully valued, appraiser unfamiliar with the area. The fix: when your loan officer orders the appraisal, ask if you can provide a 'comps packet' — 3-6 recent sold comparable properties within a half-mile radius, similar square footage, and similar condition. Include photos of your rehab scope. Many appraisers will review this before their visit."
+            },
+            {
+              heading: "Pitfall 4 — Seasoning Period Surprises",
+              body: "Most conventional lenders require 6 months of 'seasoning' (you own the property for 6+ months) before they'll let you refinance based on new appraised value rather than purchase price. Some require 12. DSCR lenders are often more flexible (3-6 months). The fix: confirm seasoning requirements IN WRITING with your refinance lender BEFORE you close on the acquisition. Never assume the rules you read online are current."
+            },
+            {
+              heading: "Pitfall 5 — Interest Rate Changes During Hold",
+              body: "A BRRRR deal underwritten at 7% interest rates can break at 9%. Rate increases during your hold period directly reduce cash flow because your new loan payment is higher. The fix: stress-test every deal at +2% above current rates during analysis. If the deal only works at today's rates, it's a fragile deal."
+            },
+            {
+              heading: "Pitfall 6 — The Tired Landlord Trap",
+              body: "After 3-5 BRRRRs, many investors hit a wall: the properties are cash-flowing but management is eating their life. Self-managing 5+ single-family rentals across a metro area is brutal. The fix: Build property management into your deal analysis from deal #1. Budget 8-10% of gross rents for management even if you're self-managing now — you'll want professional management eventually."
+            }
+          ]
         },
-        {
-          heading: "Risks to Consider",
-          body: "Common risks include: underestimating rehab costs, appraisal coming in below expectations, interest rate changes during the hold period, extended vacancy after rehab, and lender seasoning requirements (typically 6-12 months before refinance)."
+        "brrrr-alternatives": {
+          title: "BRRRR Alternatives and Hybrid Strategies",
+          icon: <Layers size={14} />,
+          sections: [
+            {
+              heading: "Traditional Buy-and-Hold",
+              body: "Purchase a rent-ready or lightly-updated property with 20-25% down and hold it as a rental. Advantages: less complexity, lower renovation risk, faster to execute. Disadvantages: requires fresh capital every deal, so portfolio growth is capped at your savings rate. Best for investors who value simplicity over speed or are working with limited handyman/contractor relationships."
+            },
+            {
+              heading: "Fix and Flip",
+              body: "Same acquisition process as BRRRR, but sell the property on the retail market instead of refinancing and holding. Advantages: faster capital turnover (4-8 month cycle vs 8-14 months for BRRRR), no landlord hassle, taxed as short-term capital gain or dealer income but realized immediately. Disadvantages: no long-term equity buildup, full taxation on each flip, selling costs (6-8% of sale price) eat into profit, market downturn risk if you can't sell."
+            },
+            {
+              heading: "The BRRRR-Flip Hybrid",
+              body: "Start every deal with both exit strategies open. After rehab, run the numbers: if holding produces strong cash flow and the refinance math works cleanly, refinance and rent. If the market is hot and flip profit is large, sell. This optionality increases your average returns but requires discipline not to chase the option that felt right at purchase time."
+            },
+            {
+              heading: "House Hacking",
+              body: "Buy a 2-4 unit property, live in one unit, rent the others. Qualifies for owner-occupant financing (FHA 3.5% down, VA 0% down, conventional 5% down) — dramatically lower down payment than investment property loans. After 12 months of owner-occupancy you can move out and either refinance or keep the low-down-payment mortgage. Among the fastest ways to get started for investors with limited capital."
+            },
+            {
+              heading: "Live-In Flip",
+              body: "Buy a primary residence that needs work, renovate while living in it, sell after 2+ years to qualify for the Section 121 capital gains exclusion ($250K single / $500K married). The federal tax exemption on the gain is often more valuable than the rental cash flow a BRRRR would produce. Major advantage for investors in high-tax brackets."
+            },
+            {
+              heading: "Turnkey Rental",
+              body: "Buy a fully renovated, already-tenanted property from a turnkey provider. Advantages: no rehab risk, immediate cash flow, minimal time commitment. Disadvantages: paying retail price (so little equity built in), quality varies wildly by provider, no forced appreciation upside. Reasonable for busy professionals with capital but no time for active BRRRRs."
+            }
+          ]
         }
-      ]
+      }
     },
-    "70-percent-rule": {
-      title: "The 70% Rule",
-      icon: <Percent size={16} />,
-      content: [
-        {
-          heading: "Definition",
-          body: "The 70% Rule is a guideline suggesting investors should pay no more than 70% of the After Repair Value (ARV) minus rehab costs. Formula: Max Offer = (ARV × 0.70) - Rehab Costs."
+
+    analysis: {
+      title: "Property Analysis",
+      icon: <Calculator size={16} />,
+      topics: {
+        "key-metrics": {
+          title: "Key Investment Metrics Explained",
+          icon: <BarChart3 size={14} />,
+          sections: [
+            {
+              heading: "Cash Flow",
+              body: "The monthly cash left over after collecting rent and paying all expenses: mortgage principal & interest (P&I), property taxes, insurance, property management, vacancy reserves, repairs & maintenance reserves, capital expenditure reserves, HOA fees, and utilities (if landlord-paid). Formula: Monthly Cash Flow = Gross Monthly Rent − All Monthly Expenses. Positive cash flow is non-negotiable for most investors — it means the property pays you every month to own it, regardless of appreciation."
+            },
+            {
+              heading: "Cap Rate (Capitalization Rate)",
+              body: "A measure of return independent of financing, useful for comparing properties. Formula: Cap Rate = Net Operating Income (NOI) / Property Value. NOI excludes mortgage payments. A property producing $18,000/year in NOI on a $250,000 value has a 7.2% cap rate. Cap rates are market-dependent: 4-5% is typical in premium coastal markets, 6-8% in secondary markets, 9%+ in tertiary or distressed markets (higher cap rate = lower price = more perceived risk)."
+            },
+            {
+              heading: "Cash-on-Cash Return (CoC)",
+              body: "Annual pre-tax cash flow divided by total cash invested. Unlike cap rate, CoC accounts for leverage. Formula: CoC = Annual Cash Flow / Total Cash Invested x 100. Example: $4,800/yr cash flow on $40K invested = 12% CoC. Target CoC ranges: 8-10% is solid, 10-15% is strong, 15%+ is excellent (but check for hidden risks). Post-BRRRR refinance, CoC often becomes 'infinite' because you have zero cash left in the deal."
+            },
+            {
+              heading: "Net Operating Income (NOI)",
+              body: "Annual gross rental income minus all operating expenses (taxes, insurance, management, vacancy, maintenance, utilities), but BEFORE debt service. NOI is the standard income metric for commercial real estate valuation and is directly used in cap rate calculations. A $2,500/mo rental with $900/mo in operating expenses produces NOI of $19,200/year."
+            },
+            {
+              heading: "Gross Rent Multiplier (GRM)",
+              body: "Property price divided by annual gross rent. A $200,000 property renting for $1,800/month ($21,600/year) has a GRM of 9.3. Lower is better. Useful for quick market comparisons without needing expense data, but a rough metric — doesn't account for expenses, vacancy, or property condition. Use GRM for screening, cap rate and CoC for decision-making."
+            },
+            {
+              heading: "Debt Service Coverage Ratio (DSCR)",
+              body: "NOI divided by annual debt service (mortgage P&I). A DSCR of 1.25 means the property produces 25% more income than the mortgage payment. Most DSCR lenders require 1.2-1.25 minimum; some require 1.0 (breakeven) with rate pricing adjustments. A property with $18K NOI and $14K in mortgage payments has a DSCR of 1.29."
+            },
+            {
+              heading: "Loan-to-Value (LTV)",
+              body: "Loan amount divided by property value. $200K loan on $250K property = 80% LTV. Investment property LTV maxes out at 80% for purchases, 75% for cash-out refinances under most conventional programs. Lower LTV = more equity cushion = better loan terms, but also more cash tied up."
+            },
+            {
+              heading: "Total Return / Internal Rate of Return (IRR)",
+              body: "Sophisticated metric that accounts for the time value of money across the full hold period: cash flow, principal paydown, appreciation, and sale proceeds. IRR calculates the annualized return that equates your initial investment with all future cash flows. Typically 15-20% IRR is strong for rental real estate. Requires modeling assumptions (appreciation rate, rent growth, exit cap rate) — garbage in, garbage out."
+            }
+          ]
         },
-        {
-          heading: "Why 70%?",
-          body: "The 30% buffer accounts for: closing costs (~2-3%), holding costs during rehab (~3-5%), refinance costs (~2-3%), selling costs if you exit (~6-8%), and your profit margin. Markets with lower appreciation may require 65% or even 60%."
+        "the-rules": {
+          title: "The Famous Rules: 70%, 1%, 2%, 50%",
+          icon: <Percent size={14} />,
+          sections: [
+            {
+              heading: "The 70% Rule (for BRRRR and Flips)",
+              body: "Max All-In Cost = ARV x 0.70. The 30% gap covers closing costs (2-3%), holding costs (3-5%), refinance costs (2-3%), and your profit margin (15-20%). In hot markets, investors stretch to 75%. In cold markets, disciplined investors hold at 65%. Example: ARV $300K x 70% = $210K max all-in. If rehab is $45K, max purchase is $165K."
+            },
+            {
+              heading: "The 1% Rule (for Rentals)",
+              body: "Monthly rent should be at least 1% of the total acquisition cost. A $180,000 all-in property should rent for $1,800/month. This is a screening heuristic, not a deal-maker. It works as a quick sanity check: properties that fail 1% almost always produce negative cash flow after expenses. Properties that clear 1% may or may not cash flow — you still have to run full numbers."
+            },
+            {
+              heading: "The 2% Rule (Aggressive Cash Flow)",
+              body: "The 1% rule's more demanding cousin: 2% of all-in cost in monthly rent. A $100K property renting for $2,000/month. Achievable only in truly distressed markets (rust-belt urban cores, rural) where purchase prices are rock-bottom. Properties hitting 2% often have hidden issues: crime, tenant class challenges, population decline. Don't chase 2% without understanding why the numbers are that good."
+            },
+            {
+              heading: "The 50% Rule (Expense Estimation)",
+              body: "Operating expenses (excluding mortgage) consume roughly 50% of gross rent over the long run. Includes: taxes, insurance, vacancy, management, repairs, capex, utilities if landlord-paid. A property renting for $2,000/month will average $1,000/month in operating expenses across a multi-year hold. If mortgage P&I is $800/month, cash flow is $200/month. This is a long-run average — in a good year expenses might be 35%; in a bad year, 65%."
+            },
+            {
+              heading: "Putting The Rules Together",
+              body: "Professional analysis uses the rules as quick filters, then confirms with itemized projections. Workflow: (1) Does it clear 1% rent-to-price? If no, pass. (2) Does purchase + rehab fit the 70% Rule? If no, re-negotiate or pass. (3) Do detailed expense projections beat the 50% Rule? If no, budget more conservatively. (4) Final decision based on cash flow, CoC, and strategic fit — not the rules."
+            }
+          ]
         },
-        {
-          heading: "Applying the Rule",
-          body: "If ARV is $300,000 and rehab is $50,000: Max Offer = ($300,000 × 0.70) - $50,000 = $160,000. Going above this erodes your margin of safety. It's a guideline, not a law — adjust based on market conditions."
+        "arv-estimation": {
+          title: "Estimating ARV: The Appraiser's Process",
+          icon: <Target size={14} />,
+          sections: [
+            {
+              heading: "What ARV Means",
+              body: "After Repair Value is what the property will appraise for once renovations are complete. It's the single most important number in a BRRRR or flip — if you're wrong by 10%, the deal can fail. ARV determines both your maximum allowable offer and your eventual refinance loan amount. Don't outsource this estimate to wholesalers or listing agents, who have incentives to inflate it."
+            },
+            {
+              heading: "The Comparable Sales (Comps) Approach",
+              body: "Appraisers and informed investors estimate ARV by analyzing recent sold properties nearby with similar characteristics. Criteria for a 'good comp': sold within the last 6 months (ideally 3), within 0.5-1 mile radius, similar square footage (+/- 15%), same bedroom/bathroom count, similar condition post-rehab, same school district, similar lot size, similar style (ranch, 2-story, etc.). Use 3-6 comps, not 1-2."
+            },
+            {
+              heading: "Sources for Comp Data",
+              body: "Professionals use the MLS, which requires an agent. Free alternatives: Zillow (approximate), Redfin (good for recent sales), Realtor.com, county assessor sites (lag behind market but accurate), PropStream or DealMachine (paid but comprehensive). Never rely on Zillow Zestimate for investment decisions — it's an algorithmic estimate that can be off by 20% in either direction."
+            },
+            {
+              heading: "Price-Per-Square-Foot Method",
+              body: "Quick sanity check: calculate $/sqft on recent comp sales, average them, multiply by subject property sqft. If 3 comps sold at $158, $165, $161 per sqft and your 1,600 sqft subject averages $161/sqft, ARV estimate is $258K. This method is most reliable when comps are tight in size and condition. Less reliable across varying floor plans (a home with more bedrooms typically sells higher $/sqft than one with larger bedrooms)."
+            },
+            {
+              heading: "Adjustments for Differences",
+              body: "No two properties are identical. Appraisers adjust comp values for differences: +$5K-$15K for extra bedroom, +$5K-$10K for extra bathroom, +$10K-$25K for garage vs no garage, +$15K-$50K for finished basement, +/-$5K for major upgrades or defects. Adjustments should be conservative — err low on subject property value, high on comp negatives."
+            },
+            {
+              heading: "Defending Your ARV to the Appraiser",
+              body: "When the refinance appraiser visits, hand them a folder: your three strongest comps with MLS printouts, photos of your completed rehab scope, a one-page list of upgrades with receipts, and the neighborhood's recent sale trajectory. Most appraisers accept well-prepared investor packets — it makes their job easier and gives them cover for a higher value. This practice is legal, common, and often decisive."
+            }
+          ]
+        },
+        "rehab-budgeting": {
+          title: "Rehab Budgeting and Scope",
+          icon: <Hammer size={14} />,
+          sections: [
+            {
+              heading: "Ranges by Rehab Level",
+              body: "Light cosmetic (paint, carpet, fixtures, cleaning): $10-$20/sqft. Medium rehab (kitchen and bath refresh, new flooring, some systems): $25-$40/sqft. Heavy rehab (full kitchen/bath gut, new electrical/plumbing, HVAC, roof): $45-$70/sqft. Full gut including structural: $75-$125/sqft. These are 2025 national averages — high-cost metros (Bay Area, NYC, Boston) run 40-80% higher. Rural markets run 15-30% lower."
+            },
+            {
+              heading: "The Renovation Hierarchy (In Order of Priority)",
+              body: "For rental properties, always address in this order: (1) Safety & code violations — fire hazards, electrical issues, structural, lead paint, mold; (2) Mechanical systems — HVAC, plumbing, electrical, roof, water heater; (3) Envelope — windows, siding, insulation; (4) Interior finishes — kitchens, baths, flooring, paint; (5) Cosmetic — landscaping, fixtures, hardware. Cutting corners on (1) or (2) creates future expenses that dwarf what you saved."
+            },
+            {
+              heading: "Kitchen Renovations for Rentals",
+              body: "Rental-grade kitchen budget: $6,000-$12,000. Typical scope: new stock cabinets (or paint existing), mid-grade quartz or butcher-block counters, stainless appliance package ($1,800-$2,400), LVP flooring ($4-$6/sqft installed), single-basin stainless sink, widespread faucet, new outlets and lighting. Avoid high-end tile backsplashes and custom cabinetry — they don't increase rental appraisal much in most markets."
+            },
+            {
+              heading: "Bathroom Renovations for Rentals",
+              body: "Rental-grade full-bath budget: $3,500-$6,500 for a standard gut. Scope: new tub/shower (fiberglass insert, not tile, unless high-end market), new toilet, vanity with integrated top, moisture-resistant flooring, new lighting, exhaust fan. Subway tile remains timeless and cheap. Avoid ornate tile patterns that date quickly."
+            },
+            {
+              heading: "Flooring Decisions",
+              body: "Luxury Vinyl Plank (LVP) is the rental market standard: waterproof, scratch-resistant, looks like wood, $4-$6/sqft installed. Use in all main living areas and kitchens. Carpet only in bedrooms (cheap replaceable carpet is actually fine: $2-$3/sqft installed, replace between tenants). Avoid hardwood refinishing in rentals — expensive and easily damaged."
+            },
+            {
+              heading: "The Contingency Line",
+              body: "Every rehab budget should include a 15-20% contingency for unknowns. On a $40K rehab, that's $6K-$8K. Unknowns always exist: rotten subfloor under the tub, outdated electrical panel that fails code, termites in the sill plate, lead paint remediation. Investors who skip contingency are investors who end up borrowing money mid-rehab at punitive rates."
+            },
+            {
+              heading: "Permits: When to Pull Them",
+              body: "Most jurisdictions require permits for: electrical changes, plumbing changes beyond fixture swaps, HVAC, structural alterations, additions. Unpermitted work creates problems at refinance (appraiser may flag it), at sale (disclosure obligations), and at insurance claim time (denied claims). Budget for permits: $500-$2,000 depending on scope. Permit timelines can add 2-8 weeks to a project — factor into your holding cost projections."
+            },
+            {
+              heading: "Contractor Management",
+              body: "Never pay more than 10-20% upfront. Use a draw schedule tied to milestones: e.g., 20% on contract signing, 30% on rough-in complete, 30% on drywall complete, 20% on final walkthrough. Require lien waivers before each draw. Get three written bids for any job over $5K. Verify licenses and insurance on every tradesperson — unlicensed contractors can't file liens but can still sue, and their insurance won't cover injuries on your property."
+            }
+          ]
         }
-      ]
+      }
     },
-    "1-percent-rule": {
-      title: "The 1% Rule",
-      icon: <DollarSign size={16} />,
-      content: [
-        {
-          heading: "Definition",
-          body: "Monthly rent should equal at least 1% of the total acquisition cost (purchase + rehab). A $150,000 all-in property should rent for at least $1,500/month to meet the rule."
-        },
-        {
-          heading: "Market Realities",
-          body: "In expensive coastal markets, the 1% rule is rarely achievable. Midwest and southern markets often hit 1-1.5%+. Don't use this as your only filter — combine with cash flow, cap rate, and cash-on-cash return analysis."
-        }
-      ]
-    },
-    "financing-strategies": {
-      title: "Financing Strategies",
+
+    financing: {
+      title: "Financing & Capital",
       icon: <PiggyBank size={16} />,
-      content: [
-        {
-          heading: "Conventional Loans",
-          body: "Fannie Mae / Freddie Mac loans with 20-25% down for investment properties. Best rates but have limits (typically 10 financed properties per borrower). 30-year fixed rates give predictable long-term payments."
+      topics: {
+        "loan-types": {
+          title: "Complete Guide to Loan Types",
+          icon: <DollarSign size={14} />,
+          sections: [
+            {
+              heading: "Conventional Investment Property Loans",
+              body: "Fannie Mae / Freddie Mac conforming loans for 1-4 unit investment properties. Requirements: 20-25% down for single-family (25% for cash-out refi), 720+ credit score for best pricing, 6 months reserves per financed property. Rate premium vs primary residence: +0.5% to +1.0%. Maximum 10 financed properties per borrower across both Fannie and Freddie combined. Best for: core investors with strong W-2 income building early portfolio."
+            },
+            {
+              heading: "DSCR (Debt Service Coverage Ratio) Loans",
+              body: "Non-QM (non-qualified mortgage) loans that underwrite to the property's rental income rather than the borrower's personal income. Requirements: 20-25% down, 620+ credit score, no personal income or tax return documentation, property must cash-flow at or above 1.0-1.25 DSCR depending on program. Rate premium: +0.75% to +2.0% over conventional. No cap on number of financed properties. Best for: self-employed investors, those who've maxed conventional slots, investors with complex tax situations."
+            },
+            {
+              heading: "Hard Money Loans",
+              body: "Short-term, asset-based loans from private or semi-institutional lenders for acquisition and rehab. Typical terms: 10-14% interest, 2-4 points upfront, 6-18 month term, interest-only payments, 85-90% of purchase + 100% of rehab (often called '90/100' financing). Lender focuses on the deal's ARV, not borrower income. Use case: acquisition-rehab leg of BRRRR, or flips where conventional doesn't work. Critical: have your refinance or sale plan locked in before closing — hard money default rates are punishing."
+            },
+            {
+              heading: "Private Money Loans",
+              body: "Loans from individual lenders (family, friends, accredited investors in your network) secured by the property. Terms are fully negotiable — 6-10% interest is common, 0-2 points, flexible on term and extensions. Best for relationship-based deals where the lender trusts your track record. Document every private loan with a proper promissory note and recorded mortgage/deed of trust — handshake deals create legal nightmares."
+            },
+            {
+              heading: "Home Equity Line of Credit (HELOC)",
+              body: "A revolving credit line secured by the equity in your primary residence. Typical: prime + 0.5% to prime + 2.5% variable rate, draw period 10 years, repayment period 20 years. Very flexible — pay interest only on what you've drawn. Use cases: down payment / rehab funding, emergency reserves. Risk: variable rates can spike (many HELOCs repriced 3-5% higher during 2022-2023), and if the deal fails, your house is on the hook."
+            },
+            {
+              heading: "Portfolio Loans",
+              body: "Loans held 'in portfolio' by a local bank or credit union rather than sold to Fannie/Freddie. Advantages: flexible underwriting (can work around complex self-employment, LLC-held properties, unusual property types), often blanket loans covering multiple properties. Disadvantages: slightly higher rates, require relationship-building, typically shorter amortization (20-year vs 30-year). Best for: investors with local banking relationships and atypical profiles."
+            },
+            {
+              heading: "Seller Financing",
+              body: "The seller carries part or all of the purchase price as a mortgage. Terms are fully negotiable: 5-8% interest is common, 5-20% down, 5-30 year amortization, often with a balloon payment at 5-10 years. Works best when: seller owns property free-and-clear, is selling for tax reasons, or can't find a retail buyer. Advantages: flexible terms, faster closing, no institutional underwriting. Downsides: often requires higher purchase prices, must refinance into conventional at balloon."
+            },
+            {
+              heading: "Owner-Occupant Loans (FHA, VA, Conventional 5%)",
+              body: "If you'll live in the property for at least 12 months, you qualify for dramatically better terms: FHA (3.5% down, lower credit requirement, allows 2-4 unit properties), VA (0% down for veterans, no PMI, 2-4 unit allowed), conventional 5% down. House hacking strategy: buy a duplex/triplex/quadplex, live in one unit, rent the others. After 12 months you can keep the low-down-payment loan and move out. The single most capital-efficient way to start a rental portfolio."
+            },
+            {
+              heading: "Commercial Loans (5+ Unit Properties)",
+              body: "Required for any property with 5+ residential units or any commercial use. Typical terms: 25-30% down, 5-year fixed / 25-year amortization with balloon at 5, DSCR-based underwriting (1.25+ required), recourse or non-recourse options. Rate premium: +0.5 to +1.5% over residential. Higher complexity but better economics at scale — commercial properties are valued on NOI, so forced appreciation from operational improvements directly increases equity."
+            }
+          ]
         },
-        {
-          heading: "Hard Money",
-          body: "Short-term asset-based loans (6-12 months) from private lenders. Higher rates (10-14%) and points (2-4%), but fast closing and flexibility on property condition. Good for acquisition + rehab phase before refinancing."
+        "refinancing": {
+          title: "Refinancing: Timing, Lenders, Strategy",
+          icon: <RefreshCw size={14} />,
+          sections: [
+            {
+              heading: "Rate-and-Term vs Cash-Out Refinance",
+              body: "Rate-and-term: refinance for the same loan amount (or less) to get a better rate or term. Typical max 80-85% LTV. Cash-out: refinance for more than you owe, pulling the difference out as cash. Typical max 70-75% LTV for investment properties. Cash-out is the BRRRR exit mechanism; rate-and-term is for optimizing existing debt."
+            },
+            {
+              heading: "Seasoning Requirements",
+              body: "Most conventional lenders require you to own the property for 6-12 months before they'll refinance based on appraised value rather than purchase price (the 'delayed financing' rule is an exception, allowing immediate refi of cash-purchased property up to 80% LTV). DSCR lenders are often more flexible: 3-6 months seasoning is common, some do no-seasoning refinances with pricing adjustments. Always confirm seasoning in writing before acquisition."
+            },
+            {
+              heading: "Shopping for Refinance Lenders",
+              body: "Get quotes from at least 3 lenders: a conventional bank, a mortgage broker with access to DSCR wholesalers, and a local portfolio lender. Compare: rate, points, lender fees, LTV available, seasoning requirement, prepayment penalty (common on DSCR), appraisal cost, total closing costs. Rate alone is misleading — a 0.25% lower rate offset by $4K more in fees is worse on a short hold."
+            },
+            {
+              heading: "Appraisal Management",
+              body: "Your refinance hinges on the appraisal. Actions that help: hand the appraiser a comps packet, have the property professionally cleaned before the visit, leave a one-page list of renovations with dates and costs, ensure all mechanical systems are accessible and functional. Actions that hurt: aggressive cleaning that reveals flaws previously hidden, discussing your 'hope' for a value (stay factual), failing to have utilities on (appraiser may reschedule)."
+            },
+            {
+              heading: "When Appraisal Comes In Short",
+              body: "Three options: (1) Accept the lower value and bring cash to close the gap — sometimes worth it if the property is strong otherwise. (2) Appeal the appraisal with new comps — success rate is low (10-15%) but free. (3) Walk away from the refinance and keep the current financing — works if your current loan is tolerable. Never pressure the appraiser — it's unethical and won't change the outcome, just creates risk."
+            },
+            {
+              heading: "Prepayment Penalties",
+              body: "Many DSCR loans carry prepayment penalties (PPP): 3-2-1 (3% year 1, 2% year 2, 1% year 3), 5-4-3-2-1, or 5-year flat 5% PPP. If you might refinance or sell within the PPP period, negotiate the PPP out (costs +0.25% to +0.5% in rate typically) or factor the exit penalty into your analysis. On a $250K loan, a 3% PPP is $7,500 — a significant drag on returns."
+            }
+          ]
         },
-        {
-          heading: "Portfolio / DSCR Loans",
-          body: "Debt-Service Coverage Ratio loans qualify based on rental income, not personal income. Great for BRRRR refinances once property is rented. Rates slightly higher than conventional but no income documentation needed."
+        "building-capital": {
+          title: "Building and Recycling Capital",
+          icon: <TrendingUp size={14} />,
+          sections: [
+            {
+              heading: "The Capital Stack",
+              body: "Every deal's funding is a 'stack' of capital sources layered by seniority: senior debt (the main mortgage), mezzanine debt (second-position loans), preferred equity (gets paid before common but after debt), common equity (you). Each layer takes more risk and demands higher returns. Beginning BRRRR investors typically use only senior debt + common equity (themselves). Experienced operators leverage the full stack to scale faster."
+            },
+            {
+              heading: "HELOC into BRRRR into Repay HELOC Cycle",
+              body: "Classic early-stage investor cycle: (1) Draw $60K from HELOC for down payment + rehab on BRRRR #1. (2) Complete BRRRR, refinance, pull $55K cash out. (3) Pay down HELOC with refinance proceeds. (4) HELOC is now available again for the next deal. Requires clean BRRRR math — partial BRRRRs leave HELOC debt drag."
+            },
+            {
+              heading: "1031 Exchange for Tax-Deferred Scaling",
+              body: "IRS Section 1031 allows you to sell an investment property and reinvest the proceeds into a 'like-kind' replacement property without paying capital gains tax. Requirements: identify replacement property within 45 days, close within 180 days, use a qualified intermediary (not the seller's own bank account). Massive wealth-building tool — can defer gains indefinitely across decades of upgrades."
+            },
+            {
+              heading: "Syndication: Raising Other People's Money",
+              body: "Partnering with multiple passive investors on larger deals. Typical structure: general partner (you) + limited partners (capital providers). LPs put up 90% of equity, earn preferred return (6-8%) and share of profits; GP earns sponsorship fees plus back-end split (20-30%). Requires securities compliance (Reg D 506(b) or 506(c)), legal counsel, and track record. Best path to scaling beyond personal-capital deals, but not a starting point."
+            },
+            {
+              heading: "Self-Directed IRA / Solo 401(k) Investing",
+              body: "Use retirement account funds to invest in real estate. Self-directed IRAs can own rental property directly (with a custodian); Solo 401(k)s allow higher contribution limits and checkbook control. Restrictions: no personal use of the property, can't lend to yourself, all expenses/income must flow through the account. Unrelated Business Income Tax (UBIT) applies if leverage is used inside an IRA. Complex — work with a specialized custodian and CPA."
+            }
+          ]
         }
-      ]
+      }
     },
-    "market-analysis": {
+
+    market: {
       title: "Market Analysis",
-      icon: <BarChart3 size={16} />,
-      content: [
-        {
-          heading: "Population & Job Growth",
-          body: "Look for markets with consistent population growth (1%+ annually) and diverse employment. Single-industry towns carry higher risk. Check BLS data, Census data, and major employer announcements."
+      icon: <MapPin size={16} />,
+      topics: {
+        "market-fundamentals": {
+          title: "Reading Market Fundamentals",
+          icon: <Activity size={14} />,
+          sections: [
+            {
+              heading: "Population Growth",
+              body: "The single strongest predictor of long-term real estate performance. Markets growing 1%+ annually see sustained demand for housing. Sources: Census Bureau American Community Survey, state demographer reports. Warning sign: population decline for 3+ consecutive years often signals market decline even if current metrics look good. Best-in-class growth markets (Austin, Nashville, Raleigh, Phoenix, Tampa) have seen 1.5-3% annual growth over the last decade."
+            },
+            {
+              heading: "Job Growth and Diversification",
+              body: "Look for: 1.5%+ annual job growth, unemployment below national average, and diversified employer base. Ideal mix: no single employer >20% of jobs, no single industry >30%. Red flags: boom-bust markets tied to one industry (oil towns, old mill towns, government-dependent cities). Source data: BLS local area unemployment statistics, state labor department quarterly reports."
+            },
+            {
+              heading: "Wage Growth and Rental Affordability",
+              body: "Healthy markets have wage growth tracking or exceeding rent growth. If rents rise faster than wages for multiple years, you eventually hit an affordability ceiling and rent growth stalls. Check the 'rent-to-income ratio' — median rent as % of median income. Healthy: <30%. Stretched: 30-40%. Unsustainable: >40% (Miami, LA, SF in recent years)."
+            },
+            {
+              heading: "Inventory and Days on Market",
+              body: "Months of Supply (MoS) = inventory / monthly sales rate. MoS <3 = strong seller's market, 3-6 = balanced, >6 = buyer's market. Days on market (DOM) is a faster-reacting leading indicator. Rising DOM over 3+ months suggests market softening before prices drop. Find these numbers in local Realtor association monthly reports or through paid tools like Altos Research."
+            },
+            {
+              heading: "Migration Trends",
+              body: "Domestic migration data reveals which markets are winning and losing residents. Sources: IRS migration data (tracks tax-return moves), Census migration estimates, U-Haul one-way rental reports. Markets with net in-migration of 5,000+ annually for multiple years tend to have sustained price/rent growth. Markets losing population struggle even if jobs exist."
+            },
+            {
+              heading: "Landlord-Friendliness of Laws",
+              body: "State and local regulatory environment has huge impact on rental economics. Factors: eviction timeline (a few days vs 6+ months), rent control (none vs strict caps), security deposit limits, required notice periods, tenant screening restrictions, source-of-income discrimination laws. Highly landlord-friendly: TX, FL, GA, TN, IN, OH. Neutral: NC, SC, AZ, NV. Tough: CA, NY, NJ, WA, OR. Factor eviction costs and timeline into your vacancy assumptions."
+            },
+            {
+              heading: "Property Tax Environment",
+              body: "Varies wildly by state. Low-tax: AL (~0.4%), LA (~0.5%), DE (~0.6%), HI (~0.3%). Mid-tax: most southern and western states (0.7-1.2%). High-tax: NJ (~2.5%), IL (~2.1%), TX (~1.8%, but no state income tax), NH (~2.1%). Tax rates matter most at the low end of the market — a $100K rental with 2% taxes pays $2,000/year, a massive cash flow drag."
+            }
+          ]
         },
-        {
-          heading: "Rent-to-Price Ratios",
-          body: "Compare median rent to median home price across markets. Higher ratios indicate better cash flow potential but often lower appreciation. Lower ratios (expensive markets) favor appreciation plays."
+        "neighborhood-analysis": {
+          title: "Neighborhood-Level Analysis",
+          icon: <Globe size={14} />,
+          sections: [
+            {
+              heading: "The A/B/C/D Neighborhood Framework",
+              body: "Industry shorthand for neighborhood class: Class A — newest, highest income, lowest crime, premium schools (think new suburban developments). Class B — established middle-class neighborhoods, good schools, low crime, aging but maintained housing stock. Class C — working-class, older housing, some crime, mixed schools. Class D — distressed, high crime, failing schools, derelict properties. BRRRR investors typically target B/C neighborhoods: enough discount to make the math work, stable enough to find tenants."
+            },
+            {
+              heading: "Crime Data Sources",
+              body: "CrimeMapping.com, SpotCrime, local police department open-data portals, and FBI Uniform Crime Reports. Trends matter more than absolute numbers — a neighborhood with high-but-falling crime is often a better investment than one with low-but-rising crime. Avoid properties in areas with concentrated violent crime regardless of cap rate; tenants leave, insurance costs climb, capex accelerates."
+            },
+            {
+              heading: "School Quality",
+              body: "GreatSchools.org ratings are a decent proxy, but flawed. Combine with: state test score reports, graduation rates, teacher turnover. For single-family rentals targeting families, school rating of 6+ is typically the threshold. Below 6, your tenant pool narrows significantly. For urban multi-families targeting young professionals, schools matter less."
+            },
+            {
+              heading: "Gentrification vs Decline",
+              body: "Signs of gentrification (appreciation ahead): new coffee shops, renovated buildings, younger demographic moving in, permit activity rising, crime falling. Signs of decline (depreciation ahead): businesses closing, properties sitting vacant, long-term residents leaving, rising 'for rent' signs, deferred maintenance visible on many houses. Drive the neighborhood personally — don't rely on data alone."
+            },
+            {
+              heading: "Proximity Factors",
+              body: "Value drivers within walking/short driving distance: grocery stores, employment centers, public transit, parks, universities, hospitals. Value detractors: busy highways (noise/fumes), industrial areas, airports, high-voltage power lines, landfills, sewage treatment, half-way houses/correctional facilities. These show up in comps — a house next to a freeway sells 10-20% below one a block away."
+            },
+            {
+              heading: "Flood Zones and Natural Hazards",
+              body: "Check FEMA flood maps (msc.fema.gov) before every offer. Flood Zone X = minimal risk, no flood insurance required. Zone AE = 1% annual chance, flood insurance required (typical premium $800-$2,500/yr). Zone VE or floodway = avoid entirely. Wildfire zones (western US), tornado alleys, hurricane zones — factor increased insurance costs into analysis. A 'cheap' property in a flood zone often isn't cheap after insurance."
+            }
+          ]
         },
-        {
-          heading: "Inventory & Days on Market",
-          body: "Low inventory and short days-on-market indicate a seller's market — harder to find deals but strong appreciation. High inventory gives buyer leverage but may signal weak demand."
+        "str-considerations": {
+          title: "Short-Term Rental (STR) Markets",
+          icon: <Home size={14} />,
+          sections: [
+            {
+              heading: "STR vs LTR Economics",
+              body: "Short-term rentals (Airbnb, Vrbo) typically gross 1.5-3x what long-term rentals gross, but operating costs are 3-5x higher. Higher: cleaning fees between stays, platform fees (Airbnb 14-16%), dynamic pricing tools, more turnover = more wear, utilities included, furnishings ($15K-$40K upfront), higher vacancy rates (35-45% is normal for STR). Net: STR can produce 1.5-2x LTR profit with dramatically more operational complexity."
+            },
+            {
+              heading: "Regulatory Risk",
+              body: "STR regulations change fast. Examples from the last 5 years: NYC banned most STRs under 30 days in 2023; Miami Beach banned STRs in residential zones; Austin restricts Type-2 STR licenses heavily; Phoenix requires registration and inspections. Before buying for STR, research: current regulations, pending legislation, HOA rules, condo association STR bans. A regulatory shift can turn a $5K/mo STR into a $2K/mo LTR overnight."
+            },
+            {
+              heading: "STR Market Validation",
+              body: "Before buying, use AirDNA (paid) or Rabbu (free tier) to analyze: average daily rate (ADR), occupancy rate, seasonality, competitive saturation. Key metrics: RevPAR (Revenue per Available Room) — monthly revenue / available nights. Typical high-performing STR markets: $150-$250 ADR, 65-80% occupancy, $3,500-$6,500/month revenue on mid-size properties."
+            },
+            {
+              heading: "Best STR Market Characteristics",
+              body: "Tourism anchor (beaches, national parks, major cities, college towns for big events), low STR saturation, permissive regulations, strong year-round demand. Examples: Pensacola, FL (beach + military); Chattanooga, TN (outdoor tourism); Pigeon Forge, TN (tourism economy). Avoid: heavily saturated vacation markets where every third house is an STR, markets with declining tourism numbers."
+            },
+            {
+              heading: "Operational Requirements",
+              body: "Running a profitable STR requires: professional photography ($500-$1,500), dynamic pricing software (PriceLabs, Wheelhouse at $20-$100/month), property management software (Guesty, Hostaway), cleaning crew on retainer, replenishment supplies tracked, local handyperson on call, noise-monitoring devices if needed, guest screening process. Budget 15-25% of gross revenue for operational costs beyond the mortgage."
+            }
+          ]
         }
-      ]
+      }
     },
-    "risk-management": {
+
+    tax: {
+      title: "Tax Strategy",
+      icon: <FileText size={16} />,
+      topics: {
+        "depreciation": {
+          title: "Depreciation: Your Best Tax Weapon",
+          icon: <TrendingDown size={14} />,
+          sections: [
+            {
+              heading: "What Depreciation Is",
+              body: "The IRS allows you to deduct the cost of the improvements (building, not land) over 27.5 years for residential rental property, 39 years for commercial. This deduction reduces your taxable rental income even though you never actually paid that 'expense' in cash. On a $250K property (of which $200K is building, $50K is land), your annual depreciation deduction is $200K / 27.5 = $7,272/year. This often makes rental properties show a tax LOSS while generating positive cash flow."
+            },
+            {
+              heading: "Why It's So Powerful",
+              body: "Consider a property that produces $4,000/year net cash flow. Without depreciation, you'd owe taxes on that $4K. WITH $7,272 of depreciation, you show a $3,272 paper loss. That loss can offset other rental income (or, if you qualify as a Real Estate Professional, any ordinary income). The cash flow is real and in your pocket; the tax loss is a tax-reducing phantom. This is why professional real estate investors often pay little to no income tax despite earning substantial income."
+            },
+            {
+              heading: "Cost Segregation Studies",
+              body: "An advanced strategy where a specialized engineer reclassifies portions of the building into shorter depreciation categories: 5-year (appliances, carpet, cabinetry), 7-year (certain fixtures), 15-year (land improvements — driveways, fencing, landscaping). Typical result: 20-35% of the building basis moves to 5/7/15-year categories, which can be depreciated much faster. Combined with bonus depreciation, you can deduct 60-80% of the shifted amount in year one. Costs: $3K-$8K for a study. Pays off on properties worth $400K+."
+            },
+            {
+              heading: "Bonus Depreciation",
+              body: "Allows immediate deduction of 100% of qualifying 5/7/15-year property in the year of purchase. Currently phasing down: 80% in 2023, 60% in 2024, 40% in 2025, 20% in 2026, 0% by 2027 (unless Congress extends). Massive benefit for investors who can absorb the depreciation against other income. Combined with cost segregation, bonus depreciation has created major tax savings for active investors."
+            },
+            {
+              heading: "Depreciation Recapture At Sale",
+              body: "The catch: when you sell, the IRS 'recaptures' the depreciation you took, taxing it at up to 25%. Cash flow magic during the hold becomes tax due at sale. The workaround: 1031 exchange defers this indefinitely; 'stepped-up basis' at death eliminates it entirely (heirs inherit at current value, wiping out the depreciation tax). 'Die with real estate' is a real tax strategy."
+            },
+            {
+              heading: "Passive Activity Loss Rules",
+              body: "Rental losses are generally 'passive' and can only offset 'passive' income. Exception for middle-income investors: up to $25,000 of rental losses can offset W-2 income if your Modified AGI is under $100K (phases out completely at $150K). Larger exception: Real Estate Professional status (750+ hours/year in real estate trades OR 50%+ of total work hours) lets you deduct unlimited rental losses against any income. This is the holy grail of real estate tax strategy — usually achievable only for full-time investors or spouses who can qualify."
+            }
+          ]
+        },
+        "entity-structure": {
+          title: "LLC, S-Corp, Trust: Entity Structure",
+          icon: <Building2 size={14} />,
+          sections: [
+            {
+              heading: "The Default: Sole Proprietorship",
+              body: "Owning rental property in your personal name, reporting on Schedule E of your 1040. Advantages: simplest structure, no formation or maintenance costs, passes through income cleanly, still deducts depreciation and expenses. Disadvantages: no liability protection — a tenant lawsuit can reach your personal assets (car, other investments, wages). For investors with few assets outside the properties, this may be acceptable."
+            },
+            {
+              heading: "Single-Member LLC",
+              body: "Hold each property (or a small group) in a separate Limited Liability Company. Taxed identically to sole proprietorship (disregarded entity — files on your personal return) but provides asset protection: a lawsuit against one property stops at that LLC's assets. Cost: $50-$500 to form depending on state, $0-$800/year ongoing fees. California: $800/year franchise tax per LLC — can negate the benefit for small-portfolio investors. Best for: investors with substantial personal wealth to protect."
+            },
+            {
+              heading: "Multi-Member LLC (Partnership Taxation)",
+              body: "Two or more owners, taxed as a partnership. Use for: joint ventures with other investors, syndications, married couples in community property states. Files a 1065 partnership return and issues K-1s to members. More complex accounting than single-member LLC but allows flexible profit/loss allocations."
+            },
+            {
+              heading: "Series LLC",
+              body: "A special LLC type available in some states (DE, TX, NV, IL, among others) that allows multiple 'series' under one parent LLC, each with its own asset protection. Cheaper than forming separate LLCs for each property. Legal protection hasn't been tested in all jurisdictions — some states may not recognize series separation. Consult an asset protection attorney."
+            },
+            {
+              heading: "S-Corporation: Usually Wrong for Rentals",
+              body: "S-Corps work well for active businesses where you want to minimize self-employment tax on profits. They're usually a bad fit for rental real estate: can't take advantage of the stepped-up basis at death, losses are more restricted, 1031 exchanges are complicated, and you can't easily add/remove assets without triggering tax. S-Corps are appropriate for flipping businesses, property management companies, and short-term rental operations — not long-term rental holds."
+            },
+            {
+              heading: "Asset Protection Attorney: When to Consult",
+              body: "Once your rental portfolio exceeds $1M in equity or you have significant outside assets, invest in a consultation with a real estate asset protection attorney. Fees: $500-$2,500 for a structuring review, then $1K-$5K to implement. Topics: LLC structure, umbrella insurance layering, charging order protection, state-specific nuances. Not a DIY area — mistakes here can be catastrophic and are only discovered after a lawsuit."
+            },
+            {
+              heading: "The Due-on-Sale Clause Risk",
+              body: "Transferring a property from personal name to an LLC after a conventional mortgage closes technically triggers the 'due-on-sale' clause, giving the lender the right to call the loan. In practice, lenders rarely exercise this right if payments remain current. Still, consult your lender, or use a trust-first structure to avoid the issue. This is one reason DSCR and portfolio loans (which allow LLC ownership from origination) are popular."
+            }
+          ]
+        },
+        "other-tax-strategies": {
+          title: "Other Tax-Saving Strategies",
+          icon: <Sparkles size={14} />,
+          sections: [
+            {
+              heading: "Section 121 Exclusion (Primary Residence)",
+              body: "Live in a property for 2 of the last 5 years and sell, and you exclude up to $250K of capital gain (single) / $500K (married) from tax. Combine with the 'live-in flip' strategy: buy a fixer-upper primary residence, renovate over 2+ years, sell tax-free, repeat. Cycle through 2-3 of these and build substantial tax-free wealth. Current restriction: gain attributable to non-qualified use (periods when it wasn't your primary residence) is NOT excluded."
+            },
+            {
+              heading: "1031 Exchange (Tax-Deferred Swap)",
+              body: "Sell an investment property and buy a 'like-kind' replacement (any other US investment real estate counts) within 180 days, and the gain is deferred indefinitely. Rules: must use a qualified intermediary, identify replacement property within 45 days, buy equal or greater value, reinvest 100% of cash proceeds. Can be stacked for decades — buy, sell, 1031 into larger property, repeat. At death, heirs receive stepped-up basis, eliminating accumulated gain. Strategy of choice for building multi-generational real estate wealth."
+            },
+            {
+              heading: "Opportunity Zones",
+              body: "Federally designated economically-distressed areas where investors can defer and partially reduce capital gains taxes by reinvesting gains into Qualified Opportunity Zone Funds. Hold 10+ years and the appreciation on the new investment is tax-free. Complex compliance requirements and specific investment windows. Best for investors selling major positions (stocks, businesses) with large capital gains to redirect."
+            },
+            {
+              heading: "Short-Term Rental Tax Loophole",
+              body: "STR income, if properly documented, can be classified as 'active' rather than 'passive' for tax purposes. Requirements: average rental period of 7 days or less, AND you provide substantial services OR materially participate (500+ hours/year). Active treatment means STR losses can offset W-2 income without qualifying as Real Estate Professional. Major tax benefit for higher-income investors who don't qualify for REPS but can run 1-2 STRs actively."
+            },
+            {
+              heading: "Augusta Rule (Section 280A)",
+              body: "Rent your primary residence to a business (possibly your own) for up to 14 days per year, tax-free. Named for Augusta, GA residents renting to Masters tournament visitors. Business deducts the rent; you receive it tax-free. Requires documentation: rental agreement, comparable market rates, legitimate business use. Useful for LLC/corporation owners hosting quarterly meetings at their home."
+            },
+            {
+              heading: "Qualified Business Income (QBI) Deduction",
+              body: "Section 199A deduction for certain rental real estate enterprises — up to 20% of rental income can be deducted, subject to income limits ($191K single / $383K married MFJ in 2024). Requires rental activities to qualify as a 'trade or business' under IRS safe harbor (250+ hours/year, separate books, etc.). Often overlooked but significant for active investors at certain income levels."
+            }
+          ]
+        }
+      }
+    },
+
+    risk: {
       title: "Risk Management",
       icon: <Shield size={16} />,
-      content: [
-        {
-          heading: "Reserve Funds",
-          body: "Maintain 6 months of expenses per property in liquid reserves. Cover vacancy, major repairs, tenant turnover, and unexpected capital expenses. Under-capitalized investors often fail during downturns."
+      topics: {
+        "reserves-and-capex": {
+          title: "Reserves, CapEx, and Staying Solvent",
+          icon: <Save size={14} />,
+          sections: [
+            {
+              heading: "Required Reserves by Category",
+              body: "Three distinct reserve categories: (1) Vacancy reserves — 1-2 months rent per property; (2) Repair & maintenance reserves — $200-$300/month per property accumulated; (3) Capital expenditure (CapEx) reserves — $200-$400/month per property accumulated for major systems. New investors routinely underfund these, then face cash crises when a roof needs replacing and three tenants move out simultaneously."
+            },
+            {
+              heading: "CapEx Planning by System",
+              body: "Rough useful life and replacement cost: Roof — 20-30 years, $8K-$15K. HVAC — 12-18 years, $5K-$8K. Water heater — 10-15 years, $1K-$2K. Appliances — 10-15 years, $2K-$4K full set. Flooring — 5-10 years for rental-grade carpet/LVP, $4K-$8K full house. Paint — 5-7 years between tenants, $2K-$4K. Windows — 25-40 years, $8K-$20K. Sum these by expected life and divide by months to get your monthly CapEx reserve per property."
+            },
+            {
+              heading: "Cash Flow vs Cash Available",
+              body: "Reported cash flow assumes you're properly reserving for the items above. If you're showing $400/month cash flow but not setting aside anything for CapEx, that 'cash flow' is a lie — it's temporary and you'll have to come up with $10K when the roof fails. Treat reserves as real expenses that come out of cash flow every month, not as 'someday if we need it' money."
+            },
+            {
+              heading: "Liquidity Rules",
+              body: "Maintain minimum liquid reserves equal to 6 months of total mortgage payments across your portfolio, plus $10K-$15K emergency reserve per property. Keep these in a high-yield savings account (4-5% APY available in 2024-2025), not invested in equities or tied up in HELOC availability. When a crisis hits (extended vacancy, major systems failure, legal dispute), cash is the only thing that solves the problem."
+            },
+            {
+              heading: "The Multiple-Property Failure Scenario",
+              body: "A common end-stage failure mode: investor owns 8 rentals, each marginally cash-flow positive. Three simultaneously go vacant, one has a roof fail, one tenant doesn't pay for 3 months during eviction. Cash reserves get drained. One property goes into foreclosure, which cross-defaults with lender. Portfolio collapses. Prevention: never scale faster than your reserves can support multiple simultaneous negative events."
+            }
+          ]
         },
-        {
-          heading: "Insurance & Liability",
-          body: "Landlord insurance (not homeowners), umbrella policy ($1-2M minimum), and consider LLC ownership for asset protection. Budget 0.5-1% of property value annually for insurance."
+        "insurance": {
+          title: "Insurance: Coverage You Actually Need",
+          icon: <Shield size={14} />,
+          sections: [
+            {
+              heading: "Landlord Insurance (DP-3)",
+              body: "Not the same as homeowners — specifically designed for rental property. Typical coverage: dwelling (at replacement cost), other structures, loss of rents (if property becomes uninhabitable), premises liability, often excludes tenant contents (they need renters insurance). Annual cost: 0.5-1.5% of property value. Never let a tenant move in without active landlord coverage — a single claim on a homeowner's policy covering a rental can be denied, leaving you uninsured."
+            },
+            {
+              heading: "Umbrella Liability Insurance",
+              body: "Additional $1M-$5M liability coverage on top of your landlord policies, covering catastrophic claims (tenant injury, dog bite, fatal accident on property, discrimination lawsuit). Annual cost: $250-$500 per million of coverage. Absolute essential once your rental portfolio exceeds 2-3 properties. Umbrella is cheap — a single catastrophic claim without it can wipe out decades of wealth-building."
+            },
+            {
+              heading: "Flood Insurance (NFIP or Private)",
+              body: "Required by lenders for properties in FEMA-designated flood zones (Zone A, V, AE, etc.). Not automatically included in landlord policies. NFIP max: $250K dwelling / $100K contents. Private flood insurance through Lloyd's of London or similar can cover higher limits. Rule of thumb: if you didn't budget for flood insurance but the property is in a flood zone, the deal is not what you thought."
+            },
+            {
+              heading: "Vacancy Endorsements",
+              body: "Most landlord policies have vacancy clauses — if the property is unoccupied for 30-60+ days, coverage drops or is eliminated. Critical during BRRRR rehab period when the property will be vacant for months. Solution: purchase a 'vacant dwelling' policy or an 'unoccupied' endorsement. Standard during rehab, usually 50-100% more expensive than occupied landlord coverage."
+            },
+            {
+              heading: "Workers Comp During Rehab",
+              body: "If you hire unlicensed helpers, pay your brother-in-law to help with the rehab, or do any substantial work yourself with others, you may be exposed to workers comp claims even if you didn't have a formal employer-employee relationship. Protect yourself: require contractors to carry WC insurance and provide certificates, avoid paying individuals directly for labor, prefer licensed GCs who carry their own WC."
+            },
+            {
+              heading: "Claims Management",
+              body: "Filing too many claims raises rates and can get you non-renewed. Self-insure small claims (under $2K-$5K), file only significant claims. Document everything: photos before/after tenants move in, photos of damage when it occurs, written communications with tenants. A contested claim often turns on whether you can document the property's condition pre-incident."
+            }
+          ]
         },
-        {
-          heading: "Exit Planning",
-          body: "Have multiple exit strategies before buying: BRRRR refinance, flip to retail buyer, sell to another investor, wholesale. If one exit fails, you need backups. Don't force-fit a strategy on the wrong property."
+        "tenant-management": {
+          title: "Tenant Selection and Management",
+          icon: <Key size={14} />,
+          sections: [
+            {
+              heading: "The Screening Criteria",
+              body: "Professional baseline: credit score 620+, gross income 3x monthly rent, verifiable employment 2+ years, no evictions on record, no violent criminal history. Apply criteria consistently — inconsistency creates discrimination lawsuits. Use a third-party screening service (SmartMove, RentPrep, MyRental) rather than pulling your own reports, which requires FCRA compliance."
+            },
+            {
+              heading: "Fair Housing Law Compliance",
+              body: "Federal Fair Housing Act protected classes: race, color, national origin, religion, sex, familial status, disability. Many states/cities add: source of income (including Section 8), sexual orientation, gender identity, age, criminal history (limited). Never advertise 'great for young professionals' or 'perfect for a single person' — these are age/familial status violations. Use neutral language focused on the property, not the tenant."
+            },
+            {
+              heading: "The Lease Agreement",
+              body: "Use a state-specific lease from a real estate attorney or a well-reviewed template (biggerpockets.com and various state REI associations offer solid ones). Key clauses: security deposit amount and terms, late fees and grace periods, pet policies, utility responsibility, maintenance responsibilities (tenant vs landlord), quiet enjoyment, prohibited activities, entry notice requirements (typically 24 hours written notice). Sign the lease BEFORE delivering keys."
+            },
+            {
+              heading: "Security Deposits",
+              body: "State laws vary: most limit deposits to 1-2 months rent; some (CA, OR, WA) limit to 1 month plus additional for pets. Must be held in compliance (some states require separate interest-bearing accounts). Must be returned within 14-45 days of move-out with itemized deductions. Common mistake: deducting for normal wear-and-tear, which is not permitted. Paint and carpet have limited lifespans that prorate against reasonable use."
+            },
+            {
+              heading: "Eviction Economics",
+              body: "Evictions cost $2K-$5K in direct fees (attorney, filing, sheriff) plus 1-6 months lost rent plus potential property damage. Prevention is dramatically cheaper than eviction: good screening prevents most issues. When late rent happens, act quickly with formal notices — the clock starts when you legally notice the tenant, not when they first miss payment. Tenant-friendly states (NY, CA, NJ, WA) can take 4-9 months to complete an eviction."
+            },
+            {
+              heading: "Property Management: DIY vs Pro",
+              body: "Self-management typical time: 2-6 hours/month per property once systems are in place; 20+ hours in crisis. Professional management: 8-10% of collected rents, plus leasing fees (one month's rent), plus maintenance markups. Breakeven: when your time is worth more than the management fee. Most investors benefit from professional management starting around property 4-6. Interview 3+ managers, ask for references from current clients, understand the fee structure completely."
+            }
+          ]
         }
-      ]
+      }
+    },
+
+    glossary: {
+      title: "Glossary",
+      icon: <BookOpen size={16} />,
+      topics: {
+        "complete-glossary": {
+          title: "Complete Real Estate Investing Glossary",
+          icon: <FileText size={14} />,
+          isGlossary: true,
+          terms: [
+            { term: "ARV", definition: "After Repair Value — the estimated market value of a property once renovations are complete." },
+            { term: "As-Is", definition: "Property sold in its current condition, with the seller making no repairs or disclosures beyond legal minimums." },
+            { term: "Assignment", definition: "Transferring contract rights to purchase a property to a third party, typically for a fee. The core wholesaling strategy." },
+            { term: "Balloon Payment", definition: "A large lump-sum payment due at the end of a loan term, common in seller financing and commercial loans." },
+            { term: "Basis Points (BPS)", definition: "1/100th of a percent. 50 bps = 0.50%. Used to quote rate changes precisely." },
+            { term: "Bird Dog", definition: "A person who finds potential investment properties and refers them to investors, often for a finder's fee." },
+            { term: "BRRRR", definition: "Buy, Rehab, Rent, Refinance, Repeat — a capital-recycling rental investment strategy." },
+            { term: "Capital Gains", definition: "Profit from the sale of an asset. Short-term (held <1 year): taxed as ordinary income. Long-term (>1 year): taxed at preferential rates (0/15/20%)." },
+            { term: "Capital Stack", definition: "The layered structure of debt and equity financing a real estate deal. Senior debt, junior debt, preferred equity, common equity in order of repayment priority." },
+            { term: "Cap Rate", definition: "Capitalization Rate = NOI / Property Value. Indicator of return independent of financing." },
+            { term: "Cash-on-Cash Return", definition: "Annual pre-tax cash flow / total cash invested. The return metric that accounts for leverage." },
+            { term: "Closing Costs", definition: "Fees paid at closing: title insurance, origination, recording, attorney, survey, taxes. Typically 2-4% of purchase price." },
+            { term: "Closing Disclosure (CD)", definition: "The federally-mandated 5-page document disclosing final loan terms and closing costs, delivered at least 3 business days before closing." },
+            { term: "CMA", definition: "Comparative Market Analysis — a real estate agent's informal property valuation based on recent comparable sales." },
+            { term: "Comp", definition: "Comparable sale. A recently sold property similar to the subject property, used to estimate value." },
+            { term: "Conventional Loan", definition: "A mortgage conforming to Fannie Mae / Freddie Mac standards, not backed by a government agency." },
+            { term: "COO (Certificate of Occupancy)", definition: "A document from local government certifying a building is habitable and code-compliant. Required after substantial rehabs in many jurisdictions." },
+            { term: "Cost Segregation", definition: "An engineering-based analysis that reclassifies portions of a building into shorter depreciation categories to accelerate tax deductions." },
+            { term: "DSCR", definition: "Debt Service Coverage Ratio = NOI / Annual Debt Service. Measures a property's ability to cover its mortgage payment. Key metric for non-QM rental loans." },
+            { term: "Deed", definition: "The legal document transferring ownership of real property. Common types: warranty deed (strongest protection), quitclaim deed (no warranty of title)." },
+            { term: "Depreciation", definition: "Tax deduction for the wear-and-tear of a rental building over its useful life (27.5 years residential, 39 years commercial)." },
+            { term: "Due Diligence", definition: "The investigation period between offer acceptance and closing when a buyer inspects, reviews documents, and confirms the deal's viability." },
+            { term: "Earnest Money Deposit (EMD)", definition: "Buyer's good-faith deposit made when a contract is accepted, typically 1-3% of purchase price." },
+            { term: "Easement", definition: "A legal right to use someone else's property for a specific purpose (utility access, driveway, etc.)." },
+            { term: "Encumbrance", definition: "Any claim, lien, or charge on a property's title that may affect its transferability." },
+            { term: "Equity", definition: "Property value minus outstanding mortgage balance. Your ownership stake." },
+            { term: "Escrow", definition: "A neutral third party holding funds or documents during a real estate transaction until conditions are met." },
+            { term: "Fannie Mae / Freddie Mac", definition: "Government-sponsored enterprises that buy conforming mortgages from originating lenders. Set the underwriting standards for 'conventional' loans." },
+            { term: "FHA Loan", definition: "Federal Housing Administration-backed mortgage allowing 3.5% down for owner-occupants. Available on 1-4 unit properties." },
+            { term: "Foreclosure", definition: "Legal process by which a lender repossesses property after borrower default. Judicial (court-supervised, longer) or non-judicial (trustee sale, faster) depending on state." },
+            { term: "FSBO", definition: "For Sale By Owner — a property sold without a real estate agent representing the seller." },
+            { term: "GRM", definition: "Gross Rent Multiplier = property price / annual gross rent. Quick screening tool, ignores expenses." },
+            { term: "Hard Money", definition: "Short-term, high-rate, asset-based financing from private lenders. Used for acquisition and rehab when conventional loans won't work." },
+            { term: "HELOC", definition: "Home Equity Line of Credit — revolving credit secured by equity in primary residence. Flexible but variable rate." },
+            { term: "HOA", definition: "Homeowners Association — governing body for planned communities, condos, and townhomes. Collects dues and enforces covenants." },
+            { term: "HUD", definition: "Housing and Urban Development — federal agency overseeing housing policy; 'HUD home' refers to a foreclosed property previously FHA-insured." },
+            { term: "Interest-Only Loan", definition: "A loan where payments cover only interest for an initial period (typically 5-10 years), then amortize over the remaining term. Common in hard money and certain commercial loans." },
+            { term: "IRR", definition: "Internal Rate of Return — the annualized rate of return that accounts for the time value of money across all cash flows of an investment." },
+            { term: "Lien", definition: "A legal claim against property for unpaid debt. Mortgages are voluntary liens; tax liens, mechanic's liens, and judgment liens are involuntary." },
+            { term: "Lis Pendens", definition: "A public notice of pending lawsuit affecting real property. Clouds title, makes the property difficult to sell until resolved." },
+            { term: "LTV", definition: "Loan-to-Value = loan amount / property value. Key underwriting metric." },
+            { term: "MAO", definition: "Maximum Allowable Offer — the highest price you can pay and still hit your return targets. Formula varies by strategy." },
+            { term: "MLS", definition: "Multiple Listing Service — the database of active and sold real estate listings maintained by local Realtor associations. Access typically requires a licensed agent." },
+            { term: "NOI", definition: "Net Operating Income = Gross Income − Operating Expenses. Does NOT include mortgage payments. Foundation of commercial real estate valuation." },
+            { term: "Non-Recourse Loan", definition: "A loan secured only by the collateral property; the lender cannot pursue the borrower's other assets if the property doesn't cover the debt. Common in large commercial loans." },
+            { term: "Owner Financing", definition: "Seller carries the mortgage for the buyer. Flexible terms, no institutional underwriting. Also called 'seller financing.'" },
+            { term: "PITI", definition: "Principal, Interest, Taxes, Insurance — the four components of a typical mortgage payment." },
+            { term: "PMI", definition: "Private Mortgage Insurance — required on conventional loans with <20% down. Protects the lender, not the borrower. Not applicable to most investment loans." },
+            { term: "Points", definition: "Prepaid interest, 1 point = 1% of loan amount. Used to buy down rates or paid as origination fees." },
+            { term: "Pre-Approval", definition: "A lender's preliminary written commitment to provide a mortgage, subject to appraisal and final verification. Stronger than pre-qualification." },
+            { term: "Principal", definition: "The remaining balance of a loan, separate from interest." },
+            { term: "Pro Forma", definition: "A projection of a property's future income and expenses. Used in deal analysis; should be stress-tested, not taken at face value." },
+            { term: "Property Class (A/B/C/D)", definition: "Informal classification of property/neighborhood quality. A = premium, B = middle-class, C = working-class, D = distressed." },
+            { term: "Quiet Title Action", definition: "A lawsuit to resolve title disputes or clear clouds on title. Required after tax deed sales and certain other situations." },
+            { term: "REIT", definition: "Real Estate Investment Trust — a company that owns or finances income-producing real estate. Can be traded on stock exchanges (publicly traded) or private. Allows small investors exposure to commercial real estate." },
+            { term: "REO", definition: "Real Estate Owned — property repossessed by a lender after a failed foreclosure auction. REO properties are sold as-is through the lender's asset manager." },
+            { term: "Refinance", definition: "Replacing an existing mortgage with a new one. Rate-and-term (lower rate/payment) or cash-out (pulling equity out)." },
+            { term: "Rent Roll", definition: "A document listing all tenants, unit numbers, lease terms, rent amounts, and payment status. Standard requirement when buying existing rental property." },
+            { term: "Seasoning", definition: "The time a borrower must own a property before a lender will refinance based on current value rather than purchase price. Typically 6-12 months conventional, 3-6 months DSCR." },
+            { term: "Section 8", definition: "Federal Housing Choice Voucher program where HUD subsidizes rent for qualifying low-income tenants. Tenants pay 30% of income; HUD pays the rest directly to landlord." },
+            { term: "Short Sale", definition: "Sale of a property for less than the mortgage balance, requiring lender approval. Longer timeline than traditional sale, often 3-12 months." },
+            { term: "Sweat Equity", definition: "Value added to a property through the owner's own labor rather than cash expenditure." },
+            { term: "Title Insurance", definition: "Insurance protecting against defects in property title discovered after closing. Owner's policy (one-time premium) and lender's policy. Critical — never close without it." },
+            { term: "Turnkey", definition: "A fully renovated, already-tenanted rental property sold to investors. No rehab work required. Usually priced at retail or above, with little forced-appreciation upside." },
+            { term: "Underwriting", definition: "The lender's process of evaluating borrower and property to approve a loan. Reviews credit, income, assets, appraisal, title." },
+            { term: "Unlawful Detainer", definition: "The legal term for an eviction lawsuit in many states." },
+            { term: "VA Loan", definition: "Veterans Affairs-backed mortgage for eligible veterans. 0% down, no PMI, available for owner-occupied 1-4 unit properties." },
+            { term: "Wholesale", definition: "Finding a discounted property, putting it under contract, and assigning the contract to an end buyer for a fee. Requires no capital but requires strong marketing and buyer network." }
+          ]
+        }
+      }
     }
   };
 
-  const topic = topics[activeTopic];
+  const category = curriculum[activeCategory];
+  const topic = category.topics[activeTopic] || Object.values(category.topics)[0];
+
+  // When category changes, reset to first topic in that category
+  const handleCategoryChange = (catKey) => {
+    setActiveCategory(catKey);
+    const firstTopic = Object.keys(curriculum[catKey].topics)[0];
+    setActiveTopic(firstTopic);
+  };
+
+  const filteredGlossaryTerms = useMemo(() => {
+    if (!topic.isGlossary) return null;
+    if (!glossarySearch.trim()) return topic.terms;
+    const q = glossarySearch.toLowerCase();
+    return topic.terms.filter(t =>
+      t.term.toLowerCase().includes(q) || t.definition.toLowerCase().includes(q)
+    );
+  }, [topic, glossarySearch]);
 
   return (
-    <div style={{ maxWidth: 1200, margin: "0 auto", padding: isMobile() ? "16px" : "24px 28px" }}>
+    <div style={{ maxWidth: 1280, margin: "0 auto", padding: isMobile() ? "16px" : "24px 28px" }}>
       <div style={{ marginBottom: 24 }}>
-        <h1 className="serif" style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>
+        <h1 className="serif" style={{ fontSize: 32, fontWeight: 700, margin: 0 }}>
           Education Center
         </h1>
-        <div style={{ fontSize: 13, color: THEME.textMuted, marginTop: 4 }}>
-          Core concepts for BRRRR investors
+        <div style={{ fontSize: 14, color: THEME.textMuted, marginTop: 6, maxWidth: 720 }}>
+          A comprehensive curriculum covering strategy, analysis, financing, market research, tax optimization, and risk management for real estate investors. Updated for 2024-2025 market conditions.
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "240px 1fr", gap: 24 }}>
+      {/* Category tabs */}
+      <div style={{
+        display: "flex",
+        gap: 6,
+        marginBottom: 24,
+        flexWrap: "wrap",
+        borderBottom: `1px solid ${THEME.border}`,
+        paddingBottom: 0
+      }}>
+        {Object.entries(curriculum).map(([key, cat]) => (
+          <button
+            key={key}
+            onClick={() => handleCategoryChange(key)}
+            style={{
+              padding: "10px 16px", fontSize: 13, fontWeight: 600,
+              background: "transparent",
+              color: activeCategory === key ? THEME.accent : THEME.textMuted,
+              borderBottom: activeCategory === key ? `2px solid ${THEME.accent}` : "2px solid transparent",
+              borderRadius: 0,
+              display: "flex", alignItems: "center", gap: 6, cursor: "pointer",
+              marginBottom: -1
+            }}
+          >
+            {cat.icon}
+            {cat.title}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "260px 1fr", gap: 24 }}>
+        {/* Topic nav within category */}
         <div>
-          {Object.entries(topics).map(([key, t]) => (
+          <div className="label-xs" style={{ marginBottom: 10 }}>
+            {category.title} Topics
+          </div>
+          {Object.entries(category.topics).map(([key, t]) => (
             <button
               key={key}
               onClick={() => setActiveTopic(key)}
@@ -3496,27 +4201,122 @@ const EducationCenter = () => {
                 color: activeTopic === key ? THEME.accent : THEME.text,
                 border: `1px solid ${activeTopic === key ? THEME.accent : "transparent"}`,
                 borderRadius: 6, textAlign: "left", marginBottom: 4,
-                display: "flex", alignItems: "center", gap: 8, fontWeight: 600, cursor: "pointer"
+                display: "flex", alignItems: "center", gap: 8, fontWeight: 600,
+                cursor: "pointer", lineHeight: 1.3
               }}
             >
-              {t.icon}
-              {t.title}
+              <span style={{ flexShrink: 0, color: activeTopic === key ? THEME.accent : THEME.textMuted }}>
+                {t.icon}
+              </span>
+              <span>{t.title}</span>
             </button>
           ))}
         </div>
 
-        <Panel title={topic.title} icon={topic.icon} accent>
-          {topic.content.map((section, idx) => (
-            <div key={idx} style={{ marginBottom: 20 }}>
-              <h3 style={{ fontSize: 16, marginBottom: 8, color: THEME.accent }}>
-                {section.heading}
-              </h3>
-              <p style={{ fontSize: 14, lineHeight: 1.6, color: THEME.text, margin: 0 }}>
-                {section.body}
-              </p>
-            </div>
-          ))}
-        </Panel>
+        {/* Topic content */}
+        <div>
+          <Panel title={topic.title} icon={topic.icon} accent>
+            {topic.isGlossary ? (
+              <div>
+                <div style={{ marginBottom: 18 }}>
+                  <input
+                    type="text"
+                    value={glossarySearch}
+                    onChange={(e) => setGlossarySearch(e.target.value)}
+                    placeholder={`Search ${topic.terms.length} terms...`}
+                    style={{ width: "100%", padding: "10px 14px", fontSize: 14 }}
+                  />
+                </div>
+                <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 12 }}>
+                  Showing {filteredGlossaryTerms.length} of {topic.terms.length} terms
+                </div>
+                <div>
+                  {filteredGlossaryTerms.map((t, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        padding: "14px 0",
+                        borderBottom: idx < filteredGlossaryTerms.length - 1 ? `1px solid ${THEME.borderLight}` : "none"
+                      }}
+                    >
+                      <div style={{
+                        fontSize: 14,
+                        fontWeight: 700,
+                        color: THEME.accent,
+                        marginBottom: 4
+                      }}>
+                        {t.term}
+                      </div>
+                      <div style={{
+                        fontSize: 13,
+                        lineHeight: 1.6,
+                        color: THEME.text
+                      }}>
+                        {t.definition}
+                      </div>
+                    </div>
+                  ))}
+                  {filteredGlossaryTerms.length === 0 && (
+                    <div style={{
+                      textAlign: "center",
+                      padding: "40px 20px",
+                      color: THEME.textDim,
+                      fontSize: 13
+                    }}>
+                      No terms match "{glossarySearch}"
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div>
+                {topic.sections.map((section, idx) => (
+                  <div key={idx} style={{
+                    marginBottom: 24,
+                    paddingBottom: idx < topic.sections.length - 1 ? 20 : 0,
+                    borderBottom: idx < topic.sections.length - 1 ? `1px solid ${THEME.borderLight}` : "none"
+                  }}>
+                    <h3 style={{
+                      fontSize: 16,
+                      marginBottom: 10,
+                      color: THEME.accent,
+                      fontWeight: 700
+                    }}>
+                      {section.heading}
+                    </h3>
+                    <p style={{
+                      fontSize: 14,
+                      lineHeight: 1.7,
+                      color: THEME.text,
+                      margin: 0
+                    }}>
+                      {section.body}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+
+          {/* Footer note */}
+          <div style={{
+            marginTop: 16,
+            padding: 12,
+            background: THEME.bgPanel,
+            border: `1px solid ${THEME.border}`,
+            borderRadius: 6,
+            fontSize: 11,
+            color: THEME.textMuted,
+            display: "flex",
+            alignItems: "center",
+            gap: 8
+          }}>
+            <Info size={14} color={THEME.textDim} />
+            <span>
+              Educational content only. Real estate, tax, and legal situations vary by jurisdiction and individual circumstances. Consult licensed professionals before acting on any strategy.
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );
