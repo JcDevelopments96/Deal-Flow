@@ -129,6 +129,7 @@ export const AcquisitionSection = ({ deal, onUpdate, metrics }) => {
               label="Loan Term (Years)"
               value={deal.loanTermYears || 30}
               onChange={(val) => onUpdate({ loanTermYears: val })}
+              integer
             />
             <NumberField
               label="Closing Costs"

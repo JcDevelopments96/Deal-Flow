@@ -19,38 +19,58 @@ export const TextField = ({ label, value, onChange, placeholder, helper }) => (
   </div>
 );
 
-export const NumberField = ({ label, value, onChange, placeholder, helper, prefix }) => (
-  <div style={{ marginBottom: 14 }}>
-    <div className="label-xs" style={{ marginBottom: 6 }}>{label}</div>
-    <div style={{ position: "relative" }}>
-      {prefix && (
-        <span style={{
-          position: "absolute",
-          left: 10,
-          top: "50%",
-          transform: "translateY(-50%)",
-          color: THEME.textMuted,
-          fontSize: 13,
-          zIndex: 1
-        }}>
-          {prefix}
-        </span>
-      )}
-      <input
-        type="number"
-        value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-        placeholder={placeholder}
-        style={{
-          width: "100%",
-          padding: prefix ? "9px 10px 9px 25px" : "9px 10px",
-          fontSize: 13
-        }}
-      />
+/**
+ * NumberField
+ *
+ * Integer vs. decimal handling:
+ * - Dollar fields (`prefix="$"`) are rounded to whole numbers — no cents.
+ * - Percent/rate fields (`prefix="%"`) or unprefixed fields keep decimals
+ *   (interest rate 7.25%, bathrooms 2.5, etc.).
+ * - Callers can force a mode with the `integer` prop (true/false) when the
+ *   prefix-based auto-detection would be wrong.
+ */
+export const NumberField = ({ label, value, onChange, placeholder, helper, prefix, integer }) => {
+  const isInteger = integer !== undefined ? integer : prefix === "$";
+  const step = isInteger ? 1 : "any";
+  const parse = (raw) => {
+    const n = parseFloat(raw);
+    if (!Number.isFinite(n)) return 0;
+    return isInteger ? Math.round(n) : n;
+  };
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div className="label-xs" style={{ marginBottom: 6 }}>{label}</div>
+      <div style={{ position: "relative" }}>
+        {prefix && (
+          <span style={{
+            position: "absolute",
+            left: 10,
+            top: "50%",
+            transform: "translateY(-50%)",
+            color: THEME.textMuted,
+            fontSize: 13,
+            zIndex: 1
+          }}>
+            {prefix}
+          </span>
+        )}
+        <input
+          type="number"
+          step={step}
+          value={value}
+          onChange={(e) => onChange(parse(e.target.value))}
+          placeholder={placeholder}
+          style={{
+            width: "100%",
+            padding: prefix ? "9px 10px 9px 25px" : "9px 10px",
+            fontSize: 13
+          }}
+        />
+      </div>
+      {helper && <div style={{ fontSize: 11, color: THEME.textDim, marginTop: 4 }}>{helper}</div>}
     </div>
-    {helper && <div style={{ fontSize: 11, color: THEME.textDim, marginTop: 4 }}>{helper}</div>}
-  </div>
-);
+  );
+};
 
 export const SelectField = ({ label, value, onChange, options }) => (
   <div style={{ marginBottom: 14 }}>
