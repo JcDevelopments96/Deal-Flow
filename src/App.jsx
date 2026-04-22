@@ -1591,31 +1591,38 @@ const AdvancedMarketIntel = () => {
       markets: [
         { 
           city: "Buffalo", state: "NY", medianPrice: 165000, medianRent: 1200, capRate: 9.8, rentGrowth: 10, inventory: 4.2, score: 85,
-          airbnb: { nightly: 95, occupancy: 65, monthlyRevenue: 1900, competition: "Medium" }
+          airbnb: { nightly: 95, occupancy: 65, monthlyRevenue: 1900, competition: "Medium" },
+          restrictions: { str: "Allowed", minStay: "2 nights", license: "Required", notes: "Registration required, safety inspections" }
         },
         { 
           city: "Rochester", state: "NY", medianPrice: 145000, medianRent: 1100, capRate: 10.1, rentGrowth: 11, inventory: 3.8, score: 88,
-          airbnb: { nightly: 85, occupancy: 62, monthlyRevenue: 1650, competition: "Low" }
+          airbnb: { nightly: 85, occupancy: 62, monthlyRevenue: 1650, competition: "Low" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Required", notes: "Host permit required" }
         },
         { 
           city: "Syracuse", state: "NY", medianPrice: 135000, medianRent: 1050, capRate: 10.5, rentGrowth: 12, inventory: 4.5, score: 90,
-          airbnb: { nightly: 80, occupancy: 58, monthlyRevenue: 1450, competition: "Low" }
+          airbnb: { nightly: 80, occupancy: 58, monthlyRevenue: 1450, competition: "Low" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Optional", notes: "Minimal restrictions" }
         },
         { 
           city: "Philadelphia", state: "PA", medianPrice: 195000, medianRent: 1450, capRate: 8.9, rentGrowth: 9, inventory: 3.2, score: 78,
-          airbnb: { nightly: 125, occupancy: 72, monthlyRevenue: 2800, competition: "High" }
+          airbnb: { nightly: 125, occupancy: 72, monthlyRevenue: 2800, competition: "High" },
+          restrictions: { str: "Restricted", minStay: "30 days", license: "Required", notes: "Primary residence only" }
         },
         { 
           city: "Pittsburgh", state: "PA", medianPrice: 145000, medianRent: 1150, capRate: 9.7, rentGrowth: 10, inventory: 3.9, score: 82,
-          airbnb: { nightly: 110, occupancy: 68, monthlyRevenue: 2350, competition: "Medium" }
+          airbnb: { nightly: 110, occupancy: 68, monthlyRevenue: 2350, competition: "Medium" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Required", notes: "Registration & inspection required" }
         },
         { 
           city: "Newark", state: "NJ", medianPrice: 285000, medianRent: 2100, capRate: 7.2, rentGrowth: 8, inventory: 2.8, score: 75,
-          airbnb: { nightly: 135, occupancy: 75, monthlyRevenue: 3200, competition: "High" }
+          airbnb: { nightly: 135, occupancy: 75, monthlyRevenue: 3200, competition: "High" },
+          restrictions: { str: "Restricted", minStay: "30 days", license: "Required", notes: "Long-term rentals only" }
         },
         { 
           city: "Camden", state: "NJ", medianPrice: 125000, medianRent: 1200, capRate: 11.5, rentGrowth: 11, inventory: 4.8, score: 89,
-          airbnb: { nightly: 90, occupancy: 55, monthlyRevenue: 1550, competition: "Low" }
+          airbnb: { nightly: 90, occupancy: 55, monthlyRevenue: 1550, competition: "Low" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Optional", notes: "Few restrictions" }
         }
       ]
     },
@@ -1624,119 +1631,148 @@ const AdvancedMarketIntel = () => {
       markets: [
         { 
           city: "Orlando", state: "FL", medianPrice: 320000, medianRent: 1850, capRate: 7.2, rentGrowth: 18, inventory: 2.1, score: 85,
-          airbnb: { nightly: 165, occupancy: 78, monthlyRevenue: 4050, competition: "Very High" }
+          airbnb: { nightly: 165, occupancy: 78, monthlyRevenue: 4050, competition: "Very High" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Required", notes: "Business license required" }
         },
         { 
           city: "Tampa", state: "FL", medianPrice: 365000, medianRent: 2100, capRate: 6.8, rentGrowth: 14, inventory: 1.9, score: 82,
-          airbnb: { nightly: 155, occupancy: 74, monthlyRevenue: 3600, competition: "High" }
+          airbnb: { nightly: 155, occupancy: 74, monthlyRevenue: 3600, competition: "High" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Required", notes: "License & safety inspection required" }
         },
         { 
           city: "Jacksonville", state: "FL", medianPrice: 285000, medianRent: 1650, capRate: 8.1, rentGrowth: 16, inventory: 2.8, score: 88,
-          airbnb: { nightly: 135, occupancy: 71, monthlyRevenue: 3000, competition: "Medium" }
+          airbnb: { nightly: 135, occupancy: 71, monthlyRevenue: 3000, competition: "Medium" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Optional", notes: "Minimal restrictions" }
         },
         { 
           city: "Miami", state: "FL", medianPrice: 485000, medianRent: 2650, capRate: 5.9, rentGrowth: 9, inventory: 1.5, score: 72,
-          airbnb: { nightly: 195, occupancy: 82, monthlyRevenue: 5000, competition: "Very High" }
+          airbnb: { nightly: 195, occupancy: 82, monthlyRevenue: 5000, competition: "Very High" },
+          restrictions: { str: "Restricted", minStay: "6 months", license: "Required", notes: "Severe restrictions in many areas" }
         },
         { 
           city: "Fort Lauderdale", state: "FL", medianPrice: 385000, medianRent: 2100, capRate: 6.5, rentGrowth: 12, inventory: 1.8, score: 78,
-          airbnb: { nightly: 175, occupancy: 79, monthlyRevenue: 4350, competition: "Very High" }
+          airbnb: { nightly: 175, occupancy: 79, monthlyRevenue: 4350, competition: "Very High" },
+          restrictions: { str: "Restricted", minStay: "30 days", license: "Required", notes: "Many areas ban STRs" }
         },
         { 
           city: "St. Petersburg", state: "FL", medianPrice: 295000, medianRent: 1750, capRate: 7.8, rentGrowth: 17, inventory: 2.4, score: 86,
-          airbnb: { nightly: 145, occupancy: 76, monthlyRevenue: 3450, competition: "High" }
+          airbnb: { nightly: 145, occupancy: 76, monthlyRevenue: 3450, competition: "High" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Required", notes: "Registration required" }
         },
         { 
           city: "Deerfield Beach", state: "FL", medianPrice: 365000, medianRent: 2200, capRate: 6.4, rentGrowth: 11, inventory: 1.7, score: 76,
-          airbnb: { nightly: 170, occupancy: 77, monthlyRevenue: 4100, competition: "Very High" }
+          airbnb: { nightly: 170, occupancy: 77, monthlyRevenue: 4100, competition: "Very High" },
+          restrictions: { str: "Restricted", minStay: "30 days", license: "Required", notes: "Limited to primary residence" }
         },
         { 
           city: "Boca Raton", state: "FL", medianPrice: 425000, medianRent: 2400, capRate: 5.8, rentGrowth: 10, inventory: 1.6, score: 74,
-          airbnb: { nightly: 185, occupancy: 78, monthlyRevenue: 4550, competition: "Very High" }
+          airbnb: { nightly: 185, occupancy: 78, monthlyRevenue: 4550, competition: "Very High" },
+          restrictions: { str: "Banned", minStay: "N/A", license: "N/A", notes: "STRs prohibited in most zones" }
         },
         { 
           city: "Delray Beach", state: "FL", medianPrice: 395000, medianRent: 2250, capRate: 6.2, rentGrowth: 11, inventory: 1.7, score: 75,
-          airbnb: { nightly: 175, occupancy: 76, monthlyRevenue: 4200, competition: "Very High" }
+          airbnb: { nightly: 175, occupancy: 76, monthlyRevenue: 4200, competition: "Very High" },
+          restrictions: { str: "Restricted", minStay: "7 days", license: "Required", notes: "Week minimum stay required" }
         },
         { 
           city: "Coral Springs", state: "FL", medianPrice: 345000, medianRent: 2050, capRate: 6.6, rentGrowth: 12, inventory: 1.9, score: 78,
-          airbnb: { nightly: 160, occupancy: 74, monthlyRevenue: 3700, competition: "High" }
+          airbnb: { nightly: 160, occupancy: 74, monthlyRevenue: 3700, competition: "High" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Required", notes: "Business license required" }
         },
         { 
           city: "Pompano Beach", state: "FL", medianPrice: 315000, medianRent: 1950, capRate: 7.0, rentGrowth: 13, inventory: 2.0, score: 80,
-          airbnb: { nightly: 155, occupancy: 75, monthlyRevenue: 3650, competition: "High" }
+          airbnb: { nightly: 155, occupancy: 75, monthlyRevenue: 3650, competition: "High" },
+          restrictions: { str: "Allowed", minStay: "3 nights", license: "Required", notes: "3-day minimum stay" }
         },
         { 
           city: "Boynton Beach", state: "FL", medianPrice: 335000, medianRent: 2000, capRate: 6.8, rentGrowth: 12, inventory: 1.8, score: 77,
-          airbnb: { nightly: 165, occupancy: 76, monthlyRevenue: 3950, competition: "High" }
+          airbnb: { nightly: 165, occupancy: 76, monthlyRevenue: 3950, competition: "High" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Required", notes: "Business license & inspection" }
         },
         { 
           city: "Hollywood", state: "FL", medianPrice: 375000, medianRent: 2150, capRate: 6.3, rentGrowth: 11, inventory: 1.7, score: 76,
-          airbnb: { nightly: 170, occupancy: 78, monthlyRevenue: 4200, competition: "Very High" }
+          airbnb: { nightly: 170, occupancy: 78, monthlyRevenue: 4200, competition: "Very High" },
+          restrictions: { str: "Restricted", minStay: "30 days", license: "Required", notes: "Monthly rentals only" }
         },
         { 
           city: "Pembroke Pines", state: "FL", medianPrice: 355000, medianRent: 2100, capRate: 6.5, rentGrowth: 12, inventory: 1.8, score: 77,
-          airbnb: { nightly: 160, occupancy: 75, monthlyRevenue: 3800, competition: "High" }
+          airbnb: { nightly: 160, occupancy: 75, monthlyRevenue: 3800, competition: "High" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Required", notes: "Registration & tax required" }
         },
         { 
           city: "Davie", state: "FL", medianPrice: 385000, medianRent: 2200, capRate: 6.2, rentGrowth: 11, inventory: 1.8, score: 75,
-          airbnb: { nightly: 165, occupancy: 76, monthlyRevenue: 3950, competition: "High" }
+          airbnb: { nightly: 165, occupancy: 76, monthlyRevenue: 3950, competition: "High" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Optional", notes: "Few restrictions" }
         },
         { 
           city: "Plantation", state: "FL", medianPrice: 395000, medianRent: 2250, capRate: 6.1, rentGrowth: 10, inventory: 1.7, score: 74,
-          airbnb: { nightly: 170, occupancy: 77, monthlyRevenue: 4100, competition: "Very High" }
+          airbnb: { nightly: 170, occupancy: 77, monthlyRevenue: 4100, competition: "Very High" },
+          restrictions: { str: "Banned", minStay: "N/A", license: "N/A", notes: "STRs prohibited citywide" }
         },
         { 
           city: "Clearwater", state: "FL", medianPrice: 285000, medianRent: 1800, capRate: 7.5, rentGrowth: 15, inventory: 2.2, score: 83,
-          airbnb: { nightly: 150, occupancy: 78, monthlyRevenue: 3650, competition: "High" }
+          airbnb: { nightly: 150, occupancy: 78, monthlyRevenue: 3650, competition: "High" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Required", notes: "Business license required" }
         },
         { 
           city: "Lakeland", state: "FL", medianPrice: 235000, medianRent: 1550, capRate: 8.2, rentGrowth: 16, inventory: 2.8, score: 87,
-          airbnb: { nightly: 125, occupancy: 72, monthlyRevenue: 2825, competition: "Medium" }
+          airbnb: { nightly: 125, occupancy: 72, monthlyRevenue: 2825, competition: "Medium" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Optional", notes: "Minimal restrictions" }
         },
         { 
           city: "Kissimmee", state: "FL", medianPrice: 285000, medianRent: 1750, capRate: 7.6, rentGrowth: 17, inventory: 2.3, score: 86,
-          airbnb: { nightly: 145, occupancy: 80, monthlyRevenue: 3650, competition: "Very High" }
+          airbnb: { nightly: 145, occupancy: 80, monthlyRevenue: 3650, competition: "Very High" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Required", notes: "Tourist area - business license" }
         },
         { 
           city: "Cape Coral", state: "FL", medianPrice: 325000, medianRent: 1950, capRate: 7.1, rentGrowth: 14, inventory: 2.1, score: 82,
-          airbnb: { nightly: 155, occupancy: 76, monthlyRevenue: 3700, competition: "High" }
+          airbnb: { nightly: 155, occupancy: 76, monthlyRevenue: 3700, competition: "High" },
+          restrictions: { str: "Allowed", minStay: "7 days", license: "Required", notes: "Weekly minimum stay" }
         },
         { 
           city: "Port St. Lucie", state: "FL", medianPrice: 295000, medianRent: 1850, capRate: 7.4, rentGrowth: 15, inventory: 2.3, score: 84,
-          airbnb: { nightly: 140, occupancy: 74, monthlyRevenue: 3250, competition: "Medium" }
+          airbnb: { nightly: 140, occupancy: 74, monthlyRevenue: 3250, competition: "Medium" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Optional", notes: "Few restrictions" }
         },
         { 
           city: "Atlanta", state: "GA", medianPrice: 285000, medianRent: 1750, capRate: 7.8, rentGrowth: 13, inventory: 2.4, score: 85,
-          airbnb: { nightly: 140, occupancy: 73, monthlyRevenue: 3200, competition: "High" }
+          airbnb: { nightly: 140, occupancy: 73, monthlyRevenue: 3200, competition: "High" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Required", notes: "Business license & tax required" }
         },
         { 
           city: "Savannah", state: "GA", medianPrice: 245000, medianRent: 1450, capRate: 8.5, rentGrowth: 15, inventory: 3.1, score: 87,
-          airbnb: { nightly: 150, occupancy: 75, monthlyRevenue: 3500, competition: "High" }
+          airbnb: { nightly: 150, occupancy: 75, monthlyRevenue: 3500, competition: "High" },
+          restrictions: { str: "Allowed", minStay: "2 nights", license: "Required", notes: "Historic district restrictions" }
         },
         { 
           city: "Charlotte", state: "NC", medianPrice: 265000, medianRent: 1550, capRate: 8.2, rentGrowth: 12, inventory: 2.6, score: 86,
-          airbnb: { nightly: 130, occupancy: 70, monthlyRevenue: 2850, competition: "Medium" }
+          airbnb: { nightly: 130, occupancy: 70, monthlyRevenue: 2850, competition: "Medium" },
+          restrictions: { str: "Allowed", minStay: "2 nights", license: "Required", notes: "Registration & inspection" }
         },
         { 
           city: "Raleigh", state: "NC", medianPrice: 295000, medianRent: 1650, capRate: 7.9, rentGrowth: 11, inventory: 2.3, score: 83,
-          airbnb: { nightly: 125, occupancy: 69, monthlyRevenue: 2700, competition: "Medium" }
+          airbnb: { nightly: 125, occupancy: 69, monthlyRevenue: 2700, competition: "Medium" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Required", notes: "Special use permit required" }
         },
         { 
           city: "Charleston", state: "SC", medianPrice: 425000, medianRent: 2250, capRate: 6.8, rentGrowth: 10, inventory: 2.0, score: 79,
-          airbnb: { nightly: 185, occupancy: 81, monthlyRevenue: 4700, competition: "Very High" }
+          airbnb: { nightly: 185, occupancy: 81, monthlyRevenue: 4700, competition: "Very High" },
+          restrictions: { str: "Restricted", minStay: "3 nights", license: "Required", notes: "Historic district limits" }
         },
         { 
           city: "Columbia", state: "SC", medianPrice: 185000, medianRent: 1250, capRate: 9.1, rentGrowth: 14, inventory: 3.6, score: 88,
-          airbnb: { nightly: 105, occupancy: 64, monthlyRevenue: 2100, competition: "Low" }
+          airbnb: { nightly: 105, occupancy: 64, monthlyRevenue: 2100, competition: "Low" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Optional", notes: "Minimal restrictions" }
         },
         { 
           city: "Nashville", state: "TN", medianPrice: 385000, medianRent: 2100, capRate: 7.1, rentGrowth: 11, inventory: 2.2, score: 81,
-          airbnb: { nightly: 160, occupancy: 77, monthlyRevenue: 3850, competition: "Very High" }
+          airbnb: { nightly: 160, occupancy: 77, monthlyRevenue: 3850, competition: "Very High" },
+          restrictions: { str: "Restricted", minStay: "3 nights", license: "Required", notes: "Complex permit process" }
         },
         { 
           city: "Memphis", state: "TN", medianPrice: 145000, medianRent: 1150, capRate: 10.2, rentGrowth: 13, inventory: 4.2, score: 90,
-          airbnb: { nightly: 95, occupancy: 62, monthlyRevenue: 1850, competition: "Medium" }
+          airbnb: { nightly: 95, occupancy: 62, monthlyRevenue: 1850, competition: "Medium" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Required", notes: "Registration required" }
         }
       ]
     },
@@ -1745,43 +1781,53 @@ const AdvancedMarketIntel = () => {
       markets: [
         { 
           city: "Detroit", state: "MI", medianPrice: 85000, medianRent: 950, capRate: 13.1, rentGrowth: 14, inventory: 6.2, score: 95,
-          airbnb: { nightly: 75, occupancy: 55, monthlyRevenue: 1300, competition: "Low" }
+          airbnb: { nightly: 75, occupancy: 55, monthlyRevenue: 1300, competition: "Low" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Optional", notes: "Few restrictions" }
         },
         { 
           city: "Toledo", state: "OH", medianPrice: 95000, medianRent: 850, capRate: 11.8, rentGrowth: 13, inventory: 5.8, score: 92,
-          airbnb: { nightly: 70, occupancy: 52, monthlyRevenue: 1150, competition: "Low" }
+          airbnb: { nightly: 70, occupancy: 52, monthlyRevenue: 1150, competition: "Low" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Optional", notes: "Minimal restrictions" }
         },
         { 
           city: "Cleveland", state: "OH", medianPrice: 165000, medianRent: 1150, capRate: 10.1, rentGrowth: 12, inventory: 4.5, score: 89,
-          airbnb: { nightly: 85, occupancy: 58, monthlyRevenue: 1550, competition: "Medium" }
+          airbnb: { nightly: 85, occupancy: 58, monthlyRevenue: 1550, competition: "Medium" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Required", notes: "Registration required" }
         },
         { 
           city: "Columbus", state: "OH", medianPrice: 215000, medianRent: 1350, capRate: 9.2, rentGrowth: 11, inventory: 3.8, score: 85,
-          airbnb: { nightly: 105, occupancy: 65, monthlyRevenue: 2150, competition: "Medium" }
+          airbnb: { nightly: 105, occupancy: 65, monthlyRevenue: 2150, competition: "Medium" },
+          restrictions: { str: "Allowed", minStay: "3 nights", license: "Required", notes: "3-day minimum & permit" }
         },
         { 
           city: "Cincinnati", state: "OH", medianPrice: 185000, medianRent: 1250, capRate: 9.5, rentGrowth: 10, inventory: 4.1, score: 84,
-          airbnb: { nightly: 95, occupancy: 63, monthlyRevenue: 1900, competition: "Medium" }
+          airbnb: { nightly: 95, occupancy: 63, monthlyRevenue: 1900, competition: "Medium" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Required", notes: "Business license required" }
         },
         { 
           city: "Indianapolis", state: "IN", medianPrice: 165000, medianRent: 1200, capRate: 9.8, rentGrowth: 12, inventory: 4.1, score: 87,
-          airbnb: { nightly: 100, occupancy: 64, monthlyRevenue: 2000, competition: "Medium" }
+          airbnb: { nightly: 100, occupancy: 64, monthlyRevenue: 2000, competition: "Medium" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Optional", notes: "Few restrictions" }
         },
         { 
           city: "Fort Wayne", state: "IN", medianPrice: 135000, medianRent: 1050, capRate: 10.4, rentGrowth: 13, inventory: 4.8, score: 89,
-          airbnb: { nightly: 80, occupancy: 56, monthlyRevenue: 1400, competition: "Low" }
+          airbnb: { nightly: 80, occupancy: 56, monthlyRevenue: 1400, competition: "Low" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Optional", notes: "Minimal restrictions" }
         },
         { 
           city: "Grand Rapids", state: "MI", medianPrice: 195000, medianRent: 1350, capRate: 9.3, rentGrowth: 11, inventory: 3.9, score: 85,
-          airbnb: { nightly: 90, occupancy: 60, monthlyRevenue: 1700, competition: "Low" }
+          airbnb: { nightly: 90, occupancy: 60, monthlyRevenue: 1700, competition: "Low" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Optional", notes: "Few restrictions" }
         },
         { 
           city: "Chicago", state: "IL", medianPrice: 285000, medianRent: 1850, capRate: 7.8, rentGrowth: 7, inventory: 3.2, score: 76,
-          airbnb: { nightly: 145, occupancy: 74, monthlyRevenue: 3350, competition: "Very High" }
+          airbnb: { nightly: 145, occupancy: 74, monthlyRevenue: 3350, competition: "Very High" },
+          restrictions: { str: "Restricted", minStay: "30 days", license: "Required", notes: "Effectively banned - complex licensing" }
         },
         { 
           city: "Rockford", state: "IL", medianPrice: 125000, medianRent: 950, capRate: 10.7, rentGrowth: 12, inventory: 5.2, score: 88,
-          airbnb: { nightly: 75, occupancy: 54, monthlyRevenue: 1275, competition: "Low" }
+          airbnb: { nightly: 75, occupancy: 54, monthlyRevenue: 1275, competition: "Low" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Optional", notes: "Few restrictions" }
         }
       ]
     },
@@ -1790,39 +1836,48 @@ const AdvancedMarketIntel = () => {
       markets: [
         { 
           city: "Houston", state: "TX", medianPrice: 245000, medianRent: 1650, capRate: 8.1, rentGrowth: 10, inventory: 3.5, score: 82,
-          airbnb: { nightly: 120, occupancy: 68, monthlyRevenue: 2550, competition: "Medium" }
+          airbnb: { nightly: 120, occupancy: 68, monthlyRevenue: 2550, competition: "Medium" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Optional", notes: "Few restrictions" }
         },
         { 
           city: "Dallas", state: "TX", medianPrice: 285000, medianRent: 1850, capRate: 7.6, rentGrowth: 9, inventory: 3.1, score: 79,
-          airbnb: { nightly: 135, occupancy: 71, monthlyRevenue: 3000, competition: "High" }
+          airbnb: { nightly: 135, occupancy: 71, monthlyRevenue: 3000, competition: "High" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Optional", notes: "Few restrictions" }
         },
         { 
           city: "San Antonio", state: "TX", medianPrice: 195000, medianRent: 1450, capRate: 8.9, rentGrowth: 11, inventory: 3.8, score: 85,
-          airbnb: { nightly: 110, occupancy: 66, monthlyRevenue: 2275, competition: "Medium" }
+          airbnb: { nightly: 110, occupancy: 66, monthlyRevenue: 2275, competition: "Medium" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Required", notes: "Business license required" }
         },
         { 
           city: "Austin", state: "TX", medianPrice: 465000, medianRent: 2350, capRate: 6.2, rentGrowth: 8, inventory: 2.1, score: 73,
-          airbnb: { nightly: 175, occupancy: 79, monthlyRevenue: 4350, competition: "Very High" }
+          airbnb: { nightly: 175, occupancy: 79, monthlyRevenue: 4350, competition: "Very High" },
+          restrictions: { str: "Restricted", minStay: "3 nights", license: "Required", notes: "Type 2 license required, complex process" }
         },
         { 
           city: "Fort Worth", state: "TX", medianPrice: 225000, medianRent: 1550, capRate: 8.4, rentGrowth: 10, inventory: 3.4, score: 83,
-          airbnb: { nightly: 125, occupancy: 69, monthlyRevenue: 2700, competition: "Medium" }
+          airbnb: { nightly: 125, occupancy: 69, monthlyRevenue: 2700, competition: "Medium" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Optional", notes: "Few restrictions" }
         },
         { 
           city: "Phoenix", state: "AZ", medianPrice: 385000, medianRent: 2100, capRate: 6.9, rentGrowth: 11, inventory: 2.2, score: 78,
-          airbnb: { nightly: 150, occupancy: 73, monthlyRevenue: 3450, competition: "High" }
+          airbnb: { nightly: 150, occupancy: 73, monthlyRevenue: 3450, competition: "High" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Required", notes: "Business license & tax required" }
         },
         { 
           city: "Tucson", state: "AZ", medianPrice: 285000, medianRent: 1550, capRate: 7.8, rentGrowth: 12, inventory: 3.1, score: 82,
-          airbnb: { nightly: 125, occupancy: 70, monthlyRevenue: 2750, competition: "Medium" }
+          airbnb: { nightly: 125, occupancy: 70, monthlyRevenue: 2750, competition: "Medium" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Optional", notes: "Few restrictions" }
         },
         { 
           city: "Denver", state: "CO", medianPrice: 485000, medianRent: 2450, capRate: 6.1, rentGrowth: 9, inventory: 1.9, score: 75,
-          airbnb: { nightly: 165, occupancy: 76, monthlyRevenue: 3950, competition: "Very High" }
+          airbnb: { nightly: 165, occupancy: 76, monthlyRevenue: 3950, competition: "Very High" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Required", notes: "Business license & inspection" }
         },
         { 
           city: "Colorado Springs", state: "CO", medianPrice: 385000, medianRent: 1950, capRate: 6.8, rentGrowth: 10, inventory: 2.5, score: 76,
-          airbnb: { nightly: 140, occupancy: 72, monthlyRevenue: 3150, competition: "High" }
+          airbnb: { nightly: 140, occupancy: 72, monthlyRevenue: 3150, competition: "High" },
+          restrictions: { str: "Allowed", minStay: "1 night", license: "Optional", notes: "Few restrictions" }
         }
       ]
     }
@@ -1838,14 +1893,26 @@ const AdvancedMarketIntel = () => {
     if (!searchQuery.trim()) return [];
     
     const query = searchQuery.toLowerCase().trim();
-    return allMarkets.filter(market => {
+    
+    // Check if searching for just a state code (e.g., "FL", "OH", "TX")
+    const isStateSearch = query.length === 2 && query.match(/^[a-z]{2}$/);
+    
+    const results = allMarkets.filter(market => {
       const cityMatch = market.city.toLowerCase().includes(query);
       const stateMatch = market.state.toLowerCase().includes(query);
       const fullMatch = `${market.city.toLowerCase()}, ${market.state.toLowerCase()}`.includes(query);
       const reverseMatch = `${market.state.toLowerCase()} ${market.city.toLowerCase()}`.includes(query);
       
+      // For state-only searches, show all cities in that state
+      if (isStateSearch) {
+        return market.state.toLowerCase() === query;
+      }
+      
       return cityMatch || stateMatch || fullMatch || reverseMatch;
-    }).slice(0, 8); // Limit to 8 results
+    });
+    
+    // If state search, show all results, otherwise limit to 8
+    return isStateSearch ? results : results.slice(0, 8);
   }, [searchQuery, allMarkets]);
 
   const getDisplayMarkets = () => {
@@ -1854,6 +1921,12 @@ const AdvancedMarketIntel = () => {
     }
     return Object.values(marketData[selectedRegion].markets || []);
   };
+
+  // Check if current search is a state search
+  const isStateSearch = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
+    return query.length === 2 && query.match(/^[a-z]{2}$/) && searchResults.length > 0;
+  }, [searchQuery, searchResults]);
 
   const getTopMarkets = (metric, count = 5) => {
     return allMarkets.sort((a, b) => b[metric] - a[metric]).slice(0, count);
@@ -1913,7 +1986,7 @@ const AdvancedMarketIntel = () => {
               />
               <input
                 type="text"
-                placeholder="Search for any city... (e.g. 'Columbus OH', 'Tampa', 'Detroit MI')"
+                placeholder="Search cities or states... (e.g. 'FL', 'Tampa FL', 'Columbus OH')"
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 style={{
@@ -2017,7 +2090,7 @@ const AdvancedMarketIntel = () => {
           <div style={{ marginTop: 16 }}>
             <div className="label-xs" style={{ marginBottom: 8 }}>POPULAR SEARCHES</div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {["Columbus OH", "Tampa FL", "Detroit MI", "Memphis TN", "Toledo OH", "Buffalo NY"].map(suggestion => (
+              {["FL", "OH", "TX", "Columbus OH", "Tampa FL", "Detroit MI", "Memphis TN"].map(suggestion => (
                 <button
                   key={suggestion}
                   onClick={() => handleSearchChange(suggestion)}
@@ -2187,6 +2260,34 @@ const AdvancedMarketIntel = () => {
                     />
                   </div>
 
+                  {/* Rental Restrictions */}
+                  <div style={{ marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${THEME.borderLight}` }}>
+                    <div className="label-xs" style={{ marginBottom: 8, color: THEME.purple }}>RENTAL REGULATIONS</div>
+                    <StatRow 
+                      label="STR Status" 
+                      value={market.restrictions.str} 
+                      valueColor={
+                        market.restrictions.str === "Allowed" ? THEME.green :
+                        market.restrictions.str === "Restricted" ? THEME.orange :
+                        THEME.red
+                      }
+                      bold
+                    />
+                    <StatRow label="Minimum Stay" value={market.restrictions.minStay} />
+                    <StatRow 
+                      label="License Required" 
+                      value={market.restrictions.license} 
+                      valueColor={
+                        market.restrictions.license === "Optional" ? THEME.green :
+                        market.restrictions.license === "Required" ? THEME.orange :
+                        THEME.red
+                      }
+                    />
+                    <div style={{ fontSize: 11, color: THEME.textMuted, marginTop: 8, fontStyle: "italic" }}>
+                      {market.restrictions.notes}
+                    </div>
+                  </div>
+
                   {/* Comparison & Score */}
                   <div style={{ paddingTop: 12, borderTop: `1px solid ${THEME.borderLight}` }}>
                     <StatRow 
@@ -2210,7 +2311,11 @@ const AdvancedMarketIntel = () => {
       {showSearchResults && searchQuery && (
         <div style={{ marginBottom: 32 }}>
           <Panel 
-            title={`Search Results for "${searchQuery}" (${searchResults.length} markets found)`} 
+            title={
+              isStateSearch 
+                ? `All Cities in ${searchQuery.toUpperCase()} (${searchResults.length} markets found)`
+                : `Search Results for "${searchQuery}" (${searchResults.length} markets found)`
+            } 
             icon={<Search size={16} />}
             accent
           >
@@ -2252,6 +2357,34 @@ const AdvancedMarketIntel = () => {
                           THEME.purple
                         }
                       />
+                    </div>
+
+                    {/* Rental Restrictions */}
+                    <div style={{ marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${THEME.borderLight}` }}>
+                      <div className="label-xs" style={{ marginBottom: 8, color: THEME.purple }}>RENTAL REGULATIONS</div>
+                      <StatRow 
+                        label="STR Status" 
+                        value={market.restrictions.str} 
+                        valueColor={
+                          market.restrictions.str === "Allowed" ? THEME.green :
+                          market.restrictions.str === "Restricted" ? THEME.orange :
+                          THEME.red
+                        }
+                        bold
+                      />
+                      <StatRow label="Minimum Stay" value={market.restrictions.minStay} />
+                      <StatRow 
+                        label="License Required" 
+                        value={market.restrictions.license} 
+                        valueColor={
+                          market.restrictions.license === "Optional" ? THEME.green :
+                          market.restrictions.license === "Required" ? THEME.orange :
+                          THEME.red
+                        }
+                      />
+                      <div style={{ fontSize: 11, color: THEME.textMuted, marginTop: 8, fontStyle: "italic" }}>
+                        {market.restrictions.notes}
+                      </div>
                     </div>
 
                     {/* Comparison & Score */}
