@@ -2,7 +2,7 @@
    EDUCATION CENTER — BRRRR + strategy + financing + market + risk curricula,
    glossary with search. This is a content-heavy view; structure lives inline.
    ============================================================================ */
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   BookOpen, Target, Activity, AlertTriangle, BarChart3, Briefcase, Building2,
   Calculator, Clock, DollarSign, Edit3, FileText, Flag, Globe, Hammer, Home,

@@ -207,11 +207,15 @@ export const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCo
           </span>
           <div style={{
             flex: 1,
-            height: 12,
-            borderRadius: 2,
+            display: "flex", gap: 2,
             border: `1px solid ${THEME.border}`,
-            background: `linear-gradient(90deg, ${scoreToHeatFill(0)} 0%, ${scoreToHeatFill(0.25)} 25%, ${scoreToHeatFill(0.5)} 50%, ${scoreToHeatFill(0.75)} 75%, ${scoreToHeatFill(1)} 100%)`
-          }} />
+            borderRadius: 2,
+            overflow: "hidden"
+          }}>
+            {[0, 0.2, 0.4, 0.6, 0.8, 1].map(t => (
+              <div key={t} style={{ flex: 1, height: 12, background: scoreToHeatFill(t) }} />
+            ))}
+          </div>
           <span className="mono" style={{ fontSize: 11, color: "#15803D", minWidth: 28, textAlign: "right", fontWeight: 700 }}>
             {HEAT_SCALE_MAX}
           </span>

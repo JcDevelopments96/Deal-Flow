@@ -60,7 +60,7 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose }) => {
             ) : (
               <div style={{
                 width: "100%", height: "100%",
-                background: `linear-gradient(135deg, ${THEME.bgTeal}, ${THEME.bgRaised})`,
+                background: THEME.bgPanel,
                 display: "flex", alignItems: "center", justifyContent: "center"
               }}>
                 <Building2 size={64} color={THEME.textDim} />

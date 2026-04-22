@@ -125,7 +125,7 @@ export const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal, recentId
               setCompareMode(m => !m);
               if (compareMode) setCompareSelected([]);
             }}
-            className={compareMode ? "btn-accent-teal" : "btn-secondary"}
+            className={compareMode ? "btn-accent-orange" : "btn-secondary"}
             style={{ padding: "8px 14px", fontSize: 12 }}
           >
             <Layers size={13} /> {compareMode ? `Compare (${compareSelected.length})` : "Compare Deals"}
@@ -285,18 +285,18 @@ export const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal, recentId
               }}
               style={{
                 padding: 18, background: THEME.bgPanel,
-                border: `1px solid ${isSelected ? THEME.teal : THEME.border}`,
+                border: `1px solid ${isSelected ? THEME.orange : THEME.border}`,
                 borderRadius: 8,
                 cursor: "pointer", transition: "all 0.15s ease",
                 position: "relative",
-                boxShadow: isSelected ? `0 0 0 2px ${THEME.bgTeal}` : "none"
+                boxShadow: isSelected ? `0 0 0 2px ${THEME.bgOrange}` : "none"
               }}
               onMouseEnter={e => {
                 e.currentTarget.style.borderColor = isSelected ? THEME.teal : THEME.accent;
                 e.currentTarget.style.transform = "translateY(-1px)";
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.borderColor = isSelected ? THEME.teal : THEME.border;
+                e.currentTarget.style.borderColor = isSelected ? THEME.orange : THEME.border;
                 e.currentTarget.style.transform = "translateY(0)";
               }}
             >
@@ -306,7 +306,7 @@ export const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal, recentId
                   style={{
                     position: "absolute", top: 12, right: 12,
                     width: 22, height: 22, borderRadius: 4,
-                    border: `2px solid ${isSelected ? THEME.teal : THEME.border}`,
+                    border: `2px solid ${isSelected ? THEME.orange : THEME.border}`,
                     background: isSelected ? THEME.teal : THEME.bg,
                     color: "#fff",
                     display: "flex", alignItems: "center", justifyContent: "center"

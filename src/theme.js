@@ -1,19 +1,27 @@
 /* ============================================================================
    THEME + STYLE_TAG
-   Palette: white primary canvas, teal + orange accents.
-   Teal is the primary action color; orange is the secondary highlight.
-   `navy` is kept as an alias pointing at teal so any legacy reference
-   still renders cleanly without hunting every call-site.
+   Palette: white primary canvas, navy for brand/CTA, teal for supporting
+   emphasis, orange for highlights. No gradients used in UI components.
+
+   Role summary:
+     accent / navy   — primary brand color, main CTAs, hero stats
+     teal            — secondary emphasis, supporting data highlights
+     orange          — warm highlights, tertiary actions, callouts
+     green / red     — positive / negative semantics (cash flow, delete)
    ============================================================================ */
 
-const TEAL = "#0D9488";      // Teal-600 — primary CTA & active states
-const TEAL_DIM = "#0F766E";  // Teal-700 — hover
+const NAVY = "#1E3A8A";      // Navy-900 — primary
+const NAVY_DIM = "#1E40AF";  // Navy-800 — hover
+const TEAL = "#0D9488";      // Teal-600 — secondary emphasis
+const TEAL_DIM = "#0F766E";  // Teal-700 — teal hover
+const ORANGE = "#EA580C";    // Orange-600 — tertiary highlight
+const ORANGE_DIM = "#C2410C";
 
 export const THEME = {
   bg: "#FFFFFF",          // Pure white canvas
   bgPanel: "#F8FAFC",     // Panel surfaces — slate-50
   bgInput: "#FFFFFF",     // Inputs match canvas
-  bgRaised: "#F0FDFA",    // Hover / raised — teal-50 (harmonizes with teal)
+  bgRaised: "#EFF6FF",    // Hover / raised — blue-50 (harmonizes with navy)
   bgTeal: "#F0FDFA",      // Teal-50 — soft teal surface
   bgOrange: "#FFF7ED",    // Orange-50 — soft orange surface for highlights
   border: "#E2E8F0",      // Standard border (slate-200)
@@ -21,12 +29,11 @@ export const THEME = {
   text: "#0F172A",        // Primary text (slate-900)
   textMuted: "#475569",   // Secondary text (slate-600)
   textDim: "#94A3B8",     // Placeholders / tertiary (slate-400)
-  accent: TEAL,
-  accentDim: TEAL_DIM,
-  // `navy` is intentionally aliased to teal — old code paths still render
-  // correctly even though navy is no longer part of the palette.
-  navy: TEAL,
-  navyDim: TEAL_DIM,
+  accent: NAVY,
+  accentDim: NAVY_DIM,
+  navy: NAVY,
+  navyDim: NAVY_DIM,
+  // Legacy "secondary" kept as teal for code that differentiated primary/secondary.
   secondary: TEAL,
   secondaryDim: TEAL_DIM,
   teal: TEAL,
@@ -35,8 +42,8 @@ export const THEME = {
   greenDim: "#D1FAE5",
   red: "#DC2626",
   redDim: "#FEE2E2",
-  orange: "#EA580C",      // Orange-600 — highlight + warm emphasis
-  orangeDim: "#C2410C",
+  orange: ORANGE,
+  orangeDim: ORANGE_DIM,
   blue: "#2563EB",
   purple: "#7C3AED"
 };
@@ -72,7 +79,7 @@ input, select, textarea {
 }
 input::placeholder, textarea::placeholder { color: ${THEME.textDim}; }
 input:focus, select:focus, textarea:focus {
-  border-color: ${THEME.accent}; box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.18);
+  border-color: ${THEME.accent}; box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.15);
 }
 input[type="checkbox"] { accent-color: ${THEME.accent}; }
 input[type="range"] { accent-color: ${THEME.accent}; }

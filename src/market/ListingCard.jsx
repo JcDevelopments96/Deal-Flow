@@ -18,7 +18,7 @@ export const ListingImage = ({ url, demo }) => {
       aspectRatio: "16 / 10",
       borderRadius: 6,
       overflow: "hidden",
-      background: showImage ? THEME.bgPanel : `linear-gradient(135deg, ${THEME.bgTeal}, ${THEME.bgRaised})`,
+      background: THEME.bgPanel,
       marginBottom: 10,
       display: "flex",
       alignItems: "center",
