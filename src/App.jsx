@@ -13,6 +13,9 @@ import {
   PiggyBank, RotateCcw, Trophy
 } from "lucide-react";
 
+// Map visualization — requires: npm install react-simple-maps
+import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
+
 // Alias for semantic naming
 const RepeatIcon = RotateCcw;
 
@@ -1537,6 +1540,181 @@ const ExitStrategyComparisons = ({ deal, metrics }) => {
 };
 
 /* ============================================================================
+   US COUNTY MAP — interactive, county-level
+   ============================================================================ */
+const STATE_FIPS_BY_CODE = {
+  AL: "01", AK: "02", AZ: "04", AR: "05", CA: "06", CO: "08", CT: "09", DE: "10",
+  DC: "11", FL: "12", GA: "13", HI: "15", ID: "16", IL: "17", IN: "18", IA: "19",
+  KS: "20", KY: "21", LA: "22", ME: "23", MD: "24", MA: "25", MI: "26", MN: "27",
+  MS: "28", MO: "29", MT: "30", NE: "31", NV: "32", NH: "33", NJ: "34", NM: "35",
+  NY: "36", NC: "37", ND: "38", OH: "39", OK: "40", OR: "41", PA: "42", RI: "44",
+  SC: "45", SD: "46", TN: "47", TX: "48", UT: "49", VT: "50", VA: "51", WA: "53",
+  WV: "54", WI: "55", WY: "56"
+};
+
+const STATE_MAP_VIEW = {
+  FL: { center: [-82, 28], zoom: 4 },
+  NY: { center: [-75.5, 43], zoom: 3.5 },
+  TX: { center: [-99, 31.5], zoom: 2.8 },
+  OH: { center: [-82.5, 40.5], zoom: 5 },
+  PA: { center: [-77.5, 41], zoom: 4.5 },
+  GA: { center: [-83, 32.5], zoom: 4.5 },
+  NC: { center: [-79.5, 35.5], zoom: 4 },
+  SC: { center: [-81, 34], zoom: 5 },
+  TN: { center: [-86, 36], zoom: 4 },
+  MI: { center: [-85, 44.5], zoom: 3.5 },
+  IN: { center: [-86, 40], zoom: 4.8 },
+  IL: { center: [-89, 40], zoom: 3.5 },
+  AZ: { center: [-112, 34], zoom: 3.5 },
+  CO: { center: [-106, 39], zoom: 3.8 },
+  NJ: { center: [-74.5, 40.3], zoom: 7 }
+};
+
+const COUNTIES_TOPOJSON = "https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json";
+
+const normalizeCountyName = (name) =>
+  (name || "").toLowerCase().replace(/\s+county$/i, "").trim();
+
+const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyClick }) => {
+  // Build lookup: stateFips -> Map(normalizedCountyName -> market)
+  const marketLookup = useMemo(() => {
+    const lookup = new Map();
+    allMarkets.forEach(m => {
+      const sf = STATE_FIPS_BY_CODE[m.state];
+      if (!sf) return;
+      if (!lookup.has(sf)) lookup.set(sf, new Map());
+      lookup.get(sf).set(normalizeCountyName(m.county), m);
+    });
+    return lookup;
+  }, [allMarkets]);
+
+  const view = (selectedState && STATE_MAP_VIEW[selectedState])
+    ? STATE_MAP_VIEW[selectedState]
+    : { center: [-96, 38], zoom: 1 };
+
+  const highlightedFips = highlightedMarket ? STATE_FIPS_BY_CODE[highlightedMarket.state] : null;
+  const highlightedCounty = highlightedMarket ? normalizeCountyName(highlightedMarket.county) : null;
+  const selectedFips = selectedState ? STATE_FIPS_BY_CODE[selectedState] : null;
+
+  return (
+    <div>
+      <div style={{
+        background: THEME.bgInput,
+        border: `1px solid ${THEME.border}`,
+        borderRadius: 6,
+        padding: 12,
+        overflow: "hidden"
+      }}>
+        <ComposableMap
+          projection="geoAlbersUsa"
+          style={{ width: "100%", height: "auto", maxHeight: 480, display: "block" }}
+        >
+          <ZoomableGroup
+            center={view.center}
+            zoom={view.zoom}
+            minZoom={1}
+            maxZoom={12}
+          >
+            <Geographies geography={COUNTIES_TOPOJSON}>
+              {({ geographies }) => {
+                if (!geographies || geographies.length === 0) return null;
+                return geographies.map(geo => {
+                  const fips = String(geo.id || "");
+                  const stateFips = fips.slice(0, 2);
+                  const countyNorm = normalizeCountyName(geo.properties.name);
+
+                  const stateMarkets = marketLookup.get(stateFips);
+                  const market = stateMarkets ? stateMarkets.get(countyNorm) : null;
+                  const isMarket = !!market;
+                  const isHighlighted = highlightedFips === stateFips && highlightedCounty === countyNorm;
+                  const isInSelectedState = selectedFips === stateFips;
+
+                  let fill = THEME.bgPanel;
+                  let stroke = THEME.border;
+                  let strokeWidth = 0.3;
+
+                  if (isInSelectedState) {
+                    fill = THEME.bgRaised;
+                    stroke = THEME.borderLight;
+                  }
+                  if (isMarket) {
+                    fill = "rgba(212, 175, 55, 0.45)";
+                    stroke = THEME.accent;
+                    strokeWidth = 0.6;
+                  }
+                  if (isHighlighted) {
+                    fill = THEME.accent;
+                    stroke = THEME.text;
+                    strokeWidth = 1.2;
+                  }
+
+                  return (
+                    <Geography
+                      key={geo.rsmKey}
+                      geography={geo}
+                      fill={fill}
+                      stroke={stroke}
+                      strokeWidth={strokeWidth}
+                      style={{
+                        default: { outline: "none", transition: "fill 0.2s" },
+                        hover: {
+                          fill: isMarket ? THEME.accentDim : (isInSelectedState ? THEME.borderLight : THEME.bgRaised),
+                          outline: "none",
+                          cursor: isMarket ? "pointer" : "default"
+                        },
+                        pressed: { outline: "none" }
+                      }}
+                      onClick={() => {
+                        if (market && onCountyClick) onCountyClick(market);
+                      }}
+                    />
+                  );
+                });
+              }}
+            </Geographies>
+          </ZoomableGroup>
+        </ComposableMap>
+      </div>
+
+      {/* Legend + info readout */}
+      <div style={{
+        display: "flex",
+        gap: 18,
+        marginTop: 12,
+        fontSize: 11,
+        color: THEME.textMuted,
+        flexWrap: "wrap",
+        alignItems: "center"
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{
+            width: 14, height: 14, borderRadius: 2,
+            background: "rgba(212, 175, 55, 0.45)",
+            border: `1px solid ${THEME.accent}`
+          }} />
+          <span>Tracked Market ({allMarkets.length})</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{
+            width: 14, height: 14, borderRadius: 2,
+            background: THEME.accent
+          }} />
+          <span>Selected County</span>
+        </div>
+        {highlightedMarket && (
+          <div style={{ color: THEME.accent, fontWeight: 600 }}>
+            {highlightedMarket.city}, {highlightedMarket.state} &mdash; {highlightedMarket.county}
+          </div>
+        )}
+        <div style={{ color: THEME.textDim, marginLeft: "auto", fontSize: 10 }}>
+          Click any gold county &bull; Scroll to zoom &bull; Drag to pan
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ============================================================================
    ADVANCED MARKET INTEL WITH LOCATION PREFERENCES
    ============================================================================ */
 const AdvancedMarketIntel = () => {
@@ -2536,6 +2714,27 @@ const AdvancedMarketIntel = () => {
   const stateMarkets = selectedState ? getStateMarkets(selectedState) : [];
   const stateInfo = selectedState ? getStateInfo(selectedState) : null;
 
+  // Map-derived focus: state selection > single search match > full US
+  const mapFocusState = useMemo(() => {
+    if (selectedState) return selectedState;
+    if (searchResults.length === 1) return searchResults[0].state;
+    return null;
+  }, [selectedState, searchResults]);
+
+  // Map highlight: single search match gets the bright pin; state browsing shows all state counties
+  const mapHighlight = useMemo(() => {
+    if (searchResults.length === 1) return searchResults[0];
+    return null;
+  }, [searchResults]);
+
+  // Clicking a county on the map drives the existing search flow
+  const handleMapCountyClick = useCallback((market) => {
+    setSearchQuery(market.city);
+    setShowSearchResults(true);
+    setSelectedState("");
+    setShowStateResults(false);
+  }, []);
+
   const renderMarketCard = (market, showRank = false, rank = 0) => (
     <div
       key={`${market.city}-${market.state}`}
@@ -2679,6 +2878,18 @@ const AdvancedMarketIntel = () => {
           <div className="label-xs" style={{ marginBottom: 10 }}>Top Recommended Markets For Your Goal</div>
           {recommendedMarkets.map((market, idx) => renderMarketCard(market, true, idx + 1))}
         </div>
+      </Panel>
+
+      <Panel title="Market Map — US Counties" icon={<MapPin size={16} />} accent style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 14 }}>
+          Every tracked market, mapped by county. Click a gold county to open its deal profile, pick a state below to zoom in, or search to spotlight a specific city.
+        </div>
+        <USCountyMap
+          allMarkets={allMarkets}
+          selectedState={mapFocusState}
+          highlightedMarket={mapHighlight}
+          onCountyClick={handleMapCountyClick}
+        />
       </Panel>
 
       <Panel title="Market Search" icon={<Search size={16} />} style={{ marginBottom: 24 }}>
