@@ -10,7 +10,8 @@ import {
   Mail, Eye, Settings,
   ChevronDown, ChevronUp, MoreHorizontal, Layout, Smartphone, Tablet,
   Wifi, WifiOff, Timer, Gauge, Layers, Hammer,
-  PiggyBank, RotateCcw, Trophy
+  PiggyBank, RotateCcw, Trophy, ClipboardList, Users, Handshake,
+  Megaphone, Scale, UserCheck, Network, Building, Cog
 } from "lucide-react";
 
 // Map visualization — requires: npm install react-simple-maps
@@ -1577,33 +1578,43 @@ const normalizeCountyName = (name) =>
   (name || "").toLowerCase().replace(/\s+county$/i, "").trim();
 
 // Return a red→yellow→green heatmap fill based on normalized score (0..1).
-// Low score = red, mid = yellow/amber, high = green. Classic performance heatmap.
+// Low score = vibrant red, mid = true yellow, high = vibrant green.
 const scoreToHeatFill = (t) => {
   const clamped = Math.max(0, Math.min(1, t));
-  // Interpolate through three stops:
-  //   0.0 = red    (220, 38, 38)
-  //   0.5 = amber  (245, 158, 11)
-  //   1.0 = green  (5, 150, 105)
+  // Three color stops (Tailwind-style vibrant palette):
+  //   0.0 = red-500    (239, 68, 68)
+  //   0.5 = yellow-400 (250, 204, 21)
+  //   1.0 = green-500  (34, 197, 94)
   let r, g, b;
   if (clamped < 0.5) {
-    const k = clamped / 0.5; // 0..1 within red→amber band
-    r = Math.round(220 + (245 - 220) * k);
-    g = Math.round(38 + (158 - 38) * k);
-    b = Math.round(38 + (11 - 38) * k);
+    const k = clamped / 0.5; // 0..1 within red→yellow band
+    r = Math.round(239 + (250 - 239) * k);
+    g = Math.round(68 + (204 - 68) * k);
+    b = Math.round(68 + (21 - 68) * k);
   } else {
-    const k = (clamped - 0.5) / 0.5; // 0..1 within amber→green band
-    r = Math.round(245 + (5 - 245) * k);
-    g = Math.round(158 + (150 - 158) * k);
-    b = Math.round(11 + (105 - 11) * k);
+    const k = (clamped - 0.5) / 0.5; // 0..1 within yellow→green band
+    r = Math.round(250 + (34 - 250) * k);
+    g = Math.round(204 + (197 - 204) * k);
+    b = Math.round(21 + (94 - 21) * k);
   }
-  return `rgba(${r}, ${g}, ${b}, 0.80)`;
+  return `rgba(${r}, ${g}, ${b}, 0.90)`;
 };
 
 const scoreToHeatStroke = (t) => {
   const clamped = Math.max(0, Math.min(1, t));
-  if (clamped < 0.5) return "#DC2626"; // red-600
-  if (clamped < 0.75) return "#D97706"; // amber-600
-  return "#059669"; // emerald-600
+  if (clamped < 0.33) return "#B91C1C"; // red-700
+  if (clamped < 0.67) return "#A16207"; // yellow-700
+  return "#15803D"; // green-700
+};
+
+// BRRRR scores typically land in the 50–100 range. Using a fixed scale (rather
+// than min/max of the dataset) means the colors carry absolute meaning: a score
+// of 65 always looks the same shade whether the dataset ranges 60–90 or 50–100.
+const HEAT_SCALE_MIN = 55;
+const HEAT_SCALE_MAX = 95;
+const scoreToT = (score) => {
+  const range = HEAT_SCALE_MAX - HEAT_SCALE_MIN;
+  return Math.max(0, Math.min(1, (score - HEAT_SCALE_MIN) / range));
 };
 
 const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyClick }) => {
@@ -1684,8 +1695,7 @@ const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyCli
                   }
                   if (isMarket) {
                     const score = getScore(market);
-                    const range = maxScore - minScore;
-                    const t = range > 0 ? (score - minScore) / range : 1;
+                    const t = scoreToT(score);
                     fill = scoreToHeatFill(t);
                     stroke = scoreToHeatStroke(t);
                     strokeWidth = 0.5;
@@ -1740,22 +1750,22 @@ const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyCli
         }}>
           <span className="label-xs">BRRRR Score Heatmap</span>
           <span style={{ fontSize: 10, color: THEME.textDim }}>
-            {allMarkets.length} markets &bull; range {minScore}-{maxScore}
+            {allMarkets.length} markets &bull; your range {minScore}-{maxScore}
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span className="mono" style={{ fontSize: 11, color: THEME.red, minWidth: 22, fontWeight: 600 }}>
-            {minScore}
+          <span className="mono" style={{ fontSize: 11, color: "#B91C1C", minWidth: 28, fontWeight: 700 }}>
+            {HEAT_SCALE_MIN}
           </span>
           <div style={{
             flex: 1,
-            height: 10,
+            height: 12,
             borderRadius: 2,
             border: `1px solid ${THEME.border}`,
-            background: `linear-gradient(90deg, ${scoreToHeatFill(0)} 0%, ${scoreToHeatFill(0.5)} 50%, ${scoreToHeatFill(1)} 100%)`
+            background: `linear-gradient(90deg, ${scoreToHeatFill(0)} 0%, ${scoreToHeatFill(0.25)} 25%, ${scoreToHeatFill(0.5)} 50%, ${scoreToHeatFill(0.75)} 75%, ${scoreToHeatFill(1)} 100%)`
           }} />
-          <span className="mono" style={{ fontSize: 11, color: THEME.green, minWidth: 22, textAlign: "right", fontWeight: 600 }}>
-            {maxScore}
+          <span className="mono" style={{ fontSize: 11, color: "#15803D", minWidth: 28, textAlign: "right", fontWeight: 700 }}>
+            {HEAT_SCALE_MAX}
           </span>
         </div>
         <div style={{
@@ -1764,8 +1774,8 @@ const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyCli
           marginTop: 4,
           fontSize: 10,
           color: THEME.textDim,
-          paddingLeft: 32,
-          paddingRight: 32
+          paddingLeft: 38,
+          paddingRight: 38
         }}>
           <span>Weak</span>
           <span>Average</span>
@@ -1786,8 +1796,8 @@ const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyCli
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{
             width: 14, height: 14, borderRadius: 2,
-            background: scoreToHeatFill(0.75),
-            border: `1px solid ${scoreToHeatStroke(0.75)}`
+            background: scoreToHeatFill(0.5),
+            border: `1px solid ${scoreToHeatStroke(0.5)}`
           }} />
           <span>Tracked Market</span>
         </div>
@@ -3504,6 +3514,66 @@ const EducationCenter = () => {
               body: "Buy a fully renovated, already-tenanted property from a turnkey provider. Advantages: no rehab risk, immediate cash flow, minimal time commitment. Disadvantages: paying retail price (so little equity built in), quality varies wildly by provider, no forced appreciation upside. Reasonable for busy professionals with capital but no time for active BRRRRs."
             }
           ]
+        },
+        "brrrr-financing": {
+          title: "Financing the BRRRR Cycle",
+          icon: <DollarSign size={14} />,
+          sections: [
+            {
+              heading: "The Two-Loan Structure",
+              body: "BRRRR financing almost always involves two distinct loans: a short-term acquisition loan (hard money, private money, HELOC, or cash) and a long-term refinance loan (conventional or DSCR). The acquisition loan funds purchase + rehab, the refi loan replaces it at the end. Understanding how these two loans interact is the most important operational skill in BRRRR."
+            },
+            {
+              heading: "Hard Money Details for BRRRR",
+              body: "Typical 2024-2025 hard money terms for BRRRR: 85-90% of purchase price + 100% of rehab financed, 10-12% interest-only, 2-3 points upfront, 6-12 month term. Lender holds back rehab funds in 'draws' released as work is completed (typically 3-4 draws tied to inspection milestones). Total out-of-pocket cash at closing: 10-15% of purchase + closing costs (~3%) + first few months of interest reserves. On a $150K purchase with $40K rehab, expect ~$22-30K cash to close."
+            },
+            {
+              heading: "90/100 and 100/100 Financing",
+              body: "'90/100' means 90% of purchase + 100% of rehab. '100/100' means 100% of both, but only up to a combined max typically of 75% of ARV. Example: $150K purchase + $40K rehab = $190K total; 75% of $275K ARV = $206K loan max. Since $190K < $206K, a 100/100 loan is possible. Very few lenders offer true 100/100 — usually reserved for experienced investors with 5+ completed BRRRRs."
+            },
+            {
+              heading: "Interest Reserves and Carrying Costs",
+              body: "Hard money lenders often require 3-6 months of interest reserves held in escrow at closing. On a $190K loan at 11%: monthly interest = $1,742; 6 months = $10,452 held in reserve. This protects the lender if you miss payments during rehab. You'll also pay property taxes, insurance (vacant policy typically), and utilities during the 3-6 month rehab period — budget $150-400/month for these combined."
+            },
+            {
+              heading: "The Refinance Bridge",
+              body: "The day your rehab is done is not the day you refinance. You need: (1) rent-ready property with CO if required by jurisdiction, (2) tenant in place with signed lease (some lenders require), (3) seasoning period completed, (4) documented rehab receipts and photos for the appraiser. From rehab complete to cash in hand: typically 45-75 days through the refinance process. Plan for 2 months of rent + operating expenses between rehab completion and refi closing."
+            },
+            {
+              heading: "Transitioning to DSCR",
+              body: "Most BRRRR investors end up refinancing with DSCR loans because: (1) conventional loans require personal income documentation, (2) conventional limits at 10 financed properties, (3) DSCR allows LLC ownership from origination, (4) DSCR seasoning is often shorter. Typical DSCR refinance: 75% LTV cash-out, 7-9% rate (in 2024-2025), 30-year amortization, $500-$3,000 lender fees, appraisal $550-$750. Prepayment penalty is standard — usually 3-5 years of declining schedule."
+            },
+            {
+              heading: "Exit Scenarios When Refi Falls Short",
+              body: "If the refinance appraisal comes in 10%+ below target, you have options: (1) Accept partial cash-out and leave equity in, which becomes a 'partial BRRRR' rather than a failure; (2) Switch to an 80% LTV rate-and-term (requires bringing cash but gets out of hard money); (3) Season longer and reappraise in 6 months if market is improving; (4) Sell the property as a flip if your acquisition + rehab allows profit at retail. Never default on hard money — the property goes back to the lender and your credit takes years to rebuild."
+            }
+          ]
+        },
+        "brrrr-examples": {
+          title: "BRRRR Worked Examples: 3 Case Studies",
+          icon: <Calculator size={14} />,
+          sections: [
+            {
+              heading: "Case 1 — The Clean BRRRR",
+              body: "Suburban 3-bed/2-bath in a B-class neighborhood. Purchase: $135,000. Hard money 85/100: $114,750 purchase loan + $35,000 rehab loan = $149,750 total HM debt. Cash to close: $24,000. Rehab: $34,200 actual vs $35,000 budgeted. Rehab time: 14 weeks. Market rent: $1,825/month. Refi appraisal: $265,000 (right at target). DSCR cash-out refi at 75% LTV: $198,750 loan. Payoff hard money + closing costs: $154,750. Cash returned to investor: $44,000. Net outcome: all capital back plus $20,800 extra, property cash-flowing $285/month after all expenses and reserves. Textbook BRRRR."
+            },
+            {
+              heading: "Case 2 — The Partial BRRRR (Most Common)",
+              body: "Urban 4-plex. Purchase: $195,000. Hard money 80/100: $156,000 + $65,000 rehab = $221,000 HM debt. Cash to close: $43,000. Rehab: $74,800 actual (15% over $65K budget due to foundation work discovered during demo). Total in deal: $52,800 cash invested. Market rent after rehab: $4,400/month combined. Refi appraisal: $325,000 (8% below $350K target due to softening market). DSCR 75% LTV = $243,750 loan. Payoff HM + closing costs: $226,500. Cash returned: $17,250. Cash still trapped: $35,550. Property cash-flowing $720/month. Cash-on-cash return ~24% rather than infinite — still strong, just not clean."
+            },
+            {
+              heading: "Case 3 — The Failed BRRRR",
+              body: "Rural cottage, 2-bed/1-bath. Purchase: $85,000. Hard money 85/100: $72,250 + $38,000 rehab. Cash to close: $16,500. Rehab: $54,300 actual vs $38,000 budgeted (42% overrun due to hidden sewer line failure, termite damage, and mold behind bathroom walls). Rehab time: 24 weeks (vs 12 planned). Additional carrying costs: $8,000. Market rent: $1,100/month (lower than $1,350 projected — rural market weaker than expected). Refi appraisal: $148,000 (vs $185,000 target). 75% LTV = $111,000 — barely covers HM payoff. Net cash returned: $0. Total cash trapped: $40,800. Lessons: rural markets have thinner comps and more appraisal risk; sewer scope inspection would have caught the line failure pre-purchase; 15% rehab contingency was too thin for a 1950s house."
+            },
+            {
+              heading: "The Portfolio Math Over Time",
+              body: "Running Case 1-style BRRRRs at 2 per year over 5 years: 10 properties, approximately $3,000/month total cash flow after reserves, ~$400K total equity, ~$200-250K still deployed from the 3-4 partial BRRRRs along the way. Starting capital needed: one deal's worth (~$30K) if all BRRRRs recycle cleanly. Reality-adjusted: ~$100-150K starting capital to absorb partial BRRRRs and reserve funding. The compounding effect matters more than any single deal's outcome — 10 traditional rentals would require $400K+ in down payments alone."
+            },
+            {
+              heading: "Key Takeaways From the Case Studies",
+              body: "(1) Aim for 70% Rule, plan for 75% — even disciplined investors slip. (2) Rehab contingency of 15-20% is non-negotiable, and higher (25%) for pre-1970s houses. (3) Appraisal is the single biggest risk factor — prepare for it, don't hope for it. (4) Market softening during your hold can sink a deal that underwrote fine; stress test at -5% ARV and -10% rents. (5) 'Partial BRRRRs' are not failures; they're the realistic baseline. (6) The compounding effect of repeated cycles matters more than any single deal's outcome."
+            }
+          ]
         }
       }
     },
@@ -3643,6 +3713,74 @@ const EducationCenter = () => {
               body: "Never pay more than 10-20% upfront. Use a draw schedule tied to milestones: e.g., 20% on contract signing, 30% on rough-in complete, 30% on drywall complete, 20% on final walkthrough. Require lien waivers before each draw. Get three written bids for any job over $5K. Verify licenses and insurance on every tradesperson — unlicensed contractors can't file liens but can still sue, and their insurance won't cover injuries on your property."
             }
           ]
+        },
+        "due-diligence": {
+          title: "Due Diligence Checklist",
+          icon: <ClipboardList size={14} />,
+          sections: [
+            {
+              heading: "The Property Walkthrough",
+              body: "Walk every room with the seller or listing agent first, then a second time alone with a notepad. Document: exterior condition (roof age, siding, foundation cracks, drainage, trees near structure), mechanicals (HVAC age/condition, water heater age, electrical panel age/amperage, plumbing material visible), interior (flooring under tiles/carpet, ceiling stains indicating roof leaks, door and window operation, kitchen and bath water damage). Take 75-100 photos — you'll want them during analysis and for contractor bidding."
+            },
+            {
+              heading: "The Professional Inspection",
+              body: "Budget $400-$700 for a full property inspection. Never skip this to save money or win a deal. Specialty inspections to add as warranted: sewer scope ($175-$350, essential for pre-1970s homes), termite inspection ($75-$150, essential in warm climates), mold testing ($300-$500 if visible water damage), foundation inspection (if cracks observed, $300-$500), roof inspection (if age >15 years, $150-$300), radon test (essential in northern climates, $150-$250)."
+            },
+            {
+              heading: "Title Search and Insurance",
+              body: "Your title company performs a title search as part of closing. Key things they check: open liens (mortgages, tax liens, mechanic's liens, judgments), easements (utilities, access, shared driveways), boundary disputes (surveys should match deed), chain of title (clean transfers back 30+ years). Red flags: open liens that won't be satisfied at closing, lis pendens (pending lawsuit), unresolved easements, missing links in chain of title. Buy an owner's title insurance policy — one-time fee of 0.5-1% of purchase price, lifetime protection."
+            },
+            {
+              heading: "Financial Due Diligence",
+              body: "Before closing, verify: property tax history (check assessor site — taxes after sale may reassess higher), insurance quotes (get a real quote before closing, not just an online estimate), HOA docs if applicable (dues, restrictions, pending assessments, rental restrictions), utility costs (ask seller for 12 months of bills), existing lease if tenanted (review all terms, check if below-market), rent roll and estoppel letters for multifamily."
+            },
+            {
+              heading: "Zoning and Permit Verification",
+              body: "Check: zoning classification (matches your intended use?), any overlay districts, setback requirements, parking requirements, rental licensing requirements (some cities require landlord registration), STR regulations (if relevant), any code violations on file (pull permits history from building department). Open permits from prior work that were never closed can become your problem at sale."
+            },
+            {
+              heading: "Neighborhood Verification",
+              body: "Drive the neighborhood at 8am, 1pm, 6pm, and 10pm. Different times reveal different issues: morning commute traffic, midday quiet or activity, evening post-work neighborhood feel, nighttime safety. Talk to 2-3 neighbors — they'll share honest intel you won't get anywhere else. Check the sex offender registry, recent police calls to the address, and crime heat maps."
+            },
+            {
+              heading: "Environmental and Structural Red Flags",
+              body: "Near-automatic deal-killers: foundation movement beyond hairline cracks, active roof leaks with interior damage, knob-and-tube or aluminum wiring (retrofit cost: $10K-$25K), cast iron or galvanized supply plumbing (replacement cost: $8K-$20K), sewer line breaks under slab, underground oil tanks (remediation $5K-$50K), meth contamination (remediation $10K-$50K and disclosure follows forever), presence of asbestos in HVAC or flooring (removal required before most rehabs), lead paint in occupied rentals (federal disclosure + EPA RRP certified contractors required)."
+            }
+          ]
+        },
+        "running-numbers": {
+          title: "Running Numbers: Complete Walkthrough",
+          icon: <Calculator size={14} />,
+          sections: [
+            {
+              heading: "Step 1 — Gather Inputs",
+              body: "You need 12 inputs minimum: asking price, estimated ARV (from comps), estimated rehab cost (from walkthrough), estimated market rent (from Rentometer + local comps), property taxes (from assessor), insurance estimate (from quick quote), HOA/condo fees if any, expected vacancy rate (usually 8-10%), property management rate (8-10%), maintenance reserve ($100-$200/month), CapEx reserve ($200-$400/month), and your financing assumptions (down %, rate, term)."
+            },
+            {
+              heading: "Step 2 — Maximum Allowable Offer",
+              body: "MAO = (ARV x 0.70) − Rehab − Closing Costs − Desired Profit Margin. Example: ARV $265,000, rehab $35,000, target 10% equity at refi. MAO = ($265K x 0.70) − $35K − ($265K x 0.03 closing) − ($265K x 0.10 margin) = $185,500 − $35K − $7,950 − $26,500 = $116,050. If asking price is $135K, you need to negotiate to $116K or lower — or pass."
+            },
+            {
+              heading: "Step 3 — Itemized Rehab Budget",
+              body: "Itemize major buckets: exterior (roof if needed, siding, paint, landscaping), interior paint, flooring, kitchen, bathrooms, mechanicals (HVAC, plumbing, electrical, water heater), windows if needed, permits and misc. For a $35K budget on a 1,500 sqft home: $1,200 exterior cleanup + $2,800 interior paint + $8,500 LVP flooring 1,300 sqft + $9,000 kitchen + $5,000 one bathroom + $2,500 mechanicals + $1,500 permits and misc + $4,500 contingency (15%)."
+            },
+            {
+              heading: "Step 4 — Post-Refi Cash Flow Calculation",
+              body: "Calculate post-refi monthly cash flow assuming 75% LTV on ARV. ARV $265K x 75% = $198,750 loan. At 8% / 30 years = $1,457/month P&I. Property taxes $185/mo, insurance $105/mo, vacancy $146/mo (8%), management $146/mo (8%), maintenance $150/mo, CapEx $250/mo. Total expenses: $2,439. Rent $1,825 minus expenses $2,439 = ($614) NEGATIVE cash flow. This deal breaks at full refi — the numbers are telling you something important."
+            },
+            {
+              heading: "Step 5 — Adjust or Walk",
+              body: "Negative cash flow means options: (1) refi at lower LTV — 65% LTV = $172K loan, $1,260 P&I, cash flow still negative at ($417). (2) Negotiate purchase lower so you can refi at less than full LTV and still get capital out. (3) Rent higher — only valid if comps support it. (4) Skip the refi entirely — keep the rental long-term with smaller cash-out to cover hard money payoff. (5) Pass. The math doesn't care about how much you like the deal. Deals that don't cash flow at the analysis stage don't magically cash flow after closing."
+            },
+            {
+              heading: "Step 6 — Stress Testing",
+              body: "Before committing, run three downside scenarios: (A) ARV comes in 10% below estimate — does the deal still work? (B) Rehab runs 25% over budget — can you absorb? (C) Market rent is 10% below projected — does cash flow still pencil? (D) Interest rates rise 1.5% between acquisition and refi — is the refi still viable? Robust deals survive all four. Fragile deals pencil only with perfect execution — avoid them."
+            },
+            {
+              heading: "The Lesson",
+              body: "Most properties fail one of the two BRRRR tests: (1) the refinance math (can you get your capital out?), or (2) the cash flow test (does it pay you to hold it?). Running numbers on 100 properties to find 3 that pass both is normal. Don't fall in love with deals — the numbers either work or they don't."
+            }
+          ]
         }
       }
     },
@@ -3746,6 +3884,70 @@ const EducationCenter = () => {
             {
               heading: "Self-Directed IRA / Solo 401(k) Investing",
               body: "Use retirement account funds to invest in real estate. Self-directed IRAs can own rental property directly (with a custodian); Solo 401(k)s allow higher contribution limits and checkbook control. Restrictions: no personal use of the property, can't lend to yourself, all expenses/income must flow through the account. Unrelated Business Income Tax (UBIT) applies if leverage is used inside an IRA. Complex — work with a specialized custodian and CPA."
+            }
+          ]
+        },
+        "creative-financing": {
+          title: "Creative Financing Techniques",
+          icon: <Sparkles size={14} />,
+          sections: [
+            {
+              heading: "Subject-To (Taking Over Payments)",
+              body: "Buyer takes title to property while the seller's mortgage stays in place. Buyer makes payments directly to the seller's lender. Strategic use: seller facing foreclosure, inherited property they can't afford, relocation. Pros: no new loan qualification, inherit low rate if the existing loan is favorable, fast closing. Cons: due-on-sale clause risk (lender can technically call the loan), title in your name but debt in theirs creates liability, seller remains legally on the hook. Requires: written agreement, authorization for information release, property in trust or LLC to reduce due-on-sale visibility. Advanced strategy — not beginner territory."
+            },
+            {
+              heading: "Wraparound Mortgages",
+              body: "Seller carries a new 'wrap' mortgage that 'wraps' around their existing mortgage. Buyer pays seller a single payment; seller pays their original lender. Spread between the two notes is the seller's profit. Works well when: seller's existing rate is low but they want income stream from sale, buyer can't qualify conventionally. Due-on-sale clause applies same as subject-to. Typically structured with attorney-drafted land trust or deed-of-trust + promissory note. Properly documented, this is a legitimate tool used across all markets."
+            },
+            {
+              heading: "Land Contract / Contract for Deed",
+              body: "Seller retains title until buyer completes payments over a defined term (5-30 years); buyer has equitable interest and possession. Default is simpler than foreclosure in most states — seller terminates contract, keeps all payments as rent, retakes property. Strategic for: buyers who can't qualify conventionally, sellers wanting monthly income with recapture security. Terms: typically 10-20% down, 7-9% interest, 5-year balloon common. Risk for buyer: no title transfer means no equity protection if seller defaults on their own mortgage or dies without estate planning."
+            },
+            {
+              heading: "Lease Option (Lease + Option to Buy)",
+              body: "Two separate agreements: a lease for 1-3 years with option to purchase at agreed price before expiration. Typical structure: market rent + 'rent credit' toward purchase (e.g., $1,800 rent with $300 credit if purchase exercised), option consideration upfront (1-5% of purchase price, non-refundable). Works when: buyer needs time to qualify for financing, seller wants income + future sale. Tax treatment matters — structure as pure lease + separate option, not combined sale."
+            },
+            {
+              heading: "Seller Carry-Back Second Mortgage",
+              body: "Buyer gets a conventional 80% first mortgage; seller carries the remaining 15-20% as a second. Reduces buyer's cash-to-close from 20% to 5%. Example: $200K property, $160K first mortgage, $30K seller second at 7%, $10K cash down. Seller benefits: higher effective sale price, interest income. Buyer benefits: lower cash commitment, access to otherwise unattainable property. Requires lender approval of the structure — many conventional lenders allow, some don't."
+            },
+            {
+              heading: "JV Partnerships and Equity Splits",
+              body: "Structure: capital partner puts up 70-100% of the equity, operator (you) brings sweat equity and deal sourcing. Common splits: 50/50 on profits after capital partner gets capital back + preferred return (often 6-8%). Written operating agreement required, filed with state. Use for: scaling beyond personal capital, accessing deals too large for solo execution, filling capital gaps while building credit. Downsides: partner relationships survive disagreements only with clear written terms; lawsuits between partners are common and expensive."
+            },
+            {
+              heading: "The Risk Warning",
+              body: "Creative financing is not a shortcut for inexperienced investors. Each technique has legal, tax, and ethical complexity. Retain a real estate attorney for every creative deal — the $500-$2,000 legal fee is dramatically cheaper than a dispute or lawsuit. Document everything in writing. Understand your state's specific laws — some states (CA, TX) have strong consumer protections that affect these structures. When done right, creative financing unlocks deals others can't touch. When done wrong, it lands you in court."
+            }
+          ]
+        },
+        "lender-relationships": {
+          title: "Your Lender Relationship",
+          icon: <Users size={14} />,
+          sections: [
+            {
+              heading: "What Lenders Actually Look At",
+              body: "Conventional investment property lending underwrites three things in priority order: (1) Credit score and history — 720+ gets best pricing, 680+ is acceptable, below 660 is subprime; (2) Debt-to-income ratio — total monthly debt payments should be <43% of gross monthly income for most programs, <50% for certain programs; (3) Reserves — 6-12 months of total payments on all financed properties (not just the subject) in liquid accounts. DSCR lenders care less about personal DTI and more about property-level cash flow and borrower credit."
+            },
+            {
+              heading: "Building a Lender Stable",
+              body: "Don't rely on one lender. Build a 'stable' of 3-5: one conventional bank for standard financing, one mortgage broker with DSCR access, one local portfolio lender (often credit unions or community banks), one hard money lender for acquisition, one private lender from your network. Each covers different scenarios. Introduce yourself to each before you need them — showing up with an urgent deal and no relationship means worse terms."
+            },
+            {
+              heading: "Documentation That Speeds Approvals",
+              body: "Assemble a 'lender package' you can send at 24-hour notice: last 2 years tax returns (all schedules), last 2 years W-2s or 1099s, last 2 months bank statements (all accounts), year-to-date pay stubs if W-2, schedule of real estate owned (with property addresses, values, debt balances, monthly rents, monthly payments, and cash flow), copy of driver's license, voided check for escrow. Having this ready means you can get pre-approved in 48-72 hours rather than 2+ weeks."
+            },
+            {
+              heading: "Tax Return Strategy for Self-Employed Investors",
+              body: "Self-employed investors face a challenge: aggressive deductions reduce your taxable income (good for taxes) but hurt your DTI (bad for loans). The fix: plan 2 years ahead. If you're going to buy 3 properties in 2026, back off some deductions on 2024 and 2025 returns to show higher AGI. Add-backs for qualifying income: depreciation, amortization, business use of home, casualty losses, non-recurring expenses. Most lenders allow these, but the guidelines are specific."
+            },
+            {
+              heading: "The Conversation to Have With Your Loan Officer",
+              body: "Before your next deal, have a 30-minute call with your primary lender: 'Based on my current profile, what's the maximum I could qualify for today? What would I need to change to qualify for $X more? How many more properties can I finance with you before you'd stop lending to me? What are your non-standard programs I should know about?' Loan officers who know your goals help you structure deals they can approve. Loan officers who don't know your goals say no a lot."
+            },
+            {
+              heading: "Red Flags — Lenders to Avoid",
+              body: "Walk away from lenders who: (1) Pressure you to overstate income or hide debts, (2) Don't deliver a Loan Estimate within 3 business days of application (it's federally required), (3) Quote rates without pulling credit (meaningless), (4) Can't explain their fees clearly, (5) Promise pre-approvals without any documentation, (6) Charge high 'application fees' or 'processing fees' upfront. Predatory lending in the investor space is real — stick with established companies with online reviews you can verify."
             }
           ]
         }
@@ -4043,6 +4245,398 @@ const EducationCenter = () => {
       }
     },
 
+    sourcing: {
+      title: "Deal Sourcing",
+      icon: <Megaphone size={16} />,
+      topics: {
+        "on-market-deals": {
+          title: "On-Market Deals (MLS and Agents)",
+          icon: <Search size={14} />,
+          sections: [
+            {
+              heading: "Working With Investor-Friendly Agents",
+              body: "Most real estate agents focus on primary residence buyers — they don't understand investor criteria. An 'investor-friendly' agent knows: the 1% and 70% rules, can pull sold comps quickly, understands after-repair value estimation, has relationships with other investors and wholesalers, can identify properties by days-on-market or price reduction history. Interview questions: 'How many investor clients have you closed deals with in the last 12 months? Can you set up an automated MLS search by cap rate and days on market? Do you work with deals that need significant rehab?'"
+            },
+            {
+              heading: "Setting Up MLS Search Alerts",
+              body: "Your agent can set up instant-alert MLS searches with specific criteria. Useful parameters for BRRRR hunters: price below X, days on market over 30, price reduction in last 14 days, 'as-is' in remarks, 'cash only' in remarks, specific zip codes, property class (3/4+ beds for SFR), ARV estimate filter (often inferred from comps). You'll get 20-100 alerts per week in active markets — the volume matters, most won't be deals but 1-2% will be."
+            },
+            {
+              heading: "Stale Listings and Price Reductions",
+              body: "Properties on market 60+ days are candidates for aggressive offers — the seller's expectation has adjusted. Properties with 2+ price reductions are even better. Your opening offer can be 15-25% below current list on stale listings. Agent won't push back hard because they want the commission. Sellers who've 'tested' the market at two prices are psychologically ready to accept realistic offers."
+            },
+            {
+              heading: "Expired and Withdrawn Listings",
+              body: "Listings that expired without selling (failed to sell in their contract term) or were withdrawn (seller pulled off market). These owners may still want to sell but are discouraged. Your agent can pull these lists from the MLS. Approach strategies: letter campaign explaining you buy as-is for cash, phone outreach if you can find numbers, door-knocking in hot neighborhoods. Conversion rates are low (1-3%) but deals from this source tend to be the best — motivated but no longer on retail market."
+            },
+            {
+              heading: "Relationship With Listing Agents",
+              body: "When you see listing agents appearing on multiple investor-grade properties, build a relationship with them. They'll call you first when a new listing hits that matches your criteria — often before MLS entry. Offer them both sides of commission (they represent seller AND buyer) when possible — many investors find this offensive ethically, but it's legal in most states when disclosed and massively increases agent cooperation."
+            },
+            {
+              heading: "Property Type Gaps in MLS",
+              body: "Certain property types are underserved on MLS and tend to yield deals: 2-4 unit properties (agents focused on SFR don't understand them), properties requiring significant rehab (most buyers can't get financing), properties with unusual features (unpermitted additions, large lots, industrial-adjacent), properties in transition neighborhoods (agents don't know how to market them). Focus your search on these gaps."
+            }
+          ]
+        },
+        "off-market-marketing": {
+          title: "Off-Market Direct Marketing",
+          icon: <Mail size={14} />,
+          sections: [
+            {
+              heading: "Why Off-Market Works",
+              body: "The best deals are properties not actively listed. The seller's pain point — inherited property, pending foreclosure, tired landlord, divorce, relocation — creates motivation but they haven't committed to a listing agent yet. By reaching them with a direct offer, you remove the listing agent's 6% commission from the equation and capture motivated seller psychology. 5-15% of all residential transactions are off-market; in certain investor-heavy markets, 30%+."
+            },
+            {
+              heading: "Building a Marketing List",
+              body: "Quality list building drives results. Target lists: absentee owners (property in different state/zip than owner address), high equity (low mortgage balance relative to value), long-term owners (15+ years, likely tired), vacant properties (USPS vacancy data or visual verification), pre-foreclosure (NOD filings), tax-delinquent, inherited (recent probate), expired listings. Tools: PropStream ($99/mo), DealMachine ($99/mo), List Source, Whitepages for skip tracing. Budget $200-500/month for list-building tools early on."
+            },
+            {
+              heading: "Direct Mail Campaigns",
+              body: "Traditional but still effective. Typical response rate: 0.5-2.0% calls, 0.1-0.4% actual deals. Piece types: yellow letter (handwritten look, highest conversion but low volume to execute), postcard (scales better, 20-40% less conversion), letter (middle ground). Cadence: 4-8 touches over 6-12 months to the same list. Cost per piece: $0.55-$1.20. Budget math: to close 2 deals a year from mail, figure $8K-$15K/year in mailing costs on a list of 2,000-5,000 addresses."
+            },
+            {
+              heading: "SMS and Cold Calling",
+              body: "Higher conversion rates than mail but also higher regulatory risk. Cold calling requires DNC (Do Not Call) list scrubbing — violations are $1,500+ per call. SMS requires explicit consent in many states — TCPA violations are $500-$1,500 per text. Use professional dialer services (Batch Dialer, Mojo) and texting platforms (LeadSherpa, SmarterContact) that include compliance tools. Expect 3-5% response rates, 0.5-1% conversion to deal."
+            },
+            {
+              heading: "Driving for Dollars",
+              body: "Physically driving neighborhoods to identify distressed properties. Indicators of distress: overgrown landscaping, peeling paint, boarded windows, multiple 'for sale' signs in yard, accumulated mail, vehicle junk in driveway. Record the address, then skip-trace to find owner contact info. Apps like DealMachine automate the process — take a photo, the app pulls owner data, queues marketing. Time-intensive but zero marketing spend. Works well in established older neighborhoods."
+            },
+            {
+              heading: "Compliance and Ethics",
+              body: "TCPA (Telephone Consumer Protection Act), CAN-SPAM (email), state Do-Not-Call lists, DNC scrubbing requirements, and consumer protection laws around unsolicited mortgage/equity offers all apply. Never: misrepresent yourself, pressure elderly sellers, buy without competent adult consent, offer substantially below fair market value to someone in crisis. Each state has specific 'predatory purchase' laws that can void contracts and create liability."
+            }
+          ]
+        },
+        "foreclosures-auctions": {
+          title: "Foreclosures, Auctions, Tax Sales",
+          icon: <Flag size={14} />,
+          sections: [
+            {
+              heading: "The Foreclosure Timeline",
+              body: "Pre-foreclosure: owner has missed 3+ payments, lender has filed notice. Public record (NOD / Lis Pendens). This is the BEST time to engage — owner may still be willing to sell, owner still on title, no court involvement. Auction: property goes to trustee/sheriff sale, sold to highest bidder (often the bank bids back if no outside buyer matches the debt). REO: if auction fails, property becomes bank-owned and is listed with an asset manager. Each phase has different strategies."
+            },
+            {
+              heading: "Pre-Foreclosure Approaches",
+              body: "Most profitable phase but requires sensitive outreach. Get NOD lists from county recorder (weekly filings). Mail, call, or door-knock to owners. Typical approach: explain you can pay off their mortgage, give them some cash to move, and save their credit vs the foreclosure that's coming. Conversion rates are low (5-10% of contacts result in serious conversations) but deals are substantial — often 65-75% of market value."
+            },
+            {
+              heading: "Foreclosure Auctions",
+              body: "Cash-only, as-is, no inspection, no title insurance until after sale. Auction day: you bid against other investors and the bank. Win = pay within hours (typically same day or next). Risks: (1) junior liens may survive (always run preliminary title report before bidding — $50-$150), (2) property may be occupied and require eviction, (3) interior condition unknown — you're buying based on drive-by and public records only. Rewards: 50-70% of market value typical. Strategy for beginners: attend 3-5 auctions as an observer before ever bidding."
+            },
+            {
+              heading: "Tax Lien vs Tax Deed States",
+              body: "States vary in how they sell delinquent tax properties. Tax Lien states (FL, MD, AZ, NJ, IL, others): you buy the tax debt; owner has a redemption period (typically 6-36 months) to repay with interest; if they don't, you can foreclose the tax lien. Tax Deed states (CA, GA, NC, PA, others): you buy the property directly at auction; no redemption period in most. Research your state's specific rules carefully — mistakes at this stage are expensive."
+            },
+            {
+              heading: "REO and Bank-Owned Properties",
+              body: "Post-failed-auction, the bank owns the property and lists it with an asset manager through the regular MLS. Easier to close than auctions — you get title insurance, inspection period, financing allowed. Banks move slowly on negotiations (asset manager committees) but prices are typically 80-90% of market. Source: MLS filtering, HUD Home Store (FHA foreclosures), Fannie Mae HomePath, Freddie Mac HomeSteps, REO-specific websites like Auction.com (some properties move through multiple channels)."
+            },
+            {
+              heading: "The Online Auction Trend",
+              body: "Post-2020, many foreclosure and REO auctions moved online (Auction.com, Hubzu, Xome, ServiceLink). Advantages: easier to participate, can bid from anywhere, more time to research. Disadvantages: typically 5% buyer premium added to winning bid, more competitive bidding than local in-person auctions, more unsophisticated buyers overbidding. Do your homework — a property you 'won' at an auction price 10% over market is a loss before you take title."
+            }
+          ]
+        },
+        "wholesaler-relationships": {
+          title: "Working With Wholesalers",
+          icon: <Handshake size={14} />,
+          sections: [
+            {
+              heading: "How Wholesaling Works",
+              body: "Wholesaler finds distressed seller, puts property under contract at $X, assigns contract to end buyer (you) at $X + assignment fee. Typical assignment fee: $5K-$25K depending on deal size and equity. You close on the property, wholesaler walks away with the fee. For you: instant access to off-market deals without the marketing spend. For wholesaler: no financing required, fast turnaround (30-60 days from contract to assignment)."
+            },
+            {
+              heading: "Finding Quality Wholesalers",
+              body: "Join local real estate investor association (REIA) meetings — wholesalers actively network there. Join local wholesaler-focused Facebook groups and GroupMe chats. Check your local BiggerPockets forums. Sign up for 5-10 wholesaler email lists in your market. Good wholesalers send 1-3 deals per month; bad ones blast 20+ marginal deals per week. Quality over quantity — you want wholesalers who pre-screen deals."
+            },
+            {
+              heading: "Evaluating a Wholesale Deal",
+              body: "Run wholesale deals through the same analysis as any other deal — don't trust the wholesaler's ARV or rehab estimate. Typical red flags: (1) ARV provided with no actual comp data, (2) rehab estimate suspiciously low ($15K for what clearly needs $40K+), (3) 'spread' too thin (less than $20K profit after assignment fee doesn't leave much margin), (4) pressure to decide within 24 hours (legitimate deals give 2-3 days for proper analysis), (5) refusal to let you inspect before signing assignment."
+            },
+            {
+              heading: "The Paper Trail",
+              body: "A legitimate wholesaler will: (1) sign an assignment agreement with you, (2) provide the original purchase contract with seller, (3) escrow the assignment fee with the title company, (4) NOT require you to pay the fee directly to them outside of closing. Wholesalers asking for 'non-refundable deposits' paid to them directly are often running scams — pay fees through escrow at close only."
+            },
+            {
+              heading: "Building Two-Way Relationships",
+              body: "The best deals from wholesalers go to their repeat buyers. To get on the 'A-list,' close deals quickly (no drawn-out negotiations), pay assignment fees without haggling to the penny, give honest feedback on why you pass on deals, and refer other buyers to them for deals you can't do. Wholesalers running 10+ deals a year have a short list of 5-10 preferred buyers — being on that list is worth $50K+ in deal flow annually."
+            },
+            {
+              heading: "Red Flag Wholesalers to Avoid",
+              body: "(1) Wholesalers who 'daisy chain' deals (assignment from wholesaler A to wholesaler B to you — each layer adds fees), (2) Wholesalers without a W-9 or EIN (may be operating illegally in states requiring real estate licensing for repeat transactions), (3) Wholesalers whose photos don't match actual property condition, (4) Wholesalers who won't let you talk directly to the seller, (5) Wholesalers who shop the same deal to multiple buyers simultaneously then pick the best offer."
+            }
+          ]
+        }
+      }
+    },
+
+    negotiation: {
+      title: "Negotiation & Offers",
+      icon: <Handshake size={16} />,
+      topics: {
+        "offer-structure": {
+          title: "Structuring Competitive Offers",
+          icon: <Edit3 size={14} />,
+          sections: [
+            {
+              heading: "Beyond Price — The Full Offer",
+              body: "Sellers respond to much more than the dollar amount. Key terms: earnest money deposit (EMD) size, inspection period length, financing contingency (or waiver), closing timeline, seller concessions requested, post-occupancy rights, personal property included. A $180K offer with 21-day close, $10K EMD, waived financing contingency often beats a $185K offer with 45-day close and full financing contingency. Structure your offer to reduce seller risk."
+            },
+            {
+              heading: "Earnest Money Strategy",
+              body: "EMD is a signal of your commitment. Typical: 1-3% of purchase price ($1,500-$5,000 on a $150-$250K property). Aggressive: 5% or $10,000+ for ultra-competitive markets. Protection: make EMD refundable during inspection period (standard), ideally escrowed with title company not seller. Non-refundable EMD = risk for buyer; offer it only when the deal is clearly yours and you won't walk."
+            },
+            {
+              heading: "Inspection Period Length",
+              body: "Standard: 7-14 days. Shortened: 3-5 days (more attractive to sellers, riskier for you). Consider your access to inspectors — can you get them out in 3 days? Contingency language matters: 'buyer has right to terminate in sole discretion during inspection period' is strong buyer protection. 'Buyer may terminate only for material defects' is weak. Read your state's standard contract carefully."
+            },
+            {
+              heading: "Financing Contingency Tradeoffs",
+              body: "Financing contingency protects your EMD if financing falls through. Typical: 21-30 days to obtain financing. Waiving it is aggressive — you lose EMD if financing fails. Only waive if: (1) you have verified pre-approval with your lender for this specific deal, (2) you have backup cash or alternative financing available, (3) the market makes waiving necessary to win. Never waive financing contingency on a deal where you'd need to scramble for alternative financing."
+            },
+            {
+              heading: "Closing Timeline",
+              body: "Standard: 30-45 days. Faster closes (15-21 days) are attractive to sellers but require pre-arranged financing, title company, and inspectors. Hard money deals can close in 7-14 days. Cash closes can be 5-10 days. Use speed as a bargaining chip: 'I can close in 15 days on this purchase price, or 30 days at $X less.' Many sellers prefer speed over small price differences."
+            },
+            {
+              heading: "The Escalation Clause",
+              body: "In multiple-offer situations: 'Buyer offers $200,000 OR $5,000 above the highest competing offer, whichever is greater, up to a maximum of $225,000.' Requires listing agent to verify competing offers (not always legal in all states). Protects you from overpaying but wins when other offers are weak. Controversial — some argue it discourages transparency. Research local norms before using."
+            },
+            {
+              heading: "As-Is Offers",
+              body: "State you accept property in current condition with no seller repairs. Attractive to sellers because it removes repair negotiations. You still have inspection rights — you can terminate if you discover serious issues, but you can't request repairs or credits. Perfect for BRRRR investors already planning major rehab. Just make sure you've inspected thoroughly enough to know the major issues before going 'as-is.'"
+            }
+          ]
+        },
+        "contingencies": {
+          title: "Contingencies Explained",
+          icon: <Shield size={14} />,
+          sections: [
+            {
+              heading: "What Contingencies Actually Do",
+              body: "A contingency is a condition that, if not met, allows you to exit the contract and recover your EMD. Contingencies are NOT outs to find a better deal — they're protections against specific risks. Using them casually destroys your reputation with agents and sellers, and the courts can rule a contingency waiver was made in bad faith."
+            },
+            {
+              heading: "Inspection Contingency",
+              body: "Most common and important. Allows you to terminate if inspection reveals issues you're unwilling to accept. Language varies: 'in buyer's sole discretion' is strong protection; 'for material defects' is weaker. Timeline typically 7-14 days from acceptance. Within this period, you conduct inspection and then either: accept as-is, request repairs or credits, or terminate."
+            },
+            {
+              heading: "Financing Contingency",
+              body: "Protects if you can't secure financing by a deadline (typically 21-30 days). Lender must provide written denial for you to exercise. Common misconception: you don't have to get to denial — if your lender requires changes that make the deal unworkable (e.g., lower appraisal requires you to bring more cash than planned), you typically have exit rights. Specific language matters — read it carefully."
+            },
+            {
+              heading: "Appraisal Contingency",
+              body: "Separate from financing contingency in many states. If appraisal comes in below purchase price, you can: (1) renegotiate price to appraisal value, (2) terminate and recover EMD, or (3) proceed with higher cash down. Without this contingency, a low appraisal forces you to either bring extra cash or lose EMD. Waiving this is aggressive — only do it when you're confident in your own ARV analysis."
+            },
+            {
+              heading: "Title Contingency",
+              body: "Standard and almost never waived. Title must be 'marketable' — free of liens, easements, or encumbrances beyond what's disclosed. Title company searches usually discover issues early enough to resolve before closing. If unresolvable (cloud on title, unreleased liens from prior owners, ownership disputes), you terminate. Your EMD is refunded."
+            },
+            {
+              heading: "HOA / Review Contingencies",
+              body: "For condos, HOAs, PUDs: contingent on review and acceptance of HOA documents, bylaws, financial statements, minutes of last 12 months meetings. Critical — HOAs with deferred special assessments, pending litigation, or problematic finances can destroy your investment. Budget 5-10 business days to review and consult a CPA or real estate attorney on complex HOAs."
+            }
+          ]
+        },
+        "negotiation-tactics": {
+          title: "Negotiation Tactics for Investors",
+          icon: <TrendingUp size={14} />,
+          sections: [
+            {
+              heading: "Anchoring",
+              body: "The first number mentioned sets the reference point for everything after. If listing is $200K and comps support $185K, your opening offer should not be $185K — it should be $170-175K. The seller's counter will likely land $180-185K, which is exactly where you wanted to be. Opening at your target price leaves no room for the dance."
+            },
+            {
+              heading: "Always Have a Reason",
+              body: "Offers with justification close more often than offers without. 'I'm offering $165K because comps show $180K ARV, rehab will cost $35K, and standard investor metrics require a $20K margin on this size deal.' Sellers and agents respect logic even when they don't like the conclusion. Arbitrary lowball offers feel like insults; calculated offers feel like business."
+            },
+            {
+              heading: "Silence as a Tool",
+              body: "After submitting an offer, stop talking. Don't pile on explanations. Don't follow up every day. Silence creates space for the seller to sit with your number and the listing agent to do the work of defending it. Investors who email/call constantly signal desperation — they always end up paying more."
+            },
+            {
+              heading: "Multiple-Offer Strategy",
+              body: "In competitive markets, multiple offers are normal. Your advantages over retail buyers: (1) proof of funds letter (show bank statements for cash or hard money, pre-approval for conventional) — include with every offer, (2) waive appraisal and inspection contingencies if you're confident, (3) faster close timeline, (4) larger EMD. If competing against retail buyers, investor flexibility often wins even at slightly lower prices."
+            },
+            {
+              heading: "The 'Deal Killer' Method",
+              body: "After inspection, rather than asking for specific dollar credits, present a list of serious issues and ask 'how do you want to handle this?' The seller's first response usually offers more than you would have asked for. If their offer is less than you need, negotiate from there. This technique works because you're positioning as a problem-solver, not a discount-seeker."
+            },
+            {
+              heading: "Walking Away",
+              body: "The most powerful negotiation technique — the credible willingness to walk. Most deals die because buyers couldn't walk from bad terms. If the numbers don't work, they don't work. State clearly and without hostility: 'At this price I'd need X, Y, Z. If those aren't possible, I understand, and I'll pass.' Half the time you get what you need. The other half, you preserved your capital for a better deal."
+            },
+            {
+              heading: "Reading the Seller's Motivation",
+              body: "Before making an offer, learn everything you can about why the seller is selling. Inherited from parent (often motivated, price-insensitive, wants problem gone) > facing divorce (time-sensitive) > relocating for job (timeline-sensitive) > tired landlord (wants a clean exit) > testing the market (low motivation, don't waste time). Ask questions of the listing agent, read the description carefully, check property history. Different motivations lead to different offer strategies."
+            }
+          ]
+        }
+      }
+    },
+
+    team: {
+      title: "Building Your Team",
+      icon: <Users size={16} />,
+      topics: {
+        "core-team": {
+          title: "The Core Team",
+          icon: <Network size={14} />,
+          sections: [
+            {
+              heading: "Investor-Friendly Real Estate Agent",
+              body: "Your first hire. Should: have closed 10+ investor transactions, understand investor analysis (cap rates, 1%/70% rules), pull sold comps without hand-holding, respond within hours during active deal hunting. Ideally, also invests themselves or has investors as their primary client base. Red flags: primarily works with first-time homebuyers, can't explain ARV, quotes rehab costs from the listing description, pushes you toward 'hot' neighborhoods that obviously don't cash flow. Expect to interview 4-8 agents before finding the right one."
+            },
+            {
+              heading: "General Contractor (GC)",
+              body: "The most important operational relationship for BRRRR investors. Good GCs: hit budgets within 10%, hit timelines within 20%, manage sub-trades professionally, pull permits when required, stand behind their work 6-12 months. Finding them: get references from other investors, check licenses and insurance, review past project photos, ask for 3 references you can call. Vet them on a small project first — never commit $40K+ to a contractor you haven't worked with before. Expect to cycle through 2-4 GCs before finding a long-term partner."
+            },
+            {
+              heading: "Mortgage Lender",
+              body: "You need 2-4 lenders, each with different strengths (covered in the Financing category). Your primary relationship should be a conventional mortgage broker or banker who knows you, has your documents, and can quickly quote scenarios. Secondary: DSCR broker with wholesale access, local portfolio lender for unique situations, hard money lender for acquisitions. Maintain active relationships even when not actively borrowing — send holiday cards, grab coffee annually."
+            },
+            {
+              heading: "Property Manager",
+              body: "Essential once you have 4+ rental properties or any property more than 30 minutes from home. Interview 3+ before hiring. Questions to ask: (1) What's your tenant screening criteria? (2) Average days to fill a vacancy? (3) How do you handle maintenance under $X without contacting owner? (4) What's your fee structure — management, leasing, renewals, maintenance markup? (5) Can I talk to three current owner clients? Get audited financials of their trust account — sloppy bookkeeping is a fraud red flag."
+            },
+            {
+              heading: "Title Company / Closing Agent",
+              body: "The least-considered but important. A competent title company: communicates clearly, catches title issues early, closes on time, produces clean closing packages. Try 2-3 over your first few deals and stick with the best. Your title company is also a valuable information source — they see every closing in the market and often know about deals before they hit MLS."
+            }
+          ]
+        },
+        "professional-services": {
+          title: "Professional Services (CPA, Attorney)",
+          icon: <Briefcase size={14} />,
+          sections: [
+            {
+              heading: "Real Estate-Specialized CPA",
+              body: "Your tax advisor is worth 10x your generalist CPA's fee. Specialized real estate CPAs know: cost segregation analysis, Real Estate Professional Status (REPS) qualification, 1031 exchange planning, depreciation recapture minimization, short-term rental loophole, entity structure optimization. Budget: $1,500-$5,000 annually for tax prep and planning. They'll save you $10K-$50K+ in taxes over 5 years. Find them: ask other investors, check CPA societies, interview 3-5 before committing."
+            },
+            {
+              heading: "Real Estate Attorney",
+              body: "Not all states require an attorney at closing — but you want one on your team regardless. Uses: LLC formation and structuring, partnership agreements for JVs, creative financing document review (subject-to, wraparounds), eviction assistance, tenant disputes, lease review. Ongoing retainer not required — most work on $250-$500/hour basis. Good relationships pay off when you need an answer fast — the $300 call that prevents a $30,000 mistake is the best legal spend you'll make."
+            },
+            {
+              heading: "Asset Protection Attorney",
+              body: "Once your portfolio exceeds $500K-$1M in equity, invest in an asset protection consultation. Different from a general real estate attorney — specializes in LLC structures, umbrella insurance layering, interstate asset separation, charging order protection. Fees: $500-$2,500 for structure review, $1K-$5K to implement. One structured consultation can protect millions of dollars in assets. Not a DIY area."
+            },
+            {
+              heading: "Insurance Agent Specializing in Investor Properties",
+              body: "Most agents don't understand investor needs. You want one who: quotes landlord policies (not homeowners) and vacant/rehab endorsements, carries multiple insurer relationships, helps layer umbrella policies over landlord policies, understands LLC-held properties. Ask for a policy review annually — you're likely either over-insured on some properties and under-insured on others. A good insurance agent audits your coverage to find both."
+            },
+            {
+              heading: "Bookkeeper",
+              body: "At 3+ properties, self-bookkeeping becomes inefficient. Hire a bookkeeper familiar with real estate: monthly reconciliations of all property accounts, categorized transactions ready for CPA at tax time, rent roll maintenance, security deposit tracking. Cost: $200-$600/month for 3-10 properties via services like Stessa + a part-time bookkeeper. Pays for itself at tax time when your CPA doesn't need to reconstruct a year of transactions."
+            },
+            {
+              heading: "Mentor or Coach",
+              body: "Paid mentorship is controversial — some are legitimate, many are scams. Legitimate: investors with 10+ year track records who charge for their time by the hour or month ($300-$1,500/month). Scams: 'gurus' selling $10K-$30K courses that teach what's freely available on BiggerPockets and YouTube. Better approach: join local REIA meetings (nominal cost), offer to help experienced investors with free work in exchange for mentorship, pay hourly for specific consultations as needed."
+            }
+          ]
+        },
+        "vendor-network": {
+          title: "Vendor and Trade Network",
+          icon: <Wrench size={14} />,
+          sections: [
+            {
+              heading: "The Trades You'll Need Most",
+              body: "In roughly this order of frequency: (1) handyman — small repairs, punch lists, turnover work, $35-$75/hour; (2) plumber — water heater replacements, leak repairs, sewer issues, $120-$250/hour; (3) electrician — panel upgrades, rewiring, GFCI, $100-$200/hour; (4) HVAC tech — system replacements, repairs, maintenance, $100-$180/hour; (5) roofer — spot repairs and replacements, $50-$80 per sq or $8K-$15K full replacements; (6) painter — turnover painting, $2-$4/sqft; (7) flooring — LVP install, carpet, hardwood, $2-$8/sqft installed."
+            },
+            {
+              heading: "Finding Quality Trades",
+              body: "Your GC knows their subs but also marks them up. Go direct for recurring small work. Sources: your GC's subs (ask for direct referrals after 2-3 projects together), NextDoor neighborhood recommendations, Facebook local contractor groups, REIA member referrals. Always verify: license (state license board website), insurance (ask for certificate), references (call at least 2)."
+            },
+            {
+              heading: "Handyman Is Your Most Important Trade",
+              body: "A reliable handyman does 80% of routine property work: leaky faucets, loose fixtures, paint touch-ups, door adjustments, screen replacements, tenant-caused damage. Per hour is usually cheaper than licensed specialists for small jobs. Find one good handyman who can be at a property within 24 hours and you'll save thousands annually vs calling specialists for every issue."
+            },
+            {
+              heading: "Preferred Vendor Relationships",
+              body: "Once you have recurring work (5+ properties), negotiate volume discounts. Plumbers and electricians often give 10-15% off labor for investors who provide steady work. Paint suppliers (Sherwin-Williams, Benjamin Moore) offer pro accounts with 20%+ discounts. Home Depot / Lowe's have Pro Xtra programs with volume discounts. These small savings add up — a 10% discount on $20K/year in maintenance is $2K/year straight to cash flow."
+            },
+            {
+              heading: "Backup Trades for Each Role",
+              body: "Primary + backup for every trade. Why: primary is unavailable (busy, vacation, sick), primary becomes unreliable, primary overcharges as they get busy. Having a second option tested on small jobs means you're never stuck with emergency pricing when a water heater fails at midnight. Cycle work between them to keep both warm."
+            },
+            {
+              heading: "Building Loyalty Through Payment Terms",
+              body: "The simplest loyalty builder: pay invoices within 7 days, every time. Many contractors chase 30-60-90 day invoices from clients. A landlord who pays within 7 days moves to the top of their priority list. You'll get better pricing, faster response, and priority service. This single practice differentiates you from 90% of other investors."
+            }
+          ]
+        }
+      }
+    },
+
+    commercial: {
+      title: "Commercial & Multifamily",
+      icon: <Building size={16} />,
+      topics: {
+        "multifamily-economics": {
+          title: "5+ Unit Multifamily Economics",
+          icon: <Building2 size={14} />,
+          sections: [
+            {
+              heading: "Why Multifamily Is Different",
+              body: "5+ unit properties (duplex, triplex, fourplex remain residential — 5+ triggers commercial treatment) are valued based on NOI and cap rates, not residential comps. This changes everything: every $1 you increase NOI raises property value by $12-$25 depending on market cap rate. A small operational improvement — reducing expenses by $12K/year at a 6% cap rate — creates $200K of equity. This is 'forced appreciation' at scale, the core of multifamily value-add investing."
+            },
+            {
+              heading: "The Commercial Valuation Formula",
+              body: "Property Value = NOI / Cap Rate. Example: 12-unit property with NOI of $120K in a market with 6% cap rates = $2M value. Raise NOI to $140K and value becomes $2.33M — $333K increase from a $20K NOI improvement. This non-linear relationship is why commercial operators focus obsessively on expense management and rent optimization."
+            },
+            {
+              heading: "Financing Multifamily",
+              body: "5+ units require commercial loans, not conventional. Typical terms 2024-2025: 25-30% down, 5-year fixed / 25-year amortization / balloon at 5 years (some 7/30 and 10/30 available), DSCR 1.25 minimum, recourse at smaller sizes / non-recourse above $1M+. Rate premium: +0.5% to +1.5% over residential. Fannie Mae Small Balance Loans ($1-6M), Freddie Mac Small Balance Loans, and local portfolio lenders are primary sources. Commercial closings typically take 60-90 days vs 30-45 for residential."
+            },
+            {
+              heading: "Underwriting a Multifamily Deal",
+              body: "Required documents: T12 (trailing 12 months income/expense), current rent roll with lease dates and amounts, property tax history, insurance history, capital improvement history, utility bills, payroll for on-site management, vendor contracts, lease agreements. Your analysis: verify T12 against bank deposits if possible, check rent roll against actual leases, inspect every unit not just model units, verify rent deposits with tenants directly if permitted, research deferred capital needs (roof, parking lot, boilers)."
+            },
+            {
+              heading: "Value-Add Strategies",
+              body: "(1) Rent optimization — bring below-market leases to market over 1-3 years as they renew, often 15-30% upside. (2) Expense reduction — renegotiate contracts, separately-meter utilities, add recycling fees, install LED lighting. (3) Physical improvements — exterior updates (landscaping, paint), unit interior renovations to command higher rents ($5-15K per unit typical, $150-300 rent increase). (4) Revenue addition — laundry income, parking fees, storage rentals, pet fees. Each dollar added to NOI compounds at the cap rate when you sell."
+            },
+            {
+              heading: "Operating a Multifamily Property",
+              body: "Significantly different from single-family: on-site manager often required at 30+ units, commercial-grade systems (central boilers, large HVAC, commercial-grade laundry), commercial vendor relationships (landscaping contracts, snow removal, trash), tenant turnover management (30%+ annual turnover is normal), compliance with fair housing at scale, professional property management essentially mandatory. Management fees: 4-8% of collected rents for larger properties (vs 8-10% for SFR)."
+            }
+          ]
+        },
+        "commercial-types": {
+          title: "Commercial Property Types",
+          icon: <Building size={14} />,
+          sections: [
+            {
+              heading: "Small Retail (Strip Centers, Single-Tenant)",
+              body: "Shopping centers under 50K sqft, single-tenant retail (Dollar Generals, drug stores, quick-serve restaurants). Tenant-quality driven — investment-grade tenant (national chain) vs local tenant creates massive risk differential. Lease structures: NNN (tenant pays taxes, insurance, maintenance) most common for single-tenant, modified gross for multi-tenant strips. Cap rates 2024-2025: 6.5-8.5% for small retail, 5.5-7% for investment-grade single-tenant NNN. Management-lite but exposed to retail apocalypse risk."
+            },
+            {
+              heading: "Office",
+              body: "Post-2020 office demand collapsed and hasn't fully recovered. Current dynamics: Class A (high-end, new construction) holding up moderately, Class B/C (older, suburban, secondary markets) deeply distressed with vacancy rates 20%+. Buy opportunities for contrarians: deeply discounted office buildings (30-50% below peak values) where conversion to residential or mixed-use is feasible. Risks: long sales cycles, difficult financing, lease risk concentration. Not a beginner category."
+            },
+            {
+              heading: "Industrial (Warehouse, Flex, Light Manufacturing)",
+              body: "Industrial has been the best-performing commercial category for a decade. E-commerce growth drives warehouse demand; reshoring of manufacturing drives light industrial. Typical deal: 10-50K sqft warehouse with 1-3 tenants on 5-10 year NNN leases. Cap rates: 5.5-7.5% depending on location and tenant. Entry point: $1-5M for smaller properties. Advantages: long leases reduce turnover, low management intensity, aligned with economic trends."
+            },
+            {
+              heading: "Self-Storage",
+              body: "Recession-resistant, management-light, scalable. Typical deal: 50K-150K sqft facility with 400-800 units. Revenue per square foot: $10-$20 annually. Management: 1-2 on-site staff for smaller facilities, REIT competition intense in major markets. Value-add opportunities: add climate control, expand square footage, add RV/boat storage, raise rents on below-market tenants. Cap rates: 5.5-7.5%. Financing: commercial loans or SBA for owner-operators, REIT-style sponsorship for larger deals. Growing popularity means deal competition is increasing."
+            },
+            {
+              heading: "Mobile Home Parks",
+              body: "Niche but economically attractive. Business model: you own the land and infrastructure (water, sewer, roads), residents own their mobile homes and pay lot rent. Operational simplicity: no interior maintenance of homes (it's tenant property), long tenant tenure (moving a mobile home costs $5-10K so tenants stay), recession-resistant (housing of last resort). Cap rates: 7-10% typical. Value-add: raise lot rents to market (often significantly below), add utilities, fix infrastructure, improve curb appeal. Challenges: institutional consolidation (REITs buying up parks), tenant class often low-income, some states highly regulated."
+            },
+            {
+              heading: "Land and Development",
+              body: "Not for beginners. Land banking (buying and holding for appreciation), subdivision (buying acreage, splitting into lots, selling retail), ground-up development (building homes or commercial on raw land), entitlement work (getting zoning changes before selling). All require specialized expertise and capital. Ground-up development can return 20-40% IRR in hot markets but also concentrate risk into a single project. Most investors are better served waiting until they have 10+ years of rental experience before exploring development."
+            }
+          ]
+        }
+      }
+    },
+
     glossary: {
       title: "Glossary",
       icon: <BookOpen size={16} />,
@@ -4052,74 +4646,165 @@ const EducationCenter = () => {
           icon: <FileText size={14} />,
           isGlossary: true,
           terms: [
+            { term: "Abstract of Title", definition: "A historical summary of all recorded documents affecting title to a property. Older alternative to modern title insurance searches." },
+            { term: "Absorption Rate", definition: "The rate at which available properties sell in a market during a given time period. Used to measure demand and predict time to sell." },
+            { term: "Adjustable Rate Mortgage (ARM)", definition: "A mortgage with an interest rate that changes periodically based on an index. Common: 5/1 ARM (fixed 5 years, then adjusts annually)." },
+            { term: "Adverse Possession", definition: "The legal doctrine by which someone can claim title to real property through continuous, open, hostile use for a statutory period (usually 7-20 years depending on state)." },
+            { term: "Amortization", definition: "The gradual paydown of loan principal over the loan term via scheduled payments. Early payments are mostly interest; later payments are mostly principal." },
+            { term: "Appraisal Contingency", definition: "A contract clause allowing buyer to terminate or renegotiate if the property doesn't appraise at or above purchase price." },
             { term: "ARV", definition: "After Repair Value — the estimated market value of a property once renovations are complete." },
             { term: "As-Is", definition: "Property sold in its current condition, with the seller making no repairs or disclosures beyond legal minimums." },
+            { term: "Assessment", definition: "The value assigned to a property by the local tax authority for property tax purposes. Often differs substantially from market value." },
             { term: "Assignment", definition: "Transferring contract rights to purchase a property to a third party, typically for a fee. The core wholesaling strategy." },
+            { term: "Assumption", definition: "The buyer takes over the seller's existing mortgage, keeping its terms intact. Available on most FHA/VA loans; rare on conventional." },
             { term: "Balloon Payment", definition: "A large lump-sum payment due at the end of a loan term, common in seller financing and commercial loans." },
+            { term: "Basis", definition: "The original cost of an asset adjusted for improvements, depreciation, and other factors. Used to calculate gain/loss at sale." },
             { term: "Basis Points (BPS)", definition: "1/100th of a percent. 50 bps = 0.50%. Used to quote rate changes precisely." },
             { term: "Bird Dog", definition: "A person who finds potential investment properties and refers them to investors, often for a finder's fee." },
+            { term: "Blanket Mortgage", definition: "A single mortgage that covers multiple properties. Allows owners to release individual properties as they're sold without paying off the entire loan." },
+            { term: "Bridge Loan", definition: "Short-term financing (6-24 months) that bridges the gap between the purchase of a new property and the sale of an existing one, or between acquisition and long-term financing." },
             { term: "BRRRR", definition: "Buy, Rehab, Rent, Refinance, Repeat — a capital-recycling rental investment strategy." },
+            { term: "Buy Box", definition: "An investor's defined criteria for what properties they'll consider: price range, location, property type, condition, returns required. Reduces analysis paralysis." },
+            { term: "Capital Expenditures (CapEx)", definition: "Major expenses that extend the life of a property: roof, HVAC, plumbing, flooring. Typically depreciated rather than expensed." },
             { term: "Capital Gains", definition: "Profit from the sale of an asset. Short-term (held <1 year): taxed as ordinary income. Long-term (>1 year): taxed at preferential rates (0/15/20%)." },
             { term: "Capital Stack", definition: "The layered structure of debt and equity financing a real estate deal. Senior debt, junior debt, preferred equity, common equity in order of repayment priority." },
             { term: "Cap Rate", definition: "Capitalization Rate = NOI / Property Value. Indicator of return independent of financing." },
+            { term: "Carrying Costs", definition: "Expenses incurred to hold a property during rehab or vacancy: mortgage, taxes, insurance, utilities, maintenance. Major factor in flip and BRRRR deal analysis." },
             { term: "Cash-on-Cash Return", definition: "Annual pre-tax cash flow / total cash invested. The return metric that accounts for leverage." },
+            { term: "Chain of Title", definition: "The historical sequence of ownership transfers for a property, established through recorded deeds." },
+            { term: "Chattel", definition: "Personal property that is movable, as opposed to real estate. Relevant in mobile home park investing where homes are chattel but land is real property." },
+            { term: "Clear Title", definition: "Title to a property that is free of liens, claims, or other encumbrances. Required for most sales and financing." },
+            { term: "Closing", definition: "The final step in a real estate transaction where ownership transfers and funds are disbursed. Typically 2-4 hours with a title company or attorney." },
             { term: "Closing Costs", definition: "Fees paid at closing: title insurance, origination, recording, attorney, survey, taxes. Typically 2-4% of purchase price." },
             { term: "Closing Disclosure (CD)", definition: "The federally-mandated 5-page document disclosing final loan terms and closing costs, delivered at least 3 business days before closing." },
+            { term: "Cloud on Title", definition: "Any claim or defect that makes title uncertain or unmarketable. Must be resolved before most sales can close." },
             { term: "CMA", definition: "Comparative Market Analysis — a real estate agent's informal property valuation based on recent comparable sales." },
+            { term: "Collateral", definition: "Property pledged to secure a loan. In real estate lending, the property itself is the collateral." },
             { term: "Comp", definition: "Comparable sale. A recently sold property similar to the subject property, used to estimate value." },
+            { term: "Condominium (Condo)", definition: "Individual ownership of a unit within a multi-unit building, combined with shared ownership of common elements. Governed by HOA." },
+            { term: "Contingency", definition: "A condition in a contract that must be met for the contract to remain binding. Common: inspection, financing, appraisal, title." },
+            { term: "Contract for Deed", definition: "A financing arrangement where the seller retains title until the buyer completes scheduled payments. Also called a land contract." },
             { term: "Conventional Loan", definition: "A mortgage conforming to Fannie Mae / Freddie Mac standards, not backed by a government agency." },
+            { term: "Conveyance", definition: "The legal transfer of ownership from one party to another, typically via deed." },
+            { term: "Cooperative (Co-op)", definition: "Multi-unit housing where residents own shares in a corporation that owns the building, rather than owning real property. Common in NYC." },
             { term: "COO (Certificate of Occupancy)", definition: "A document from local government certifying a building is habitable and code-compliant. Required after substantial rehabs in many jurisdictions." },
+            { term: "Cost Approach", definition: "A valuation method based on the cost to reproduce the property minus depreciation plus land value. Used primarily for unique properties without good comps." },
             { term: "Cost Segregation", definition: "An engineering-based analysis that reclassifies portions of a building into shorter depreciation categories to accelerate tax deductions." },
-            { term: "DSCR", definition: "Debt Service Coverage Ratio = NOI / Annual Debt Service. Measures a property's ability to cover its mortgage payment. Key metric for non-QM rental loans." },
+            { term: "Days on Market (DOM)", definition: "The number of days a property has been actively listed for sale. Long DOM indicates motivated sellers or overpricing." },
+            { term: "Debt-to-Income (DTI)", definition: "The ratio of monthly debt payments to gross monthly income. Key lender underwriting metric; most loans cap at 43-50%." },
             { term: "Deed", definition: "The legal document transferring ownership of real property. Common types: warranty deed (strongest protection), quitclaim deed (no warranty of title)." },
+            { term: "Deed in Lieu of Foreclosure", definition: "An agreement where a borrower voluntarily transfers property to the lender to avoid foreclosure. Spares both parties the foreclosure process." },
+            { term: "Default", definition: "Failure to meet contract or loan obligations, typically missed payments. Triggers lender remedies including foreclosure." },
             { term: "Depreciation", definition: "Tax deduction for the wear-and-tear of a rental building over its useful life (27.5 years residential, 39 years commercial)." },
+            { term: "Distressed Property", definition: "A property in poor condition, behind on payments, or owned by a motivated seller. Typically sold at a discount to market value." },
+            { term: "DSCR", definition: "Debt Service Coverage Ratio = NOI / Annual Debt Service. Measures a property's ability to cover its mortgage payment. Key metric for non-QM rental loans." },
             { term: "Due Diligence", definition: "The investigation period between offer acceptance and closing when a buyer inspects, reviews documents, and confirms the deal's viability." },
+            { term: "Due-on-Sale Clause", definition: "A mortgage clause allowing the lender to demand full repayment if the property is transferred without lender consent. Rarely enforced if payments remain current." },
             { term: "Earnest Money Deposit (EMD)", definition: "Buyer's good-faith deposit made when a contract is accepted, typically 1-3% of purchase price." },
             { term: "Easement", definition: "A legal right to use someone else's property for a specific purpose (utility access, driveway, etc.)." },
+            { term: "Effective Gross Income", definition: "Gross potential rent minus vacancy and collection losses. The actual income figure used in NOI calculation." },
+            { term: "Encroachment", definition: "A structure or improvement that extends onto a neighboring property, creating a title defect that must be resolved." },
             { term: "Encumbrance", definition: "Any claim, lien, or charge on a property's title that may affect its transferability." },
             { term: "Equity", definition: "Property value minus outstanding mortgage balance. Your ownership stake." },
             { term: "Escrow", definition: "A neutral third party holding funds or documents during a real estate transaction until conditions are met." },
+            { term: "Estoppel Certificate", definition: "A signed statement from a tenant confirming lease terms, rent paid, and any disputes. Required documentation when buying tenanted property." },
+            { term: "Eviction", definition: "The legal process to remove a tenant for lease violations or non-payment. Timeline and procedure vary dramatically by state." },
+            { term: "Fair Market Value (FMV)", definition: "The price a property would sell for in an arm's-length transaction between knowledgeable, willing, and unpressured parties." },
             { term: "Fannie Mae / Freddie Mac", definition: "Government-sponsored enterprises that buy conforming mortgages from originating lenders. Set the underwriting standards for 'conventional' loans." },
             { term: "FHA Loan", definition: "Federal Housing Administration-backed mortgage allowing 3.5% down for owner-occupants. Available on 1-4 unit properties." },
+            { term: "First Mortgage", definition: "The primary mortgage on a property, taking precedence over later (junior) liens in case of foreclosure." },
+            { term: "Fixed Rate Mortgage", definition: "A mortgage with an interest rate that doesn't change over the loan term. Provides payment predictability." },
+            { term: "Fixture", definition: "Personal property that has been attached to real estate and is now part of it. Transfers with sale unless specifically excluded." },
+            { term: "Flip", definition: "Buying a property, renovating quickly, and selling for profit — typically within 6-12 months. Taxed as short-term gain or dealer income." },
+            { term: "Forbearance", definition: "A temporary lender agreement to reduce or suspend payments, usually due to borrower hardship. Repayment typically required later." },
             { term: "Foreclosure", definition: "Legal process by which a lender repossesses property after borrower default. Judicial (court-supervised, longer) or non-judicial (trustee sale, faster) depending on state." },
             { term: "FSBO", definition: "For Sale By Owner — a property sold without a real estate agent representing the seller." },
+            { term: "Gentrification", definition: "The process by which a working-class or deteriorated neighborhood transitions to a higher-income demographic, often bringing rising property values and displacement." },
+            { term: "Ground Lease", definition: "A long-term (50-99 year) lease of land where the tenant builds and owns improvements on the land. Common in commercial real estate." },
             { term: "GRM", definition: "Gross Rent Multiplier = property price / annual gross rent. Quick screening tool, ignores expenses." },
             { term: "Hard Money", definition: "Short-term, high-rate, asset-based financing from private lenders. Used for acquisition and rehab when conventional loans won't work." },
             { term: "HELOC", definition: "Home Equity Line of Credit — revolving credit secured by equity in primary residence. Flexible but variable rate." },
             { term: "HOA", definition: "Homeowners Association — governing body for planned communities, condos, and townhomes. Collects dues and enforces covenants." },
+            { term: "Hold Period", definition: "The length of time an investor keeps a property. Affects tax treatment (short-term vs long-term capital gains) and strategy." },
             { term: "HUD", definition: "Housing and Urban Development — federal agency overseeing housing policy; 'HUD home' refers to a foreclosed property previously FHA-insured." },
+            { term: "Impound Account", definition: "An escrow account where the lender collects monthly installments for property taxes and insurance, paying them when due. Also called escrow account." },
+            { term: "Income Approach", definition: "A valuation method based on the property's NOI and market cap rate. Primary method for commercial and multifamily." },
             { term: "Interest-Only Loan", definition: "A loan where payments cover only interest for an initial period (typically 5-10 years), then amortize over the remaining term. Common in hard money and certain commercial loans." },
             { term: "IRR", definition: "Internal Rate of Return — the annualized rate of return that accounts for the time value of money across all cash flows of an investment." },
+            { term: "Jumbo Loan", definition: "A mortgage exceeding Fannie Mae / Freddie Mac conforming loan limits ($766K+ in most areas for 2024). Higher rates and stricter qualification." },
+            { term: "Land Contract", definition: "A financing arrangement where the seller holds title until the buyer completes payments. Also called contract for deed or installment contract." },
+            { term: "Landlord", definition: "The owner of rental property who leases it to tenants. Legal duties vary by state but generally include habitability and quiet enjoyment." },
+            { term: "Lease Option", definition: "A contract combining a lease agreement with an option to purchase during the lease term. Tenant pays option consideration for the future right to buy." },
+            { term: "Leasehold", definition: "The right to use and occupy property under a lease agreement, as opposed to fee simple ownership." },
+            { term: "Leverage", definition: "Using borrowed money to increase the potential return (and risk) of an investment. Real estate's low-cost leverage is a key wealth-building advantage." },
             { term: "Lien", definition: "A legal claim against property for unpaid debt. Mortgages are voluntary liens; tax liens, mechanic's liens, and judgment liens are involuntary." },
+            { term: "Lien Waiver", definition: "A document signed by a contractor or supplier waiving their right to file a mechanic's lien for the work or materials covered. Required before each payment draw." },
+            { term: "Liquidity", definition: "How quickly an asset can be converted to cash at fair value. Real estate is relatively illiquid — weeks to months to sell." },
             { term: "Lis Pendens", definition: "A public notice of pending lawsuit affecting real property. Clouds title, makes the property difficult to sell until resolved." },
             { term: "LTV", definition: "Loan-to-Value = loan amount / property value. Key underwriting metric." },
             { term: "MAO", definition: "Maximum Allowable Offer — the highest price you can pay and still hit your return targets. Formula varies by strategy." },
+            { term: "Mechanic's Lien", definition: "A lien filed by a contractor or materials supplier for unpaid work on a property. Can block sale or refinance until resolved." },
             { term: "MLS", definition: "Multiple Listing Service — the database of active and sold real estate listings maintained by local Realtor associations. Access typically requires a licensed agent." },
+            { term: "Mortgage", definition: "A loan secured by real property. Also refers to the document creating the lender's security interest." },
+            { term: "Mortgage Broker", definition: "An intermediary who shops loans from multiple lenders on behalf of borrowers. Compensated by lender or borrower." },
             { term: "NOI", definition: "Net Operating Income = Gross Income − Operating Expenses. Does NOT include mortgage payments. Foundation of commercial real estate valuation." },
+            { term: "Non-Conforming Loan", definition: "A mortgage that doesn't meet Fannie Mae / Freddie Mac guidelines. Includes jumbo loans, non-QM loans, and portfolio loans." },
             { term: "Non-Recourse Loan", definition: "A loan secured only by the collateral property; the lender cannot pursue the borrower's other assets if the property doesn't cover the debt. Common in large commercial loans." },
+            { term: "Note", definition: "The promissory note — a written promise to repay a loan. The legal instrument evidencing the debt." },
+            { term: "Opportunity Zone", definition: "Federally designated economically-distressed area offering capital gains tax benefits for qualified long-term investments." },
             { term: "Owner Financing", definition: "Seller carries the mortgage for the buyer. Flexible terms, no institutional underwriting. Also called 'seller financing.'" },
             { term: "PITI", definition: "Principal, Interest, Taxes, Insurance — the four components of a typical mortgage payment." },
-            { term: "PMI", definition: "Private Mortgage Insurance — required on conventional loans with <20% down. Protects the lender, not the borrower. Not applicable to most investment loans." },
+            { term: "Pocket Listing", definition: "A property marketed privately without MLS entry, typically to a limited network of buyers. Shrinking in prevalence due to MLS rules." },
             { term: "Points", definition: "Prepaid interest, 1 point = 1% of loan amount. Used to buy down rates or paid as origination fees." },
+            { term: "PMI", definition: "Private Mortgage Insurance — required on conventional loans with <20% down. Protects the lender, not the borrower. Not applicable to most investment loans." },
             { term: "Pre-Approval", definition: "A lender's preliminary written commitment to provide a mortgage, subject to appraisal and final verification. Stronger than pre-qualification." },
+            { term: "Preforeclosure", definition: "The period between a Notice of Default filing and foreclosure auction. Owner may still negotiate with lender or sell to an investor." },
+            { term: "Prepayment Penalty", definition: "A fee charged by a lender if you pay off a loan before maturity. Common on DSCR loans (3-5 year declining schedule)." },
             { term: "Principal", definition: "The remaining balance of a loan, separate from interest." },
+            { term: "Private Mortgage Lender", definition: "An individual or small company that lends on real estate without institutional backing. Terms are negotiated directly." },
             { term: "Pro Forma", definition: "A projection of a property's future income and expenses. Used in deal analysis; should be stress-tested, not taken at face value." },
             { term: "Property Class (A/B/C/D)", definition: "Informal classification of property/neighborhood quality. A = premium, B = middle-class, C = working-class, D = distressed." },
+            { term: "Property Management", definition: "The operation and oversight of rental property, including tenant relations, rent collection, maintenance, and accounting. Usually 8-10% of gross rents." },
+            { term: "Purchase Money Mortgage", definition: "A mortgage used to finance the purchase of the property, as opposed to a refinance. Can be from a lender or the seller." },
+            { term: "Qualified Intermediary", definition: "A third party who holds proceeds during a 1031 exchange, required to maintain the tax-deferred status of the transaction." },
             { term: "Quiet Title Action", definition: "A lawsuit to resolve title disputes or clear clouds on title. Required after tax deed sales and certain other situations." },
+            { term: "Rate Lock", definition: "A lender's commitment to hold an interest rate for a specific period (typically 30-60 days) while the loan is processed." },
             { term: "REIT", definition: "Real Estate Investment Trust — a company that owns or finances income-producing real estate. Can be traded on stock exchanges (publicly traded) or private. Allows small investors exposure to commercial real estate." },
+            { term: "Rent Control", definition: "Local or state laws limiting the amount landlords can charge or increase rent. Present in CA, NY, NJ, OR, and some other jurisdictions." },
             { term: "REO", definition: "Real Estate Owned — property repossessed by a lender after a failed foreclosure auction. REO properties are sold as-is through the lender's asset manager." },
             { term: "Refinance", definition: "Replacing an existing mortgage with a new one. Rate-and-term (lower rate/payment) or cash-out (pulling equity out)." },
             { term: "Rent Roll", definition: "A document listing all tenants, unit numbers, lease terms, rent amounts, and payment status. Standard requirement when buying existing rental property." },
+            { term: "Reserve Fund", definition: "Cash set aside for major repairs, vacancies, and unexpected expenses. Critical for maintaining property performance." },
+            { term: "Right of First Refusal", definition: "A contract clause giving someone the right to match any offer the owner receives before the owner sells to a third party." },
             { term: "Seasoning", definition: "The time a borrower must own a property before a lender will refinance based on current value rather than purchase price. Typically 6-12 months conventional, 3-6 months DSCR." },
             { term: "Section 8", definition: "Federal Housing Choice Voucher program where HUD subsidizes rent for qualifying low-income tenants. Tenants pay 30% of income; HUD pays the rest directly to landlord." },
             { term: "Short Sale", definition: "Sale of a property for less than the mortgage balance, requiring lender approval. Longer timeline than traditional sale, often 3-12 months." },
+            { term: "Special Warranty Deed", definition: "A deed that warrants title against defects arising during the grantor's ownership only, not before. Common in commercial transactions and REO sales." },
+            { term: "Subject-To", definition: "A purchase where the buyer takes title while the seller's existing mortgage remains in place. Buyer makes payments to the seller's lender." },
+            { term: "Subordination", definition: "An agreement making one lien junior to another. Required when adding a HELOC behind a first mortgage refinance, for example." },
+            { term: "Survey", definition: "A map showing property boundaries, improvements, and encroachments. Sometimes required by lenders, often waived for standard residential." },
             { term: "Sweat Equity", definition: "Value added to a property through the owner's own labor rather than cash expenditure." },
+            { term: "Tax Deed", definition: "A deed issued to the purchaser of a property at a tax sale (for unpaid property taxes). Rights vary by state." },
+            { term: "Tax Lien", definition: "A government claim against property for unpaid taxes. Takes priority over most other liens in most states." },
+            { term: "Tenancy in Common", definition: "Co-ownership of property where each owner holds an undivided fractional interest that can be sold or inherited independently." },
+            { term: "Term Sheet", definition: "A non-binding document outlining the proposed terms of a loan or investment, issued before final loan documents are drawn." },
             { term: "Title Insurance", definition: "Insurance protecting against defects in property title discovered after closing. Owner's policy (one-time premium) and lender's policy. Critical — never close without it." },
+            { term: "Title Search", definition: "The process of examining public records to confirm property ownership and identify liens or encumbrances." },
+            { term: "Triple Net Lease (NNN)", definition: "A lease where the tenant pays property taxes, insurance, and maintenance in addition to rent. Common in commercial single-tenant properties." },
+            { term: "Trust Deed", definition: "An alternative to a mortgage, used in some states. A trustee holds title as security for the loan. Allows faster non-judicial foreclosure." },
+            { term: "Trustee Sale", definition: "A foreclosure sale conducted by a trustee in non-judicial foreclosure states. Faster than judicial foreclosure." },
             { term: "Turnkey", definition: "A fully renovated, already-tenanted rental property sold to investors. No rehab work required. Usually priced at retail or above, with little forced-appreciation upside." },
             { term: "Underwriting", definition: "The lender's process of evaluating borrower and property to approve a loan. Reviews credit, income, assets, appraisal, title." },
             { term: "Unlawful Detainer", definition: "The legal term for an eviction lawsuit in many states." },
+            { term: "Usury", definition: "Charging interest above the legal maximum rate. Limits vary by state and loan type. Hard money lenders must be careful with rate + points totals." },
             { term: "VA Loan", definition: "Veterans Affairs-backed mortgage for eligible veterans. 0% down, no PMI, available for owner-occupied 1-4 unit properties." },
-            { term: "Wholesale", definition: "Finding a discounted property, putting it under contract, and assigning the contract to an end buyer for a fee. Requires no capital but requires strong marketing and buyer network." }
+            { term: "Vacancy Rate", definition: "The percentage of time a rental property sits unoccupied. Used in underwriting — typical 5-10% assumed for SFR, higher for multifamily." },
+            { term: "Variance", definition: "A permitted exception to zoning rules, granted by local zoning board. Required when property or intended use doesn't conform to current zoning." },
+            { term: "Warranty Deed", definition: "A deed providing the strongest title guarantees, warranting that the grantor holds clear title throughout the entire chain of title." },
+            { term: "Wholesale", definition: "Finding a discounted property, putting it under contract, and assigning the contract to an end buyer for a fee. Requires no capital but requires strong marketing and buyer network." },
+            { term: "Wraparound Mortgage", definition: "A mortgage that 'wraps around' an existing mortgage, where the seller carries a new note that includes the balance of the existing loan." },
+            { term: "Yield", definition: "The annual return on an investment, expressed as a percentage. Can refer to cap rate, cash-on-cash, or total return depending on context." },
+            { term: "Zoning", definition: "Local government regulation of land use (residential, commercial, industrial, mixed-use). Zoning violations can prevent intended use and halt investment plans." }
           ]
         }
       }
