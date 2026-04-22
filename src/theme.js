@@ -1,13 +1,19 @@
 /* ============================================================================
    THEME + STYLE_TAG
-   Palette: white primary, navy + teal + orange accents.
+   Palette: white primary canvas, teal + orange accents.
+   Teal is the primary action color; orange is the secondary highlight.
+   `navy` is kept as an alias pointing at teal so any legacy reference
+   still renders cleanly without hunting every call-site.
    ============================================================================ */
+
+const TEAL = "#0D9488";      // Teal-600 — primary CTA & active states
+const TEAL_DIM = "#0F766E";  // Teal-700 — hover
 
 export const THEME = {
   bg: "#FFFFFF",          // Pure white canvas
   bgPanel: "#F8FAFC",     // Panel surfaces — slate-50
   bgInput: "#FFFFFF",     // Inputs match canvas
-  bgRaised: "#EFF6FF",    // Hover / raised — blue-50 (harmonizes with navy)
+  bgRaised: "#F0FDFA",    // Hover / raised — teal-50 (harmonizes with teal)
   bgTeal: "#F0FDFA",      // Teal-50 — soft teal surface
   bgOrange: "#FFF7ED",    // Orange-50 — soft orange surface for highlights
   border: "#E2E8F0",      // Standard border (slate-200)
@@ -15,19 +21,21 @@ export const THEME = {
   text: "#0F172A",        // Primary text (slate-900)
   textMuted: "#475569",   // Secondary text (slate-600)
   textDim: "#94A3B8",     // Placeholders / tertiary (slate-400)
-  accent: "#1E3A8A",      // Navy-900 — primary CTA & active states
-  accentDim: "#1E40AF",   // Navy-800 — hover
-  navy: "#1E3A8A",
-  navyDim: "#1E40AF",
-  secondary: "#0D9488",   // Teal-600 — secondary emphasis
-  secondaryDim: "#0F766E",
-  teal: "#0D9488",
-  tealDim: "#0F766E",
+  accent: TEAL,
+  accentDim: TEAL_DIM,
+  // `navy` is intentionally aliased to teal — old code paths still render
+  // correctly even though navy is no longer part of the palette.
+  navy: TEAL,
+  navyDim: TEAL_DIM,
+  secondary: TEAL,
+  secondaryDim: TEAL_DIM,
+  teal: TEAL,
+  tealDim: TEAL_DIM,
   green: "#059669",
   greenDim: "#D1FAE5",
   red: "#DC2626",
   redDim: "#FEE2E2",
-  orange: "#EA580C",
+  orange: "#EA580C",      // Orange-600 — highlight + warm emphasis
   orangeDim: "#C2410C",
   blue: "#2563EB",
   purple: "#7C3AED"
@@ -64,7 +72,7 @@ input, select, textarea {
 }
 input::placeholder, textarea::placeholder { color: ${THEME.textDim}; }
 input:focus, select:focus, textarea:focus {
-  border-color: ${THEME.accent}; box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.15);
+  border-color: ${THEME.accent}; box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.18);
 }
 input[type="checkbox"] { accent-color: ${THEME.accent}; }
 input[type="range"] { accent-color: ${THEME.accent}; }

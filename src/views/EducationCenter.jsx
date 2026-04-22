@@ -4,9 +4,9 @@
    ============================================================================ */
 import React, { useState } from "react";
 import {
-  BookOpen, Target, Activity, AlertTriangle, Briefcase, Calculator,
-  Clock, DollarSign, FileText, Flag, Globe, Hammer, Home, Info, Key,
-  Layers, Mail, MapPin, Percent, PiggyBank, RefreshCw, Save, Search,
+  BookOpen, Target, Activity, AlertTriangle, BarChart3, Briefcase, Building2,
+  Calculator, Clock, DollarSign, Edit3, FileText, Flag, Globe, Hammer, Home,
+  Info, Key, Layers, Mail, MapPin, Percent, PiggyBank, RefreshCw, Save, Search,
   Shield, Sparkles, TrendingDown, TrendingUp, Users, Wrench, RotateCcw
 } from "lucide-react";
 import { THEME } from "../theme.js";

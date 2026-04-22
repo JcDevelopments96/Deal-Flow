@@ -23,7 +23,7 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <div style={{
           width: 36, height: 36, borderRadius: 8,
-          background: `linear-gradient(135deg, ${THEME.navy}, ${THEME.teal})`,
+          background: THEME.teal,
           display: "flex", alignItems: "center", justifyContent: "center"
         }}>
           <Building2 size={20} color="white" />

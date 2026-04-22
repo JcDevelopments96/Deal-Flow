@@ -252,7 +252,7 @@ export const CostBreakdown = ({ deal, metrics, onUpdate }) => {
                 formula="Purchase × (Down % ÷ 100)"
               />
             </div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: THEME.navy }}>{fmtUSD(cashDown)}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: THEME.orange }}>{fmtUSD(cashDown)}</div>
           </div>
           <div>
             <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4, display: "inline-flex", alignItems: "center" }}>
