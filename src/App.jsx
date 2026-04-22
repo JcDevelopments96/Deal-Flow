@@ -25,35 +25,35 @@ const getJsPDF = () => (typeof window !== "undefined" && window.jspdf && window.
   || null;
 
 /* ============================================================================
-   THEME + FONTS (MIDNIGHT INK — rich dark navy + champagne)
+   THEME + FONTS (TEAL & ORANGE — clean light)
    ============================================================================ */
 const THEME = {
-  bg: "#0B1120",          // Deep navy-black canvas (rich, not harsh)
-  bgPanel: "#111827",     // Panel surface
-  bgInput: "#0F172A",     // Inputs — slate-900
-  bgRaised: "#1E293B",    // Hover / raised — slate-800
-  border: "#1E293B",      // Standard border
-  borderLight: "#334155", // Divider — slate-700
-  text: "#F8FAFC",        // Primary text — slate-50
-  textMuted: "#CBD5E1",   // Secondary — slate-300 (higher contrast for professional scan-ability)
-  textDim: "#64748B",     // Tertiary — slate-500
-  accent: "#D4AF37",      // Champagne gold — primary brand
-  accentDim: "#E8C960",   // Lighter gold for hover
-  secondary: "#60A5FA",   // Soft blue — cool counterpoint for secondary emphasis
-  secondaryDim: "#93C5FD",
-  green: "#34D399",       // Emerald-400 (positive)
-  greenDim: "rgba(52, 211, 153, 0.15)",
-  red: "#F87171",         // Red-400 (negative)
-  redDim: "rgba(248, 113, 113, 0.15)",
-  orange: "#FBBF24",      // Amber-400 (warnings)
-  blue: "#60A5FA",
-  purple: "#C084FC"
+  bg: "#FFFFFF",          // Pure white canvas
+  bgPanel: "#FAFAFA",     // Panel surfaces — subtle off-white
+  bgInput: "#FFFFFF",     // Inputs match canvas
+  bgRaised: "#F1F5F9",    // Hover / raised (slate-100)
+  border: "#E2E8F0",      // Standard border (slate-200)
+  borderLight: "#F1F5F9", // Subtle dividers
+  text: "#0F172A",        // Primary text (slate-900)
+  textMuted: "#475569",   // Secondary text (slate-600) — high-contrast for scanning
+  textDim: "#94A3B8",     // Placeholders / tertiary (slate-400)
+  accent: "#0D9488",      // Teal-600 — primary CTA & active states
+  accentDim: "#0F766E",   // Teal-700 — hover
+  secondary: "#EA580C",   // Orange-600 — highlights & secondary emphasis
+  secondaryDim: "#C2410C",// Orange-700 — hover
+  green: "#059669",       // Emerald-600 (positive cash flow)
+  greenDim: "#D1FAE5",    // Emerald-100
+  red: "#DC2626",         // Red-600 (negative / delete)
+  redDim: "#FEE2E2",      // Red-100
+  orange: "#EA580C",
+  blue: "#2563EB",
+  purple: "#7C3AED"
 };
 
 const STYLE_TAG = `
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@400;500;700&display=swap');
 * { box-sizing: border-box; }
-html, body { background: ${THEME.bg}; color-scheme: dark; }
+html, body { background: ${THEME.bg}; }
 body { margin: 0; }
 .brrrr-root {
   font-family: 'DM Sans', sans-serif;
@@ -81,10 +81,8 @@ input, select, textarea {
 }
 input::placeholder, textarea::placeholder { color: ${THEME.textDim}; }
 input:focus, select:focus, textarea:focus {
-  border-color: ${THEME.accent}; box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
+  border-color: ${THEME.accent}; box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
 }
-select option { background: ${THEME.bgInput}; color: ${THEME.text}; }
-input[type="date"] { color-scheme: dark; }
 input[type="checkbox"] { accent-color: ${THEME.accent}; }
 input[type="range"] { accent-color: ${THEME.accent}; }
 button {
@@ -93,31 +91,34 @@ button {
   transition: all 0.15s ease;
 }
 .btn-primary {
-  background: ${THEME.accent}; color: ${THEME.bg}; font-weight: 600;
+  background: ${THEME.accent}; color: #FFFFFF; font-weight: 600;
   padding: 8px 14px; font-size: 13px; display: inline-flex;
   align-items: center; gap: 6px; transition: all 0.15s ease;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 .btn-primary:hover { background: ${THEME.accentDim}; }
 .btn-secondary {
-  border: 1px solid ${THEME.borderLight};
+  border: 1px solid ${THEME.border};
   color: ${THEME.text}; padding: 8px 14px; font-size: 13px;
   display: inline-flex; align-items: center; gap: 6px;
-  background: transparent;
+  background: ${THEME.bg};
 }
 .btn-secondary:hover {
   border-color: ${THEME.accent};
   color: ${THEME.accent};
   background: ${THEME.bgRaised};
 }
+.btn-accent-orange {
+  background: ${THEME.secondary}; color: #FFFFFF; font-weight: 600;
+  padding: 8px 14px; font-size: 13px; display: inline-flex;
+  align-items: center; gap: 6px; transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+.btn-accent-orange:hover { background: ${THEME.secondaryDim}; }
 .btn-ghost { color: ${THEME.textMuted}; }
 .btn-ghost:hover { color: ${THEME.accent}; background: ${THEME.bgRaised}; }
 .btn-danger { color: ${THEME.red}; }
-.btn-danger:hover { color: #FCA5A5; background: ${THEME.redDim}; }
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: ${THEME.bg}; }
-::-webkit-scrollbar-thumb { background: ${THEME.borderLight}; border-radius: 5px; }
-::-webkit-scrollbar-thumb:hover { background: ${THEME.textDim}; }
+.btn-danger:hover { color: #B91C1C; background: ${THEME.redDim}; }
 `;
 
 /* ============================================================================
@@ -851,9 +852,9 @@ const RehabSection = ({ deal, onUpdate }) => {
                 return (
                   <div key={itemKey} style={{
                     padding: 16,
-                    border: `1px solid ${item.cost > 0 ? category.color + '66' : THEME.border}`,
+                    border: `1px solid ${item.cost > 0 ? category.color + '40' : THEME.border}`,
                     borderRadius: 6,
-                    background: item.cost > 0 ? category.color + '1A' : THEME.bgPanel
+                    background: item.cost > 0 ? category.color + '0D' : THEME.bgPanel
                   }}>
                     <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "2fr 1fr 1fr 1fr", gap: 12, alignItems: "end" }}>
                       <div>
@@ -1575,7 +1576,30 @@ const COUNTIES_TOPOJSON = "https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.
 const normalizeCountyName = (name) =>
   (name || "").toLowerCase().replace(/\s+county$/i, "").trim();
 
+// Return a teal fill whose opacity scales with the score.
+// Low score -> pale teal, high score -> deep teal.
+// t is normalized 0..1 (score position within dataset min..max).
+const scoreToTealFill = (t) => {
+  const clamped = Math.max(0, Math.min(1, t));
+  // Opacity 0.20 at low end, 0.95 at high end
+  const alpha = 0.20 + clamped * 0.75;
+  // Teal RGB (13, 148, 136) — matches THEME.accent
+  return `rgba(13, 148, 136, ${alpha.toFixed(2)})`;
+};
+
 const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyClick }) => {
+  // Score range across the dataset — drives the gradient scale
+  const { minScore, maxScore } = useMemo(() => {
+    const scores = allMarkets
+      .map(m => (typeof m.brrrrScore === "number" ? m.brrrrScore : m.score))
+      .filter(s => typeof s === "number");
+    if (scores.length === 0) return { minScore: 0, maxScore: 100 };
+    return {
+      minScore: Math.min(...scores),
+      maxScore: Math.max(...scores)
+    };
+  }, [allMarkets]);
+
   // Build lookup: stateFips -> Map(normalizedCountyName -> market)
   const marketLookup = useMemo(() => {
     const lookup = new Map();
@@ -1595,6 +1619,8 @@ const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyCli
   const highlightedFips = highlightedMarket ? STATE_FIPS_BY_CODE[highlightedMarket.state] : null;
   const highlightedCounty = highlightedMarket ? normalizeCountyName(highlightedMarket.county) : null;
   const selectedFips = selectedState ? STATE_FIPS_BY_CODE[selectedState] : null;
+
+  const getScore = (m) => (typeof m.brrrrScore === "number" ? m.brrrrScore : m.score) || 0;
 
   return (
     <div>
@@ -1635,17 +1661,20 @@ const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyCli
 
                   if (isInSelectedState) {
                     fill = THEME.bgRaised;
-                    stroke = THEME.borderLight;
+                    stroke = THEME.border;
                   }
                   if (isMarket) {
-                    fill = "rgba(212, 175, 55, 0.45)";
+                    const score = getScore(market);
+                    const range = maxScore - minScore;
+                    const t = range > 0 ? (score - minScore) / range : 1;
+                    fill = scoreToTealFill(t);
                     stroke = THEME.accent;
-                    strokeWidth = 0.6;
+                    strokeWidth = 0.5;
                   }
                   if (isHighlighted) {
-                    fill = THEME.accent;
-                    stroke = THEME.text;
-                    strokeWidth = 1.2;
+                    fill = THEME.secondary;
+                    stroke = THEME.secondaryDim;
+                    strokeWidth = 1.4;
                   }
 
                   return (
@@ -1658,7 +1687,7 @@ const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyCli
                       style={{
                         default: { outline: "none", transition: "fill 0.2s" },
                         hover: {
-                          fill: isMarket ? THEME.accentDim : (isInSelectedState ? THEME.borderLight : THEME.bgRaised),
+                          fill: isMarket ? THEME.secondary : (isInSelectedState ? THEME.border : THEME.bgRaised),
                           outline: "none",
                           cursor: isMarket ? "pointer" : "default"
                         },
@@ -1676,11 +1705,47 @@ const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyCli
         </ComposableMap>
       </div>
 
+      {/* Gradient legend */}
+      <div style={{
+        marginTop: 14,
+        padding: "10px 14px",
+        background: THEME.bgPanel,
+        border: `1px solid ${THEME.border}`,
+        borderRadius: 6
+      }}>
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 6
+        }}>
+          <span className="label-xs">BRRRR Score</span>
+          <span style={{ fontSize: 10, color: THEME.textDim }}>
+            {allMarkets.length} markets &bull; range {minScore}-{maxScore}
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span className="mono" style={{ fontSize: 11, color: THEME.textMuted, minWidth: 22 }}>
+            {minScore}
+          </span>
+          <div style={{
+            flex: 1,
+            height: 10,
+            borderRadius: 2,
+            border: `1px solid ${THEME.border}`,
+            background: `linear-gradient(90deg, ${scoreToTealFill(0)} 0%, ${scoreToTealFill(0.5)} 50%, ${scoreToTealFill(1)} 100%)`
+          }} />
+          <span className="mono" style={{ fontSize: 11, color: THEME.textMuted, minWidth: 22, textAlign: "right" }}>
+            {maxScore}
+          </span>
+        </div>
+      </div>
+
       {/* Legend + info readout */}
       <div style={{
         display: "flex",
         gap: 18,
-        marginTop: 12,
+        marginTop: 10,
         fontSize: 11,
         color: THEME.textMuted,
         flexWrap: "wrap",
@@ -1689,25 +1754,27 @@ const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyCli
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{
             width: 14, height: 14, borderRadius: 2,
-            background: "rgba(212, 175, 55, 0.45)",
+            background: scoreToTealFill(0.7),
             border: `1px solid ${THEME.accent}`
           }} />
-          <span>Tracked Market ({allMarkets.length})</span>
+          <span>Tracked Market</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{
             width: 14, height: 14, borderRadius: 2,
-            background: THEME.accent
+            background: THEME.secondary
           }} />
-          <span>Selected County</span>
+          <span>Selected</span>
         </div>
         {highlightedMarket && (
-          <div style={{ color: THEME.accent, fontWeight: 600 }}>
+          <div style={{ color: THEME.secondary, fontWeight: 600 }}>
             {highlightedMarket.city}, {highlightedMarket.state} &mdash; {highlightedMarket.county}
+            &nbsp;&bull;&nbsp;
+            Score {getScore(highlightedMarket)}
           </div>
         )}
         <div style={{ color: THEME.textDim, marginLeft: "auto", fontSize: 10 }}>
-          Click any gold county &bull; Scroll to zoom &bull; Drag to pan
+          Click a teal county &bull; Scroll to zoom &bull; Drag to pan
         </div>
       </div>
     </div>
@@ -2882,7 +2949,7 @@ const AdvancedMarketIntel = () => {
 
       <Panel title="Market Map — US Counties" icon={<MapPin size={16} />} accent style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 14 }}>
-          Every tracked market, mapped by county. Click a gold county to open its deal profile, pick a state below to zoom in, or search to spotlight a specific city.
+          Every tracked market, color-coded by BRRRR score. Deeper teal indicates stronger overall investment conditions. Click a county to open its profile, or use the controls below to zoom and filter.
         </div>
         <USCountyMap
           allMarkets={allMarkets}
@@ -3539,9 +3606,9 @@ const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal }) => {
                 <div style={{
                   padding: "4px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700,
                   background: metrics.grade === "A" ? THEME.greenDim :
-                             metrics.grade.startsWith("B") ? "rgba(212, 175, 55, 0.18)" : THEME.redDim,
+                             metrics.grade.startsWith("B") ? "#FFEDD5" : THEME.redDim,
                   color: metrics.grade === "A" ? THEME.green :
-                         metrics.grade.startsWith("B") ? THEME.accent : THEME.red
+                         metrics.grade.startsWith("B") ? THEME.secondary : THEME.red
                 }}>
                   {metrics.grade}
                 </div>
