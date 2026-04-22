@@ -376,7 +376,7 @@ const generatePDFReport = async (deal, metrics, type = "investor") => {
       [`Cash Flow: $${metrics.monthlyCashFlow?.toFixed(0) || '0'}/month`, `Cap Rate: ${metrics.capRate?.toFixed(1) || '0.0'}%`],
       [`Cash on Cash: ${metrics.cashOnCash?.toFixed(1) || '0.0'}%`, `1% Rule: ${metrics.onePercentRule ? 'Yes' : 'No'}`],
       [`Total Investment: $${metrics.totalInvested?.toLocaleString() || '0'}`, `Equity Gained: $${((deal.arv || 0) - metrics.totalInvested).toLocaleString()}`],
-      [`BRRRR Score: ${metrics.score}/100 (${metrics.grade})`, `ROI: ${metrics.totalROI?.toFixed(1) || '0.0'}%`]
+      [`Deal Score: ${metrics.score}/100 (${metrics.grade})`, `ROI: ${metrics.totalROI?.toFixed(1) || '0.0'}%`]
     ];
 
     metricsToShow.forEach(([left, right]) => {
@@ -1747,7 +1747,7 @@ const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyCli
           justifyContent: "space-between",
           marginBottom: 6
         }}>
-          <span className="label-xs">BRRRR Score Heatmap</span>
+          <span className="label-xs">Deal Score Heatmap</span>
           <span style={{ fontSize: 10, color: THEME.textDim }}>
             {allMarkets.length} markets &bull; your range {minScore}-{maxScore}
           </span>
@@ -2878,7 +2878,7 @@ const AdvancedMarketIntel = () => {
           )}
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 11, color: THEME.textMuted }}>BRRRR Score</div>
+          <div style={{ fontSize: 11, color: THEME.textMuted }}>Deal Score</div>
           <div style={{ fontSize: 18, fontWeight: 700, color: THEME.accent }}>
             {market.brrrrScore || market.score}
           </div>
@@ -2990,7 +2990,7 @@ const AdvancedMarketIntel = () => {
 
       <Panel title="Market Map — US Counties" icon={<MapPin size={16} />} accent style={{ marginBottom: 24 }}>
         <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 14 }}>
-          Every tracked market, color-coded by BRRRR score on a red-yellow-green heatmap. Red indicates weaker markets, yellow is average, and green represents the strongest investment conditions. Click a county to drill in.
+          Every tracked market, color-coded by overall deal score on a red-yellow-green heatmap. Red indicates weaker markets, yellow is average, and green represents the strongest investment conditions. Click a county to drill in.
         </div>
         <USCountyMap
           allMarkets={allMarkets}
@@ -3114,7 +3114,7 @@ const AdvancedMarketIntel = () => {
               { key: "capRate", label: "Cap Rate" },
               { key: "rentGrowth", label: "Rent Growth" },
               { key: "score", label: "Overall Score" },
-              { key: "brrrrScore", label: "BRRRR Score" }
+              { key: "brrrrScore", label: "Deal Score" }
             ].map(metric => (
               <button
                 key={metric.key}
@@ -3167,7 +3167,7 @@ const Header = ({ view, onChangeView, onNewDeal }) => (
             DealTrack
           </div>
           <div style={{ fontSize: 10, color: THEME.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 2 }}>
-            BRRRR Investment Platform
+            Real Estate Investment Platform
           </div>
         </div>
       </div>
@@ -3288,7 +3288,7 @@ const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete }) => {
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4 }}>BRRRR SCORE</div>
+            <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4 }}>DEAL SCORE</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: THEME.accent }}>
               {metrics.score}/100 <span style={{ fontSize: 14 }}>({metrics.grade})</span>
             </div>
@@ -3577,6 +3577,566 @@ const EducationCenter = () => {
       }
     },
 
+    flip: {
+      title: "Fix & Flip",
+      icon: <Hammer size={16} />,
+      topics: {
+        "flip-fundamentals": {
+          title: "Flip Fundamentals and Economics",
+          icon: <DollarSign size={14} />,
+          sections: [
+            {
+              heading: "What a Flip Actually Is",
+              body: "Fix and flip is buying a property at a discount, renovating quickly, and selling on the retail market — typically within 4-9 months of purchase. Unlike BRRRR, you don't hold as a rental. Profit is realized on sale. The strategy trades long-term wealth-building for faster capital turnover: you can run 2-4 flips per year with the same capital that would buy 1-2 BRRRR properties."
+            },
+            {
+              heading: "The Flip Math",
+              body: "Profit = Sale Price − Purchase − Rehab − Holding Costs − Selling Costs − Financing Costs. Example: Sell $320K, purchase $175K, rehab $45K, holding $8K (6 months of taxes, insurance, utilities, HOA), selling $22K (6-7% agent commission + closing), financing $12K (hard money interest + points). Profit = $320K − $262K = $58K. Target minimum profit: $40K per flip in typical markets, $60K+ in higher-cost metros."
+            },
+            {
+              heading: "The 70% Rule Applied to Flips",
+              body: "Same formula as BRRRR: Max Offer = (ARV × 0.70) − Rehab. The 30% buffer covers holding costs (~3-5%), selling costs (6-8%), financing costs (3-5%), and profit margin (15-20%). On a $320K ARV with $45K rehab: Max Offer = $224K − $45K = $179K. Going above this crushes margin. In hot markets some flippers stretch to 75%; in soft markets discipline at 65%."
+            },
+            {
+              heading: "Capital Requirements",
+              body: "Typical cash outlay on a $175K purchase with $45K rehab using 85/100 hard money: $26K down (15% of purchase) + 3% closing costs ($5K) + 3-month interest reserve ($6K) = $37K at closing. Plus $10K-$15K working capital for rehab draws and holding costs. Total: ~$50K to execute a flip of this size. More at higher price points."
+            },
+            {
+              heading: "Flip vs BRRRR Decision Framework",
+              body: "Flip when: (1) the numbers produce $40K+ profit at sale, (2) the property wouldn't cash flow as a rental, (3) market is hot and selling will be fast, (4) you need to realize capital quickly for another opportunity. BRRRR when: (1) the property cash flows strongly as a rental, (2) refinance math works to recover most capital, (3) you want long-term equity and appreciation exposure. Some deals work as either — run both analyses and pick the better outcome."
+            },
+            {
+              heading: "Realistic Expectations",
+              body: "Social media portrays flipping as consistent $50K-$100K paydays. Reality: first-time flippers often break even or lose money on deal #1 due to rehab overruns, timeline slippage, or selling-season mistiming. Experienced flippers average $35K-$50K profit per deal in most markets, with 30-40% of deals disappointing. Plan for 3-4 deals per year at $40K average — about $140K gross annual profit, taxed as ordinary income if classified as dealer activity."
+            }
+          ]
+        },
+        "finding-flips": {
+          title: "Sourcing Flip-Worthy Properties",
+          icon: <Search size={14} />,
+          sections: [
+            {
+              heading: "What Makes a Property Flip-Ready",
+              body: "Ideal flip target: 3-4 bed, 2+ bath, 1,200-2,200 sqft, in a neighborhood with active buyer demand. Cosmetic-to-moderate rehab scope (avoid major structural, foundation, or full-gut projects unless experienced). Age 1980-2010 sweet spot — old enough to need updating, new enough to avoid lead paint, knob-and-tube, or galvanized plumbing horror stories. School district rating 6+ for family-buyer appeal."
+            },
+            {
+              heading: "Sources for Flip Deals",
+              body: "Rank-ordered by volume: (1) MLS stale listings and price drops, (2) wholesaler networks, (3) direct-mail to absentee owners and pre-foreclosures, (4) foreclosure auctions (risky but deep discounts), (5) REO bank-owned, (6) off-market referrals from agents and other investors. Running a flip business typically means sourcing 20-30 potential deals per month to close 2-3 flips per quarter."
+            },
+            {
+              heading: "Neighborhood Selection for Flips",
+              body: "B+ and A- neighborhoods generally produce the most profitable flips — strong buyer demand, appraisals that support reasonable ARVs, short days-on-market. Class C neighborhoods have cheaper acquisition but thinner buyer pools and longer sale times, which increases holding costs. Class D almost never flip-profitable — investors pay retail for rentals there, not end-users. Avoid markets with declining population or industry collapse."
+            },
+            {
+              heading: "Reading Comps Like a Retail Appraiser",
+              body: "Flip ARV estimation is stricter than BRRRR ARV estimation. Retail buyers and their appraisers are picky — comp must be within 0.25-0.5 miles, same school attendance zone, similar lot size, similar style, sold in last 90 days, similar rehab level. Use 4-6 tight comps, not wide ones. A 0.75-mile comp or 120-day-old sale may make a BRRRR refi but can tank a flip appraisal."
+            },
+            {
+              heading: "Red Flag Properties to Avoid",
+              body: "Pass on flips with: location issues (backing to a highway, next to commercial, flood zone, unusual lot), structural issues (foundation movement, sagging roof line, pest damage), pre-1978 homes unless you're certified for lead paint RRP work, unpermitted additions (disclosure required and appraisal problems), properties with active tenants on leases, properties in HOAs with special assessments pending. These all reduce buyer pool and complicate timeline."
+            },
+            {
+              heading: "The 'Best Street, Worst House' Heuristic",
+              body: "The highest-return flips are the ugliest house on a strong street. The ARV is pulled up by surrounding property values, your rehab costs to bring it to neighborhood standard are predictable, and end-buyers pay a premium for the location. Inverse: the best house on a weak street is a terrible flip — surrounding values cap your ARV below your rehabbed property's standalone value."
+            }
+          ]
+        },
+        "rehab-for-retail": {
+          title: "Rehab Scope for Retail Sale",
+          icon: <Wrench size={14} />,
+          sections: [
+            {
+              heading: "Flip-Grade vs Rental-Grade Finishes",
+              body: "Flips need to wow retail buyers; rentals need durable, budget-friendly finishes. Flip-grade kitchen: quartz counters (not butcher block or laminate), stainless appliance package ($2,500-$3,500), soft-close cabinets, designer-grade lighting, tile backsplash. Flip-grade bathroom: tiled showers (not fiberglass), vanity with stone top, upgraded fixtures, modern lighting. Expect to spend 30-50% more on finishes than a comparable BRRRR rehab."
+            },
+            {
+              heading: "What Retail Buyers Actually Pay For",
+              body: "Buyers pay premiums for: updated kitchens (highest ROI), updated primary bathrooms, fresh paint in modern neutrals, new flooring throughout (hardwood or premium LVP — not carpet in main living), curb appeal (fresh landscaping, painted exterior, new front door). Buyers pay less for: secondary bathroom upgrades, garage upgrades, basement finishing (ROI often under 70%), pool additions (negative in many markets), elaborate landscaping."
+            },
+            {
+              heading: "Kitchen Investment for Flips",
+              body: "Flip kitchen budget: $18K-$35K depending on size and market. Scope: new semi-custom cabinets ($6K-$14K), quartz or granite counters ($3K-$6K), stainless appliance suite ($2.5K-$4K), subway or modern tile backsplash ($800-$2K), luxury vinyl plank or tile floor ($3K-$6K), modern lighting + island pendant ($500-$1.5K), updated sink + faucet ($400-$800), paint + hardware ($500-$1K). Never cheap out on the kitchen — it's the most valued room."
+            },
+            {
+              heading: "Primary Bathroom Investment",
+              body: "Flip primary bath budget: $8K-$18K. Scope: tiled walk-in shower with glass enclosure ($3K-$5K), stone-top vanity ($1K-$2.5K), free-standing tub if space allows ($1.5K-$3K — high perceived value), new toilet, tiled floor ($1.5K-$3K), modern fixtures and lighting ($500-$1.5K). Two-bath homes: primary gets full treatment, secondary gets lighter refresh ($4K-$7K)."
+            },
+            {
+              heading: "Exterior and Curb Appeal",
+              body: "Budget $3K-$12K for exterior improvements. High-ROI items: fresh paint or siding refresh, new front door ($800-$2K, often highest ROI-per-dollar improvement), landscaping refresh (mulch, trimming, seasonal plants: $1K-$3K), power washing, driveway seal, mailbox replacement, modern house numbers. Low-ROI: custom hardscaping, elaborate fencing, pool renovations."
+            },
+            {
+              heading: "Neutral Everywhere",
+              body: "Personal taste kills flips. Paint: warm white (Sherwin-Williams Alabaster, Benjamin Moore Simply White) or very light greige. Cabinet colors: white, warm white, or medium stained wood — never bright colors. Flooring: light-to-medium warm tones, never super-dark or super-light. Fixtures: matte black or brushed nickel trending; avoid oil-rubbed bronze (dating) and polished chrome (dating). Modern and neutral outsells any specific style."
+            }
+          ]
+        },
+        "staging-selling": {
+          title: "Staging, Listing, and Selling",
+          icon: <Home size={14} />,
+          sections: [
+            {
+              heading: "Staging Matters",
+              body: "Staged homes sell 30-70% faster than vacant ones and often for 1-5% more. Full staging for a 2,000 sqft home: $1,500-$4,000/month with typical 2-3 month engagement. Virtual staging (digital): $25-$75 per photo, faster but less effective. Minimum viable: stage the living room, primary bedroom, and primary bath. Buyers struggle to visualize empty space — staging solves that problem."
+            },
+            {
+              heading: "Photography Drives Listing Performance",
+              body: "Professional real estate photography: $300-$700 for a comprehensive package (30-50 edited photos, drone aerials, twilight exterior). First-day listing traffic is overwhelmingly driven by MLS photos. Skip this and you lose 40-60% of potential buyers. Budget for: wide-angle interior lens, HDR compositing, grass/sky enhancement in post, drone exterior, twilight shots of lit exterior."
+            },
+            {
+              heading: "Pricing Strategy",
+              body: "Price 1-3% below ARV to generate multiple-offer scenarios. Overpricing by 5%+ sits the listing, which cuts into your buyer pool. First 10-14 days on market generates 60% of showing activity — you want to be attractively priced from day one. Reduce quickly if showings are slow: don't let 30 days pass without action."
+            },
+            {
+              heading: "Listing Agent Selection",
+              body: "Interview 2-3 agents before listing. Questions: (1) Number of flips they've listed in last 12 months, (2) average days on market for their flip listings, (3) price-to-list ratio on closed flips, (4) marketing plan specifics (staging budget, photography, open houses, social media, broker networking), (5) commission structure (5-6% standard, negotiate to 5% on higher-priced flips). Avoid agents with limited flip experience — retail listings and investor listings have different marketing needs."
+            },
+            {
+              heading: "Offer Evaluation",
+              body: "In multiple-offer situations, evaluate beyond headline price: cash vs financed, pre-approval strength, contingencies (inspection, appraisal, financing), closing timeline, earnest money size, concession requests. A $330K cash offer with 21-day close often beats a $340K offer with 45-day financing timeline and extensive contingencies. Your agent should present all offers side-by-side in a spreadsheet."
+            },
+            {
+              heading: "Inspection Response Strategy",
+              body: "Buyer's inspector will find items. Categories: safety items (address always), major system items (HVAC nearing end of life, roof issues — address if significant), cosmetic items (paint scrapes, loose hardware — rarely address), code items on pre-existing conditions (usually not required to fix for FHA/VA, negotiate). Budget $1,500-$4,000 for post-inspection concessions on a typical flip. Offer a credit at closing rather than doing repairs yourself — keeps timeline moving."
+            }
+          ]
+        },
+        "flip-timeline-capital": {
+          title: "Timeline and Capital Management",
+          icon: <Clock size={14} />,
+          sections: [
+            {
+              heading: "Typical Flip Timeline",
+              body: "Close to sold: 4-9 months in most markets. Breakdown: Close acquisition (day 0), demo and rough-in (weeks 1-3), mechanicals (weeks 2-5), drywall and trim (weeks 4-7), finishes (weeks 6-10), final punch and photos (week 11-12), list (week 12-13), under contract (week 14-16), close sale (week 18-20). Each slippage week adds $500-$1,500 in holding costs depending on property value and financing."
+            },
+            {
+              heading: "Holding Costs Breakdown",
+              body: "Monthly holding costs on a $220K flip with hard money: mortgage interest $1,800 (at 11% on $200K loan), property taxes $220, insurance $140 (vacant policy), utilities $120, HOA if applicable $50-$300, maintenance/snow/lawn $100. Total: $2,430-$2,730/month. Budget 6 months of holding = $14,500-$16,400. Plan for 8 months worst-case before eating into profit margin materially."
+            },
+            {
+              heading: "Working With a GC vs Self-Managing",
+              body: "Using a General Contractor: +8-15% over trades' direct costs, but GC handles scheduling, quality, and problem-solving. Self-managing trades: cheaper but time-consuming and relies on your project management skills. Recommendation for new flippers: use a GC on first 2-3 flips to learn the process; self-manage once you understand what's being done and can spot quality issues."
+            },
+            {
+              heading: "Draw Schedule and Cash Flow",
+              body: "Hard money rehab funds release in 3-5 draws tied to inspection milestones. Typical schedule: 20% at signing, 25% after demo + rough-in complete, 25% after drywall and trim, 20% after finishes, 10% final. You front contractor payments, then submit receipts and get reimbursed by lender. This means you need $15K-$30K working capital beyond the down payment."
+            },
+            {
+              heading: "Contingency and Overrun Management",
+              body: "Expect 10-20% budget overrun on first-time flips, 5-10% once experienced. Common overrun sources: hidden damage revealed during demo (termite, water, electrical issues), scope creep (deciding to renovate more rooms), schedule slippage (holding costs extend), material price increases. Build 15% contingency into every flip budget, not 5%."
+            },
+            {
+              heading: "Exit Planning Before Purchase",
+              body: "Before buying a flip, validate: at the projected ARV, is this a 30-day sale or a 90-day sale? Check current DOM in that specific neighborhood for renovated homes in similar price range. If DOM is already 45-60 days, your flip will sit — budget extended holding. If DOM is 7-15 days, you have optionality to price aggressively for quick sale. This pre-purchase validation separates reliable flippers from gamblers."
+            }
+          ]
+        },
+        "flip-taxes": {
+          title: "Tax Treatment of Flipping",
+          icon: <FileText size={14} />,
+          sections: [
+            {
+              heading: "Dealer vs Investor Status",
+              body: "The IRS classifies flippers who do multiple deals per year as 'dealers' — property is inventory, not investment. Consequences: profits taxed as ordinary income (up to 37% federal) + self-employment tax (15.3% on net), no long-term capital gains treatment even if held >1 year, no 1031 exchange eligibility. One occasional flip may qualify as investment; a pattern of flipping triggers dealer classification. Most active flippers pay 30-50% of profit in combined taxes."
+            },
+            {
+              heading: "Entity Choice for Flipping",
+              body: "Unlike rentals (where LLC taxed as disregarded entity is typical), flipping benefits from S-Corp election. Why: S-Corp allows you to pay yourself a reasonable salary (subject to employment taxes) and take the remainder as distributions (no SE tax). On $120K flip profit, switching from sole prop to S-Corp can save $8K-$12K in self-employment taxes annually. Requires formal payroll processing, quarterly estimated taxes, more complex tax filing."
+            },
+            {
+              heading: "Deductible Flip Expenses",
+              body: "Fully deductible against flip profit: all rehab costs, acquisition costs (title, inspection, lender fees), interim financing costs, insurance, utilities, taxes during hold, marketing and listing costs, commissions paid, staging, professional fees (CPA, attorney), vehicle mileage for property visits, home office for flip business, tools and equipment. Keep receipts for everything."
+            },
+            {
+              heading: "Quarterly Estimated Taxes",
+              body: "Flippers must pay quarterly estimated taxes to avoid IRS penalties. Federal + state combined can reach 40-50% of net profit. On $40K flip profit closing in Q2, plan to send $16K-$20K to IRS and state DOR by the next quarterly deadline. Failure to pay quarterly generates penalty + interest charges. Set up a separate savings account for tax reserves — transfer 30-40% of every closing check."
+            },
+            {
+              heading: "The 1031 Exchange Gap",
+              body: "1031 exchanges defer capital gains tax on investment property sales — but flips don't qualify. IRS treats flip profit as inventory income, which is ineligible. Workaround: convert flip to rental for 2+ years before sale (changes tax character from dealer to investor). Impractical for most flippers, but worth considering if capital is tied up and you have strong rental demand."
+            },
+            {
+              heading: "Loss Handling",
+              body: "Flip losses are ordinary losses (not capital losses), deductible in full against other income. This is actually favorable — capital losses are limited to $3K/year against ordinary income, but ordinary losses have no cap. Small consolation for a failed flip, but the tax treatment softens the blow. Document everything carefully — the IRS scrutinizes loss deductions on real estate."
+            }
+          ]
+        }
+      }
+    },
+
+    str: {
+      title: "Short-Term Rentals",
+      icon: <Key size={16} />,
+      topics: {
+        "str-business-model": {
+          title: "The STR Business Model",
+          icon: <Home size={14} />,
+          sections: [
+            {
+              heading: "How Short-Term Rentals Differ From Long-Term",
+              body: "STRs (Airbnb, Vrbo, Furnished Finder) operate more like hospitality than rental real estate. Average stays: 2-7 nights. Revenue: 1.5-3x long-term rental potential in strong markets. Expenses: 3-5x higher (cleaning, utilities, platform fees, dynamic pricing tools, furnishings, consumables, maintenance). Net profit often 1.5-2x LTR after all costs, with dramatically more operational complexity."
+            },
+            {
+              heading: "Revenue Components",
+              body: "STR gross revenue breakdown: Average Daily Rate (ADR) × occupancy × days available = gross booking revenue. Example: $180 ADR × 70% occupancy × 350 nights available = $44,100 gross. Minus platform fees (14-16% Airbnb, 8% Vrbo), cleaning fees (passed through to guest), OTA commissions. Net to operator: typically 75-80% of gross. Add: cleaning fee markup ($15-$30 per stay retained by operator), extended-stay discounts affect margins."
+            },
+            {
+              heading: "The Unit Economics",
+              body: "On a $400K STR property: mortgage $2,200/mo, taxes $350, insurance $200 (STR requires specialty coverage), utilities + internet $350 (landlord-paid), cleaning supplies and consumables $150, software tools $80 (dynamic pricing + channel manager), maintenance reserve $300, CapEx reserve $400. Total fixed costs: ~$4,030/mo. Required revenue: $4,030 breakeven; $6,500-$8,500 target for attractive returns. Requires strong market and operational execution."
+            },
+            {
+              heading: "Capital Requirements Beyond the Property",
+              body: "Furnishing a 2-bedroom STR: $15K-$30K for mid-tier market, $40K-$80K for luxury. Includes: full furniture package, linens and bath supplies, kitchen equipment, decor and art, TVs, outdoor furniture, grill, coffee supplies, consumable starter kit. Multiply by 1.5x for 3-bedroom, 2x for 4-bedroom. This is cash that doesn't exist in LTR investing."
+            },
+            {
+              heading: "The Time Investment Reality",
+              body: "Self-managed STRs: 15-25 hours/week per property for messaging guests, coordinating cleanings, handling maintenance, managing listings, adjusting prices. Full-service STR management companies: 20-30% of gross revenue (huge cut) but handle everything. Co-hosting model: 15-20% of gross with shared responsibilities. Most investors underestimate time investment by 3-5x — plan for high time commitment in year one before systemizing."
+            },
+            {
+              heading: "Who STR Works For",
+              body: "STR suits: investors with tolerance for operational complexity, sole proprietors who can absorb time investment, those in or near STR markets for self-management, investors seeking higher returns in exchange for more work. STR doesn't suit: passive investors wanting hands-off returns, people with W-2 jobs that don't permit phone interruptions, investors in heavily regulated markets, those with low risk tolerance (regulations can change quickly)."
+            }
+          ]
+        },
+        "str-market-selection": {
+          title: "STR Market Selection and Validation",
+          icon: <MapPin size={14} />,
+          sections: [
+            {
+              heading: "What Makes a Strong STR Market",
+              body: "Key characteristics: tourism anchor (beach, mountains, national park, major city, festival town), year-round demand (not just seasonal), permissive regulations, manageable saturation (not oversupplied), proximity to dining/entertainment, good walk score or drive score. Examples of strong STR markets: Pensacola FL, Chattanooga TN, Broken Bow OK, Asheville NC (with regs), Galena IL, Joshua Tree CA. Avoid: cities banning STRs, oversaturated beach towns where rates are compressed."
+            },
+            {
+              heading: "Using AirDNA and Rabbu for Market Data",
+              body: "AirDNA ($50-$200/mo subscription) provides: market-wide ADR, occupancy, RevPAR, active listing count, seasonality patterns, top-performing property profiles, competitive analysis. Free alternative Rabbu: basic market metrics and property projections. Minimum viable analysis: pull 12 months of data, identify seasonal highs/lows, compare to your financial projections. Don't trust vague marketing claims — get the numbers."
+            },
+            {
+              heading: "Regulatory Research",
+              body: "Before buying, verify: (1) Is STR legal in this jurisdiction? (2) Is permit/license required? What's the cost and process? (3) Is owner occupancy required for some of the year? (4) Are there minimum-night restrictions? (5) Occupancy limits per property? (6) Parking requirements? (7) Noise ordinances? (8) What's the HOA stance (can kill STR even where legal)? Check city/county code, planning department, STR association websites, recent news articles."
+            },
+            {
+              heading: "Competitive Saturation Analysis",
+              body: "Count active STR listings in your target neighborhood using AirDNA. Too few: demand may be weak. Too many: rates compressed. Sweet spot varies but generally 5-15 listings in a mile radius for suburban/small town, 30-50 for urban. Check 'submarket' data — a city might look saturated overall but have under-served neighborhoods."
+            },
+            {
+              heading: "Seasonality and Revenue Pacing",
+              body: "Understand when peak season hits and what the off-season looks like. Beach markets: 4-6 month strong season, 2-3 month weak. Mountain/snow: winter-focused with summer secondary. Urban: surprisingly steady year-round. Festival towns: intense weeks around events. Annual revenue = peak months weighted heavily. A property generating $8K/month in peak but $2K in off-season averages $5K — model this accurately."
+            },
+            {
+              heading: "Validating With Listings at Your Price Point",
+              body: "Search Airbnb for properties similar to yours in your target market. Filter by: same bedroom count, similar pool/amenities. Check their pricing, calendar booking density (see when they're booked in next 60 days), reviews count and rating. If top-20 similar properties average 60%+ occupancy at your target ADR, demand supports your plan. If they're showing wide-open calendars, reconsider."
+            }
+          ]
+        },
+        "str-property-selection": {
+          title: "Property Selection for STR",
+          icon: <Home size={14} />,
+          sections: [
+            {
+              heading: "Property Features That Drive Bookings",
+              body: "Proven revenue drivers: private hot tub (+15-30% revenue on average), pool in warm markets (+20-40%), game room with pool table or arcade (+10-20%), fire pit or outdoor entertainment space (+5-15%), king bed in primary (vs queen), ensuite bathrooms, high-speed WiFi and workspace (critical for extended stays), designated parking for 4+ vehicles. One or two of these amenities can differentiate your listing from identical properties without them."
+            },
+            {
+              heading: "Size and Layout Sweet Spots",
+              body: "Strong performers by market: Urban/small town: 1-bed studios and 2-bed condos (business travelers, couples, short stays). Suburban/vacation: 3-4 bed with multiple baths (families, small groups). Large vacation markets: 5-7 bed with bunk rooms (reunions, bachelor/ette parties, groups). Luxury: 4+ bed with premium amenities. Avoid: 2-bed vacation rentals (too small for groups, too expensive for couples), 6+ bed without group-friendly features."
+            },
+            {
+              heading: "Location Within the Market",
+              body: "Walking distance to bars/restaurants/attractions = higher ADR in urban markets. Beach within 5 blocks vs 10 blocks = 20-40% ADR difference. Lake frontage vs lake view vs lake access: each step down cuts 15-25% from revenue potential. Quiet residential neighborhoods can command premiums if they're 'character' (cute historic district) but not if they're just residential."
+            },
+            {
+              heading: "Avoiding Operational Nightmares",
+              body: "Red-flag properties: shared walls (noise complaints from neighbors kill reviews and may trigger HOA action), unclear parking (guest frustration source), stairs as primary access (cuts out family, older, mobility-limited guests = 25% of demand), wells or septic (maintenance risk with high-volume use), private roads (plowing and access issues). Even if price is attractive, operational headaches reduce revenue and review scores."
+            },
+            {
+              heading: "Purchase Price vs Revenue Trade-offs",
+              body: "Cheaper properties in weaker sub-markets often have worse revenue-to-price ratios than well-located properties. Example: $350K in walking-distance downtown with $65K projected revenue beats $250K on the outskirts with $35K projected revenue. Calculate revenue/price ratio (gross annual / purchase price) — target 15-20% minimum for STR. Properties below 12% rarely produce attractive net returns."
+            },
+            {
+              heading: "Zoning and HOA Compatibility",
+              body: "Before closing, get in writing: (1) property zoning explicitly permits STR, (2) HOA (if any) permits STR (many prohibit, some require permits, some limit to minimum-stays), (3) any condo association rules, (4) local STR permit/license availability. One property with STR-permissive zoning next door to one with prohibited zoning is common — block-by-block verification is essential."
+            }
+          ]
+        },
+        "str-furnishing-design": {
+          title: "Furnishing, Design, and Amenities",
+          icon: <Sparkles size={14} />,
+          sections: [
+            {
+              heading: "The 'Instagram-Worthy' Principle",
+              body: "Modern STR success depends on photogenic design. Unique, memorable, photo-ready spaces generate social sharing, saved listings, and book-it-now decisions. Look at AirDNA's top-performing properties in your market — they share cohesive design themes (mid-century modern, boho coastal, rustic industrial, etc.), intentional color palettes, and at least one 'wow' feature (striking mural, statement furniture, dramatic bedroom design)."
+            },
+            {
+              heading: "Furnishing Budget Allocation",
+              body: "$25K for a 3-bed STR, allocated roughly: Living room $4K (sofa, chairs, coffee table, rug, art, lamps, TV $800), primary bedroom $3K (king bed, nightstands, dresser, lamps, art), secondary bedrooms $2K each (queen or twins, nightstand, lamp), bathrooms $800 each, kitchen $3K (dishes, cookware, appliances, table + chairs), outdoor $2K, decor and linens $3K, misc $2K. Don't cheap out on the mattress — 'uncomfortable bed' kills reviews."
+            },
+            {
+              heading: "Durable Materials That Look Nice",
+              body: "Everything gets beaten up. Choose: sofas with removable washable covers, performance fabrics (Sunbrella, Crypton), solid wood furniture (holds up better than veneer), commercial-grade carpet (or avoid carpet entirely), stone or tile counters (not laminate), durable outdoor furniture (aluminum/powder-coated, not wood that rots or rusts prone). Spend on mattresses, pillows, linens — guest sleep quality drives reviews."
+            },
+            {
+              heading: "Consumables and Starter Supplies",
+              body: "Guests expect basics stocked: toilet paper, paper towels, hand soap, dish soap, dishwasher tabs, laundry detergent, coffee + filters, salt/pepper/oil/vinegar starter kit, shampoo/conditioner/body wash, trash bags, sponges, cleaning supplies. Initial stocking cost: $200-$400. Reorder every 1-3 months. Many guests appreciate a 'welcome basket' (snacks, water, local treats) — $15-$25 and often generates 5-star reviews."
+            },
+            {
+              heading: "Tech and Entertainment",
+              body: "Essential: strong WiFi (minimum 100 Mbps, tested), smart locks (Schlage Encode, Yale Assure, RemoteLock — enables automated access), smart thermostat (Ecobee or Nest), video doorbell (Ring — deters parties), smoke/CO detectors (required). Nice-to-have: smart TV with streaming apps (Roku TVs, Apple TVs, not cable), board games, books, local guidebook, portable speaker, exercise equipment in basement."
+            },
+            {
+              heading: "The Photoshoot That Pays Back 10x",
+              body: "Professional STR-specific photographer: $400-$900 for 30-60 edited photos, twilight exterior, drone shots if relevant. STR photographers understand vertical composition (for mobile), detail shots (for amenities), and lifestyle staging (styled plates, flowers, books). DIY phone photos are a $500K property mistake — they reduce listing performance 40%+. Reshoot when you update furniture or major decor."
+            }
+          ]
+        },
+        "str-operations": {
+          title: "Operations, Tech, and Automation",
+          icon: <Sparkles size={14} />,
+          sections: [
+            {
+              heading: "The Tech Stack",
+              body: "Core tools for a professional STR operation: (1) Listing platforms: Airbnb + Vrbo minimum, add Booking.com and direct booking site. (2) Channel manager: Hospitable ($40-$100/mo), Hostaway, Guesty — syncs calendars and messaging across platforms. (3) Dynamic pricing: PriceLabs ($20-$40/mo per property), Wheelhouse — adjusts rates daily based on demand. (4) Smart lock: Schlage Encode or similar ($200-$350). (5) Video doorbell: Ring ($100-$250). (6) Security camera exteriors (NOT interior — prohibited): additional Ring cameras."
+            },
+            {
+              heading: "Cleaning Team Management",
+              body: "Your most critical operational partner. Options: individual cleaner ($20-$35/hr, 3-5 hours per turnover, $60-$175 per clean), cleaning company ($100-$250 per turnover, includes linens laundry, more reliable), turnover specialist (STR-focused cleaners like Turno platform, $80-$200). Requirements: photo checklist completion, linen management, supply restocking, damage reporting. Build relationships with 2+ cleaners for backup coverage."
+            },
+            {
+              heading: "Messaging Automation and Templates",
+              body: "Automate 70-80% of guest communication with scheduled messages: booking confirmation, 7-day pre-arrival (house rules + confirmation), arrival day check-in (smart lock code + arrival instructions), mid-stay check-in (problem anticipation), departure day reminder (check-out time + cleaning responsibility), post-stay thank-you (review request). Hospitable, Host Tools, and similar platforms handle this. Manual messaging for unique situations only."
+            },
+            {
+              heading: "Pricing Strategy",
+              body: "Static pricing leaves 20-40% of revenue on the table. Dynamic pricing (PriceLabs/Wheelhouse) adjusts daily based on: day of week, seasonality, local events, competitor pricing, booking pace, historical occupancy. Set base rate, minimum rate (never go below this), maximum rate, orphan day discounts (single-night gaps), last-minute discounts. Review pricing rules monthly — markets change, your property's performance changes."
+            },
+            {
+              heading: "Review Management",
+              body: "4.9+ rating is critical for top-tier search ranking. 4.7 or below hurts bookings. Drive 5-star reviews: accurate listing photos, immaculate cleanliness, clear check-in instructions, responsive messaging (under 1 hour when possible), thoughtful touches (welcome note, local guide, snacks). Handle complaints proactively — guests who raise issues during stay give better final reviews than those who stew silently."
+            },
+            {
+              heading: "The Manual That Pays You Back",
+              body: "Create a digital guest guide (Touch Stay, StayFi, or PDF) covering: house rules, check-in/out procedures, WiFi password, appliance operation (washing machines, coffee makers, TVs — things that vary by property), trash/recycling procedures, parking details, local recommendations (restaurants, attractions, groceries, emergency contacts). Reduces guest questions by 70%, improves review scores, professionalizes the operation."
+            }
+          ]
+        },
+        "str-regulations-risk": {
+          title: "Regulations, Insurance, and Risk",
+          icon: <Shield size={14} />,
+          sections: [
+            {
+              heading: "The Regulatory Landscape",
+              body: "STR regulations have tightened dramatically since 2020. Common regulatory structures: (1) Outright bans in residential zones (NYC, Miami Beach residential areas). (2) Primary-residence-only requirements (Portland OR, Santa Monica). (3) Registration/permit systems with caps (Austin Type 2, Charleston). (4) Occupancy and minimum-night limits. (5) Neighborhood impact fees. (6) Lodging tax collection requirements. Before buying, call the local STR association or permitting office directly — online info is often outdated."
+            },
+            {
+              heading: "Specialty STR Insurance",
+              body: "Standard landlord insurance won't cover STR operations. You need a policy specifically for short-term rentals. Providers: Proper Insurance (specialty STR carrier), Safely, CBIZ, some regional brokers. Coverage includes: liability $1M-$3M, building coverage, contents coverage, lost income, guest injury. Annual cost: 1.5-3x landlord policy. Airbnb's AirCover and host guarantees don't replace your own policy — they fill gaps only."
+            },
+            {
+              heading: "Liability Exposure and Risk Mitigation",
+              body: "STR liability risk: guest injury (slip on wet bathroom floor, drowning in pool, fall from stairs), property damage by guests, damage to neighboring property, noise/nuisance complaints triggering fines, guest illness from property conditions. Mitigation: post safety signage, maintain all systems rigorously, install smoke/CO detectors and test monthly, require rental agreement (Airbnb/Vrbo don't include one by default), umbrella policy $1-$5M."
+            },
+            {
+              heading: "Local Occupancy and Lodging Taxes",
+              body: "Most jurisdictions require STR operators to collect and remit local taxes: state lodging tax, county tax, city tax. Airbnb and Vrbo collect and remit automatically in many markets, but not all — verify for your specific property. Non-compliance: back taxes + penalties + interest + potential operating ban. Register with state DOR and local tax authority before taking first booking."
+            },
+            {
+              heading: "HOA and Neighbor Relations",
+              body: "Even where STRs are legal, HOAs often restrict or ban them. Review HOA CCRs (covenants) carefully before buying — they may require minimum lease terms (30+ days disqualifies most STR operations). For non-HOA neighborhoods: proactive neighbor relationships reduce complaints. Introduce yourself, provide your phone number for issues, enforce party rules aggressively (200+ point review deductions aren't worth a rowdy guest's booking)."
+            },
+            {
+              heading: "Exit Planning for STRs",
+              body: "Regulatory risk is the biggest concern. If your city bans STRs mid-ownership, you have three options: convert to long-term rental (usually means revenue drops 50-70%), convert to mid-term rental (Furnished Finder, 30+ day stays), or sell the property. Before buying, run the numbers as if it might be forced LTR — if the LTR numbers are catastrophic, your downside is too severe regardless of current STR potential."
+            }
+          ]
+        }
+      }
+    },
+
+    construction: {
+      title: "New Construction",
+      icon: <Building2 size={16} />,
+      topics: {
+        "build-vs-buy": {
+          title: "Build-vs-Buy Economics",
+          icon: <Calculator size={14} />,
+          sections: [
+            {
+              heading: "When Building Makes Sense",
+              body: "New construction is attractive when: (1) existing housing stock in your target market is expensive or poor quality, (2) land is available at reasonable prices, (3) construction costs + land < retail price of comparable finished homes (positive 'build spread'), (4) you have builder relationships or development experience, (5) you want a specific configuration (STR layout, multifamily) that's rare in existing inventory. Building typically yields 15-25% profit margins when executed well — comparable to or better than flipping."
+            },
+            {
+              heading: "The Build Spread Calculation",
+              body: "Build Spread = Retail ARV − (Land Cost + Hard Construction + Soft Costs + Financing + Profit Margin). Example: ARV $450K, land $65K, hard construction $220K ($150/sqft × 1,467 sqft), soft costs (architect, permits, utilities hookup) $22K, financing costs $15K. Raw cost: $322K. Spread to ARV: $128K or 28%. Minus 10% target profit margin = $83K available for contingency and risk. Positive but thin — requires execution."
+            },
+            {
+              heading: "Construction Cost Ranges by Grade",
+              body: "Builder-grade (entry-level subdivisions): $130-$170/sqft. Mid-grade (typical suburban): $170-$230/sqft. Semi-custom (upgraded finishes, architect-designed): $230-$320/sqft. Custom (full architect, premium materials): $320-$500/sqft. Luxury: $500-$1,000+/sqft. These are national averages for 2024-2025 — high-cost metros (Bay Area, NYC, Boston) add 40-80%. Rural markets with local labor: often 15-30% below."
+            },
+            {
+              heading: "Land Cost as Percent of Total",
+              body: "Healthy build economics keep land at 20-30% of total finished value. Above 35% and margins get thin. Above 40% and the deal often doesn't work unless ARV is unusually strong. Example: $450K ARV property with $65K land = 14% ratio (very healthy). $450K with $160K land = 36% (stretched). Use this ratio as a quick screen before going deep on a land deal."
+            },
+            {
+              heading: "Build Time as a Cost",
+              body: "Typical single-family build: 7-12 months from groundbreaking to CO. Pre-construction (permits, plans, utility arrangements): 3-9 months. Total project timeline: 10-21 months from land purchase to finished home. Financing costs compound over this period — longer timeline, more interest. This is why experienced builders run 5-10 projects simultaneously: cost and timeline averages smooth out across a portfolio."
+            },
+            {
+              heading: "Risk Profile vs Flipping and BRRRR",
+              body: "New construction risks: entitlement/permitting delays (3-12 months added), construction cost overruns (10-25% typical), interest rate changes during long timeline, material price volatility, labor availability, weather delays, code compliance issues, market shifts during build. Rewards: higher margins than flips when executed well, differentiated product in the market, potential for repeat projects with same builder and plans. Higher complexity, not a starter strategy."
+            }
+          ]
+        },
+        "land-acquisition": {
+          title: "Land Acquisition and Due Diligence",
+          icon: <MapPin size={14} />,
+          sections: [
+            {
+              heading: "Types of Land",
+              body: "Infill lots: existing neighborhoods with vacant or teardown lots. Easiest because utilities exist, neighborhood sold comps available, zoning typically residential-by-right. Subdivision lots: pre-developed lots in new subdivisions, premium pricing but turnkey for construction. Raw land: unsubdivided, may require entitlement. Land with old structure: teardown situations, sometimes cheaper per lot than infill. For first-time builders, infill lots are strongly recommended."
+            },
+            {
+              heading: "Entitlement Status — What Can You Build?",
+              body: "Before buying land, verify: current zoning classification, permitted uses in that zoning, setbacks and height restrictions, lot coverage maximums (footprint as % of lot), parking requirements, minimum lot size for proposed use, overlay districts (historic, environmental, flood), variances required (avoid unless you know the local planning department will grant). One zoning miscalculation can kill a project — consult a land-use attorney or municipal planner before close."
+            },
+            {
+              heading: "Utility Availability",
+              body: "Critical: (1) Water — public water service at the lot line, or well-drilling viable? (2) Sewer — public sewer at lot line, or septic system feasible and permitted? (3) Electric — service at the lot? How far from pole? (4) Gas — natural gas available, or propane/electric heat required? (5) Telecom — fiber/cable/phone service. Utility extensions can cost $20K-$100K+ if far from infrastructure. Get written commitments from utility companies before close."
+            },
+            {
+              heading: "Soil and Site Conditions",
+              body: "Soil testing (percolation test for septic, soil bearing capacity for foundation): $500-$2,500. Required before septic design and foundation engineering. Poor soil can require: engineered foundation (+$15K-$40K), special drainage systems, excavation of problem soil (+$10K-$50K). Sloped lots require: retaining walls, regrading, specialty foundation work. Walk the site after heavy rain to see drainage patterns."
+            },
+            {
+              heading: "Title and Deed Restrictions",
+              body: "Standard title search plus: recorded subdivision covenants (may limit building style, size, materials), deed restrictions from prior owners, HOA rules if applicable, recorded easements (utility, drainage, access), adverse possession risks, boundary disputes. Buy title insurance. Read every recorded document in the title report. Subdivision covenants often include design review committees that approve house plans before building — factor into timeline."
+            },
+            {
+              heading: "Environmental Due Diligence",
+              body: "Environmental Phase I assessment ($1,500-$3,500): reviews historical uses, potential contamination, wetlands, endangered species. Required by most construction lenders for commercial projects, prudent for all builders. Red flags: former industrial or gas station sites, wetlands restrictions, protected species habitat, lead paint in any existing structures (requires EPA-certified demolition). Environmental issues can kill a project entirely or add $50K+ in remediation."
+            }
+          ]
+        },
+        "construction-loans": {
+          title: "Construction Loans and Financing",
+          icon: <DollarSign size={14} />,
+          sections: [
+            {
+              heading: "How Construction Loans Work",
+              body: "Construction loans fund in 'draws' tied to construction milestones rather than a lump sum at closing. Typical draw schedule (5-10 draws): foundation, framing, rough-in (plumbing/electric/HVAC), drywall, finishes, final. Lender inspects progress before each draw release. Interest accrues only on drawn amounts. Loan terms: 12-18 month duration, interest-only payments during construction, single-close or construction-to-permanent structures."
+            },
+            {
+              heading: "Construction-to-Permanent (C-to-P) Loans",
+              body: "Popular structure: one closing covers both construction and permanent mortgage. When CO is issued, loan converts automatically to a 30-year mortgage with pre-agreed terms. Advantages: single set of closing costs, rate locked at application (protection against rate increases during build), no second application. Typical terms: 20-25% down on total project cost, 7-9% rate in 2024-2025, 30-year amortization post-conversion."
+            },
+            {
+              heading: "Single-Close Construction Loans (Investor)",
+              body: "For investors who'll sell or refinance at completion rather than hold: 12-18 month interest-only construction loan, then either pay off with sale proceeds or refinance with a DSCR or conventional investment loan. Higher rates (9-12%) than C-to-P. Advantages: flexibility on exit, don't commit to terms for long hold before building. Typical lenders: regional banks, portfolio lenders, non-QM construction specialists."
+            },
+            {
+              heading: "Documentation Required",
+              body: "Construction loan packages are document-heavy. Required: architect-stamped plans, detailed construction budget itemized by trade, contractor's builder risk insurance, contractor's license and insurance, builder/owner contract, schedule of values showing cost allocations, preliminary title, soil report, survey, appraisal of subject (based on plans and specs), personal financial statement, last 2 years tax returns. Expect 45-75 day close timeline."
+            },
+            {
+              heading: "The 'Builder Risk' Appraisal",
+              body: "Construction lenders appraise based on proposed plans — the 'subject to completion' value. Appraiser reviews plans, specs, and comparable finished construction in the area. Low appraisal = reduced loan amount = more cash you bring. Appraiser packet matters: provide your 3-6 best comps of similar new construction in the same area, photos of prior projects if available, plans and specs clearly presented."
+            },
+            {
+              heading: "Contingency and Soft Cost Buffer",
+              body: "Build 10-15% contingency into your budget before financing — lenders will fund you based on total budget including contingency. Soft costs that can be financed: architect fees, engineering, permits, impact fees, utility hookups, builder risk insurance. Uncovered: legal fees, marketing, furnishings (for STR or spec). Plan your cash needs beyond the loan: $40K-$100K of personal cash typical for mid-size build."
+            }
+          ]
+        },
+        "builder-architect": {
+          title: "Builder, Architect, and Permitting",
+          icon: <Users size={14} />,
+          sections: [
+            {
+              heading: "Selecting a General Contractor",
+              body: "Interview 3-5 GCs before hiring. Verify: state license in good standing, liability insurance ($1M+), workers comp, references from 5+ past clients (call them), ideally visit 2-3 completed projects. Red flags: wants large upfront payment (standard is 10% at signing), can't provide detailed line-item budget, dismissive of change order process, has pending lawsuits or complaints. A $300K build with a bad GC becomes a $400K nightmare with a court case attached."
+            },
+            {
+              heading: "Fixed-Price vs Cost-Plus Contracts",
+              body: "Fixed-price: GC commits to a lump sum for specified work. Advantages: budget certainty for you. Disadvantages: GC pads for risk, change orders contentious. Cost-plus: you pay actual costs plus GC markup (typically 15-20%). Advantages: no pad, flexibility. Disadvantages: no cost ceiling, requires careful oversight. Hybrid: guaranteed maximum price (GMP) combines fixed cap with cost-plus flexibility. For first-time builders: fixed-price with clear scope and change order procedures."
+            },
+            {
+              heading: "Architect and Engineering Fees",
+              body: "Architect fees: 6-15% of construction cost (lower for simpler projects, higher for custom). Structural engineering: $2K-$8K for residential. Civil engineering (site plans): $3K-$10K. Mechanical/electrical/plumbing engineering: $2K-$6K. Survey: $500-$2K. Soils report: $500-$2,500. Total soft costs typically 8-15% of hard construction cost. Pre-purchase plans/stock plans reduce architect fees to $2K-$6K for customization."
+            },
+            {
+              heading: "Permitting Process",
+              body: "Typical residential permit timeline: 2-12 weeks depending on jurisdiction. Fast jurisdictions (small suburbs, unincorporated areas): 2-4 weeks. Slow jurisdictions (California cities, urban centers): 3-8 months for complex projects. Permit fees: 0.5-2% of construction cost. Impact fees (for schools, transportation, parks): $5K-$25K in growth areas. Plan reviewers request revisions — factor 2-3 rounds of revisions into timeline."
+            },
+            {
+              heading: "Change Orders",
+              body: "Mid-construction changes cost 2-5x what the same work would cost if planned originally. Reasons: time lost, rework required, GC markup on change orders (15-30%), materials ordering complications. Plan thoroughly upfront. When changes are needed (and they will be), document in writing via signed change order including cost, timeline impact, and scope specifics. Never verbal — verbal change orders become legal disputes."
+            },
+            {
+              heading: "Inspections and Certificate of Occupancy",
+              body: "Construction triggers multiple required inspections: foundation, framing, rough plumbing, rough electrical, rough HVAC, insulation, drywall, final plumbing, final electrical, final HVAC, final inspection. Each must pass before proceeding. Failed inspection = reinspection fees + timeline delay. Certificate of Occupancy (CO) issued after final inspection — property is now legally habitable. No CO = no move-in, no refinance, no sale."
+            }
+          ]
+        },
+        "build-process": {
+          title: "The Build Process Stage by Stage",
+          icon: <Hammer size={14} />,
+          sections: [
+            {
+              heading: "Pre-Construction (Months 1-6)",
+              body: "Activities: land purchase, architectural design, permit application, engineering (structural, civil, MEP), surveying, soil testing, construction loan closing, GC selection and contract. Deliverables: permits issued, construction drawings finalized, GC under contract, loan funded. This phase often takes longer than construction itself. Errors here (inadequate plans, skipped engineering) cause massive problems later."
+            },
+            {
+              heading: "Site Work and Foundation (Months 6-7)",
+              body: "Lot preparation: clearing, grading, excavation. Utility trenches installed. Foundation poured — slab, crawlspace, or basement depending on region and design. Waterproofing for basements. Drainage installed. This phase is weather-dependent (can't pour concrete in freezing or very wet conditions). Budget delays: 2-4 weeks weather typical. Post-foundation inspection before framing begins."
+            },
+            {
+              heading: "Framing and Exterior (Months 7-8)",
+              body: "Framed shell: floors, walls, roof. Roof sheathing and shingles/metal/tiles applied. Exterior sheathing and house wrap. Windows and doors installed. Siding begins. End of this phase: the house is 'dried in' — enclosed against weather. Framing inspection required before rough-in trades. First substantial visible progress milestone."
+            },
+            {
+              heading: "Rough-In Trades (Months 8-9)",
+              body: "Plumbing, electrical, HVAC, low-voltage (internet, cable, security) all installed inside the framed walls before drywall. Inspected at rough-in stage — crucial inspection because drywall hides everything afterward. Change orders during rough-in still manageable; changes after drywall are expensive. Walk the house with contractors during this phase to verify outlet locations, lighting plans, etc."
+            },
+            {
+              heading: "Drywall, Trim, Finishes (Months 9-11)",
+              body: "Insulation installed before drywall. Drywall hung, taped, mudded — longest finish sub-phase. Interior paint. Flooring installed. Trim and doors hung. Kitchen cabinets installed. Countertops templated, fabricated, installed (3-week lag typical for stone). Bathroom tile, vanities, fixtures. Appliances delivered and installed. This is the 'magical' phase where the raw shell becomes a finished home."
+            },
+            {
+              heading: "Punch List and CO (Month 11-12)",
+              body: "Final mechanical trims (outlet covers, switch plates, faucets, fixtures). Landscaping and grading finished. Driveway poured and cured. Final cleaning. Walkthrough with you — document punch list items. GC completes punch list items (typically 2-4 weeks). Final inspection. CO issued. Loan converts to permanent or property is ready for sale. Budget 4-8 weeks from 'substantially complete' to truly ready."
+            }
+          ]
+        },
+        "spec-vs-custom": {
+          title: "Spec Home vs Custom Build Economics",
+          icon: <TrendingUp size={14} />,
+          sections: [
+            {
+              heading: "The Two Models",
+              body: "Spec build: you build speculatively — no buyer identified — and sell to the retail market at completion. You own the risk and reward of market timing. Custom build: buyer commits upfront with contract, you build to their specifications, they take title at completion or close on the finished home. Spec = more risk and more potential reward; custom = less risk and thinner margins but faster capital turnover."
+            },
+            {
+              heading: "Spec Home Margins and Risk",
+              body: "Target spec margins: 18-25% net of all costs and financing. Example: $500K ARV, total cost $380K, profit $120K (24%). Risks: market downturn during build, inability to price correctly for actual demand, carrying costs extending post-completion, buyer preferences mismatch (wrong room configuration, finish level). Best markets for spec: appreciating, undersupplied, 15-30 day DOM on finished comparables."
+            },
+            {
+              heading: "Custom Build Margins and Structure",
+              body: "Target custom margins: 12-18% of construction cost (lower than spec, less risk). Buyer contracts typically include: deposit (5-10% of price), progress payments tied to construction milestones, final payment at CO. Protects you from build-and-can't-sell risk. Downside: buyer change orders can be contentious, buyer walkthroughs during build slow progress, buyer financing issues can kill mid-stream deals."
+            },
+            {
+              heading: "Design Decisions for Spec Homes",
+              body: "Build broadly appealing, not personally-preferred. Modern farmhouse exterior aesthetics outsell other styles in most US markets. Floor plan priorities: open concept kitchen/family, primary bedroom on main level (for multi-generational appeal), 3-4 bedrooms, 2.5-3 baths, mudroom or drop zone, laundry on main or near bedrooms, home office or flex room. Avoid: overly small closets, galley kitchens, split-level designs, wall-to-wall carpet in main living."
+            },
+            {
+              heading: "Pre-Selling During Build",
+              body: "Marketing spec homes during construction: stake sign 'Coming Soon,' professional rendering signage, drip marketing to your buyer list and agent network, list on MLS as 'under construction' once substantially enclosed. Pre-selling before CO: reduces carrying costs, locks in sale price before market can shift, eliminates staging cost. Offer small customization options (paint colors, light fixtures) to pre-sale buyers to increase conversion."
+            },
+            {
+              heading: "Scaling a Construction Business",
+              body: "Experienced builders run 3-10+ projects simultaneously. Keys: standardized plans (2-3 approved designs with customization options), repeating GC and sub-contractor teams, consistent lender relationships, bulk purchasing relationships (cabinets, flooring, appliances). Scale tends to reduce per-unit costs 5-15% and eliminate the learning curve. Most single-project builders who tried 'just one house' stop after one — the complexity and risk require either commitment to scaling or one-and-done acceptance."
+            }
+          ]
+        }
+      }
+    },
     analysis: {
       title: "Property Analysis",
       icon: <Calculator size={16} />,
@@ -5026,7 +5586,7 @@ const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal }) => {
           No Deals Yet
         </h2>
         <p style={{ fontSize: 14, color: THEME.textMuted, maxWidth: 420, margin: "0 auto 24px" }}>
-          Start analyzing your first BRRRR opportunity. Use the templates to jumpstart your analysis
+          Start analyzing your first investment opportunity. Use the templates to jumpstart your analysis
           or build a deal from scratch.
         </p>
         <button className="btn-primary" onClick={onNewDeal} style={{ padding: "12px 20px", fontSize: 14 }}>
@@ -5406,7 +5966,7 @@ export default function BRRRRTracker() {
             Market Intelligence
           </h1>
           <div style={{ fontSize: 13, color: THEME.textMuted, marginTop: 4 }}>
-            Research BRRRR-friendly markets across the US
+            Research investment markets across the US
           </div>
         </div>
         <AdvancedMarketIntel />
