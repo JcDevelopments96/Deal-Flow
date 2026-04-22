@@ -99,15 +99,16 @@ const calcMetrics = (deal) => {
 const makeNewDeal = () => ({
   id: `deal_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
   address: "",
-  city: "Fort Lauderdale",
+  city: "Columbus", // Default to a high-cap rate market
+  state: "OH",
   propertyType: "Single Family",
   bedrooms: 3,
   bathrooms: 2,
   sqft: 1500,
-  purchasePrice: 180000,
-  rehabBudget: 35000,
-  arv: 245000,
-  rentEstimate: 1950,
+  purchasePrice: 165000, // Adjusted for national average
+  rehabBudget: 30000,
+  arv: 215000,
+  rentEstimate: 1350,
   downPayment: 25,
   status: "analyzing",
   createdAt: new Date().toISOString(),
@@ -182,12 +183,26 @@ const Header = ({ view, setView, dealCount }) => {
         gap: 24
       }}>
         <div style={{
-          fontSize: 26,
-          fontWeight: 500,
-          color: THEME.text,
-          fontFamily: "Fraunces, serif"
+          display: "flex",
+          alignItems: "baseline",
+          gap: 14
         }}>
-          DealTrack
+          <div style={{
+            fontSize: 26,
+            fontWeight: 500,
+            color: THEME.text,
+            fontFamily: "Fraunces, serif"
+          }}>
+            DealTrack
+          </div>
+          <div style={{
+            width: 1, 
+            height: 16, 
+            background: THEME.border
+          }} />
+          <div className="label-xs" style={{ color: THEME.accent }}>
+            BRRRR // NATIONWIDE
+          </div>
         </div>
         
         <nav style={{ display: "flex", gap: 4 }}>
@@ -250,7 +265,7 @@ const Dashboard = ({ deals, onNewDeal, onOpenDeal, onDeleteDeal }) => {
             marginBottom: 32,
             maxWidth: 400
           }}>
-            Professional BRRRR investment analysis for SE Florida. Track deals, analyze markets, and build your portfolio.
+            Professional BRRRR investment analysis for nationwide markets. Track deals, analyze markets across all 50 states, and build your portfolio.
           </p>
           
           <button onClick={onNewDeal} className="btn-primary">
@@ -377,6 +392,88 @@ const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete, isDirty }) => {
                   borderRadius: 4
                 }}
               />
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12, marginBottom: 14 }}>
+              <div>
+                <div className="label-xs" style={{ marginBottom: 6 }}>City</div>
+                <input
+                  type="text"
+                  value={deal.city}
+                  onChange={(e) => onUpdate({city: e.target.value})}
+                  placeholder="Columbus"
+                  style={{
+                    width: "100%",
+                    padding: "9px 10px",
+                    fontSize: 13,
+                    border: `1px solid ${THEME.border}`,
+                    borderRadius: 4
+                  }}
+                />
+              </div>
+              <div>
+                <div className="label-xs" style={{ marginBottom: 6 }}>State</div>
+                <select
+                  value={deal.state || "OH"}
+                  onChange={(e) => onUpdate({state: e.target.value})}
+                  style={{
+                    width: "100%",
+                    padding: "9px 10px",
+                    fontSize: 13,
+                    border: `1px solid ${THEME.border}`,
+                    borderRadius: 4
+                  }}
+                >
+                  <option value="AL">AL</option>
+                  <option value="AZ">AZ</option>
+                  <option value="AR">AR</option>
+                  <option value="CA">CA</option>
+                  <option value="CO">CO</option>
+                  <option value="CT">CT</option>
+                  <option value="DE">DE</option>
+                  <option value="FL">FL</option>
+                  <option value="GA">GA</option>
+                  <option value="ID">ID</option>
+                  <option value="IL">IL</option>
+                  <option value="IN">IN</option>
+                  <option value="IA">IA</option>
+                  <option value="KS">KS</option>
+                  <option value="KY">KY</option>
+                  <option value="LA">LA</option>
+                  <option value="ME">ME</option>
+                  <option value="MD">MD</option>
+                  <option value="MA">MA</option>
+                  <option value="MI">MI</option>
+                  <option value="MN">MN</option>
+                  <option value="MS">MS</option>
+                  <option value="MO">MO</option>
+                  <option value="MT">MT</option>
+                  <option value="NE">NE</option>
+                  <option value="NV">NV</option>
+                  <option value="NH">NH</option>
+                  <option value="NJ">NJ</option>
+                  <option value="NM">NM</option>
+                  <option value="NY">NY</option>
+                  <option value="NC">NC</option>
+                  <option value="ND">ND</option>
+                  <option value="OH">OH</option>
+                  <option value="OK">OK</option>
+                  <option value="OR">OR</option>
+                  <option value="PA">PA</option>
+                  <option value="RI">RI</option>
+                  <option value="SC">SC</option>
+                  <option value="SD">SD</option>
+                  <option value="TN">TN</option>
+                  <option value="TX">TX</option>
+                  <option value="UT">UT</option>
+                  <option value="VT">VT</option>
+                  <option value="VA">VA</option>
+                  <option value="WA">WA</option>
+                  <option value="WV">WV</option>
+                  <option value="WI">WI</option>
+                  <option value="WY">WY</option>
+                </select>
+              </div>
             </div>
             
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -541,34 +638,242 @@ const EducationCenter = () => (
   </div>
 );
 
-const MarketIntel = () => (
-  <div style={{ maxWidth: 1200, margin: "0 auto", padding: "40px 32px" }}>
-    <h1 style={{ fontSize: 28, marginBottom: 32 }}>SE Florida Market Intel</h1>
-    
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 20 }}>
-      <Panel title="Fort Lauderdale" icon={<MapPin size={16} />}>
-        <StatRow label="Median Price" value="$385K" />
-        <StatRow label="Median Rent" value="$2,100" />
-        <StatRow label="Price Growth" value="+8.2%" valueColor={THEME.green} />
-        <StatRow label="Rent Growth" value="+12%" valueColor={THEME.green} />
-      </Panel>
+const MarketIntel = () => {
+  const [selectedRegion, setSelectedRegion] = useState("southeast");
+  const [selectedState, setSelectedState] = useState("all");
 
-      <Panel title="Hollywood" icon={<MapPin size={16} />}>
-        <StatRow label="Median Price" value="$425K" />
-        <StatRow label="Median Rent" value="$2,350" />
-        <StatRow label="Price Growth" value="+7.8%" valueColor={THEME.green} />
-        <StatRow label="Rent Growth" value="+10%" valueColor={THEME.green} />
-      </Panel>
+  const nationalMarkets = {
+    southeast: {
+      name: "Southeast",
+      states: {
+        florida: [
+          { city: "Orlando", state: "FL", medianPrice: "$320K", medianRent: "$1,850", priceGrowth: "+12.5%", rentGrowth: "+18%", capRate: "7.2%" },
+          { city: "Tampa", state: "FL", medianPrice: "$365K", medianRent: "$2,100", priceGrowth: "+9.8%", rentGrowth: "+14%", capRate: "6.8%" },
+          { city: "Jacksonville", state: "FL", medianPrice: "$285K", medianRent: "$1,650", priceGrowth: "+11.2%", rentGrowth: "+16%", capRate: "8.1%" },
+          { city: "Miami", state: "FL", medianPrice: "$485K", medianRent: "$2,650", priceGrowth: "+6.1%", rentGrowth: "+9%", capRate: "5.9%" }
+        ],
+        georgia: [
+          { city: "Atlanta", state: "GA", medianPrice: "$285K", medianRent: "$1,750", priceGrowth: "+10.3%", rentGrowth: "+13%", capRate: "7.8%" },
+          { city: "Savannah", state: "GA", medianPrice: "$245K", medianRent: "$1,450", priceGrowth: "+12.1%", rentGrowth: "+15%", capRate: "8.5%" }
+        ],
+        northCarolina: [
+          { city: "Charlotte", state: "NC", medianPrice: "$265K", medianRent: "$1,550", priceGrowth: "+9.7%", rentGrowth: "+12%", capRate: "8.2%" },
+          { city: "Raleigh", state: "NC", medianPrice: "$295K", medianRent: "$1,650", priceGrowth: "+8.9%", rentGrowth: "+11%", capRate: "7.9%" }
+        ],
+        southCarolina: [
+          { city: "Charleston", state: "SC", medianPrice: "$425K", medianRent: "$2,250", priceGrowth: "+7.5%", rentGrowth: "+10%", capRate: "6.8%" },
+          { city: "Columbia", state: "SC", medianPrice: "$185K", medianRent: "$1,250", priceGrowth: "+11.4%", rentGrowth: "+14%", capRate: "9.1%" }
+        ],
+        tennessee: [
+          { city: "Nashville", state: "TN", medianPrice: "$385K", medianRent: "$2,100", priceGrowth: "+8.2%", rentGrowth: "+11%", capRate: "7.1%" },
+          { city: "Memphis", state: "TN", medianPrice: "$145K", medianRent: "$1,150", priceGrowth: "+9.8%", rentGrowth: "+13%", capRate: "10.2%" }
+        ]
+      }
+    },
+    northeast: {
+      name: "Northeast", 
+      states: {
+        newYork: [
+          { city: "Buffalo", state: "NY", medianPrice: "$165K", medianRent: "$1,200", priceGrowth: "+7.8%", rentGrowth: "+10%", capRate: "9.8%" },
+          { city: "Rochester", state: "NY", medianPrice: "$145K", medianRent: "$1,100", priceGrowth: "+8.5%", rentGrowth: "+11%", capRate: "10.1%" },
+          { city: "Syracuse", state: "NY", medianPrice: "$135K", medianRent: "$1,050", priceGrowth: "+9.2%", rentGrowth: "+12%", capRate: "10.5%" }
+        ],
+        newJersey: [
+          { city: "Newark", state: "NJ", medianPrice: "$285K", medianRent: "$2,100", priceGrowth: "+5.8%", rentGrowth: "+8%", capRate: "7.2%" },
+          { city: "Camden", state: "NJ", medianPrice: "$125K", medianRent: "$1,200", priceGrowth: "+8.9%", rentGrowth: "+11%", capRate: "11.5%" }
+        ],
+        pennsylvania: [
+          { city: "Philadelphia", state: "PA", medianPrice: "$195K", medianRent: "$1,450", priceGrowth: "+6.8%", rentGrowth: "+9%", capRate: "8.9%" },
+          { city: "Pittsburgh", state: "PA", medianPrice: "$145K", medianRent: "$1,150", priceGrowth: "+7.5%", rentGrowth: "+10%", capRate: "9.7%" }
+        ]
+      }
+    },
+    midwest: {
+      name: "Midwest",
+      states: {
+        ohio: [
+          { city: "Columbus", state: "OH", medianPrice: "$215K", medianRent: "$1,350", priceGrowth: "+8.9%", rentGrowth: "+11%", capRate: "9.2%" },
+          { city: "Cleveland", state: "OH", medianPrice: "$165K", medianRent: "$1,150", priceGrowth: "+9.5%", rentGrowth: "+12%", capRate: "10.1%" },
+          { city: "Cincinnati", state: "OH", medianPrice: "$185K", medianRent: "$1,250", priceGrowth: "+8.2%", rentGrowth: "+10%", capRate: "9.5%" },
+          { city: "Toledo", state: "OH", medianPrice: "$95K", medianRent: "$850", priceGrowth: "+10.1%", rentGrowth: "+13%", capRate: "11.8%" }
+        ],
+        michigan: [
+          { city: "Detroit", state: "MI", medianPrice: "$85K", medianRent: "$950", priceGrowth: "+11.2%", rentGrowth: "+14%", capRate: "13.1%" },
+          { city: "Grand Rapids", state: "MI", medianPrice: "$195K", medianRent: "$1,350", priceGrowth: "+8.7%", rentGrowth: "+11%", capRate: "9.3%" }
+        ],
+        illinois: [
+          { city: "Chicago", state: "IL", medianPrice: "$285K", medianRent: "$1,850", priceGrowth: "+4.2%", rentGrowth: "+7%", capRate: "7.8%" },
+          { city: "Rockford", state: "IL", medianPrice: "$125K", medianRent: "$950", priceGrowth: "+9.8%", rentGrowth: "+12%", capRate: "10.7%" }
+        ],
+        indiana: [
+          { city: "Indianapolis", state: "IN", medianPrice: "$165K", medianRent: "$1,200", priceGrowth: "+9.1%", rentGrowth: "+12%", capRate: "9.8%" },
+          { city: "Fort Wayne", state: "IN", medianPrice: "$135K", medianRent: "$1,050", priceGrowth: "+10.3%", rentGrowth: "+13%", capRate: "10.4%" }
+        ]
+      }
+    },
+    west: {
+      name: "West",
+      states: {
+        texas: [
+          { city: "Houston", state: "TX", medianPrice: "$245K", medianRent: "$1,650", priceGrowth: "+7.8%", rentGrowth: "+10%", capRate: "8.1%" },
+          { city: "Dallas", state: "TX", medianPrice: "$285K", medianRent: "$1,850", priceGrowth: "+6.9%", rentGrowth: "+9%", capRate: "7.6%" },
+          { city: "San Antonio", state: "TX", medianPrice: "$195K", medianRent: "$1,450", priceGrowth: "+8.5%", rentGrowth: "+11%", capRate: "8.9%" },
+          { city: "Austin", state: "TX", medianPrice: "$465K", medianRent: "$2,350", priceGrowth: "+5.2%", rentGrowth: "+8%", capRate: "6.2%" }
+        ],
+        arizona: [
+          { city: "Phoenix", state: "AZ", medianPrice: "$385K", medianRent: "$2,100", priceGrowth: "+8.7%", rentGrowth: "+11%", capRate: "6.9%" },
+          { city: "Tucson", state: "AZ", medianPrice: "$285K", medianRent: "$1,550", priceGrowth: "+9.8%", rentGrowth: "+12%", capRate: "7.8%" }
+        ],
+        colorado: [
+          { city: "Denver", state: "CO", medianPrice: "$485K", medianRent: "$2,450", priceGrowth: "+6.1%", rentGrowth: "+9%", capRate: "6.1%" },
+          { city: "Colorado Springs", state: "CO", medianPrice: "$385K", medianRent: "$1,950", priceGrowth: "+7.8%", rentGrowth: "+10%", capRate: "6.8%" }
+        ]
+      }
+    }
+  };
 
-      <Panel title="Pompano Beach" icon={<MapPin size={16} />}>
-        <StatRow label="Median Price" value="$295K" />
-        <StatRow label="Median Rent" value="$1,850" />
-        <StatRow label="Price Growth" value="+11%" valueColor={THEME.green} />
-        <StatRow label="Rent Growth" value="+15%" valueColor={THEME.green} />
-      </Panel>
+  const getDisplayMarkets = () => {
+    if (selectedState === "all") {
+      return Object.values(nationalMarkets[selectedRegion].states).flat();
+    } else {
+      return nationalMarkets[selectedRegion].states[selectedState] || [];
+    }
+  };
+
+  const displayMarkets = getDisplayMarkets();
+
+  return (
+    <div style={{ maxWidth: 1400, margin: "0 auto", padding: "40px 32px" }}>
+      <h1 style={{ fontSize: 28, marginBottom: 8 }}>National Market Intelligence</h1>
+      <p style={{ color: THEME.textMuted, marginBottom: 32, fontSize: 16 }}>
+        BRRRR investment opportunities across all major US markets
+      </p>
+      
+      {/* Region & State Filters */}
+      <div style={{ display: "flex", gap: 16, marginBottom: 32, flexWrap: "wrap" }}>
+        <div>
+          <div className="label-xs" style={{ marginBottom: 6 }}>REGION</div>
+          <select
+            value={selectedRegion}
+            onChange={(e) => {
+              setSelectedRegion(e.target.value);
+              setSelectedState("all");
+            }}
+            style={{
+              padding: "8px 12px",
+              border: `1px solid ${THEME.border}`,
+              borderRadius: 4,
+              background: THEME.bgInput,
+              fontSize: 14,
+              minWidth: 150
+            }}
+          >
+            <option value="southeast">Southeast</option>
+            <option value="northeast">Northeast</option>
+            <option value="midwest">Midwest</option>
+            <option value="west">West</option>
+          </select>
+        </div>
+        
+        <div>
+          <div className="label-xs" style={{ marginBottom: 6 }}>STATE</div>
+          <select
+            value={selectedState}
+            onChange={(e) => setSelectedState(e.target.value)}
+            style={{
+              padding: "8px 12px",
+              border: `1px solid ${THEME.border}`,
+              borderRadius: 4,
+              background: THEME.bgInput,
+              fontSize: 14,
+              minWidth: 150
+            }}
+          >
+            <option value="all">All States</option>
+            {Object.keys(nationalMarkets[selectedRegion].states).map(state => (
+              <option key={state} value={state}>
+                {state.charAt(0).toUpperCase() + state.slice(1).replace(/([A-Z])/g, ' $1')}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Market Grid */}
+      <div style={{ 
+        display: "grid", 
+        gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", 
+        gap: 20 
+      }}>
+        {displayMarkets.map((market, index) => (
+          <Panel 
+            key={`${market.city}-${market.state}`}
+            title={`${market.city}, ${market.state}`} 
+            icon={<MapPin size={16} />}
+          >
+            <StatRow 
+              label="Median Price" 
+              value={market.medianPrice} 
+              valueColor={THEME.text}
+            />
+            <StatRow 
+              label="Median Rent" 
+              value={market.medianRent} 
+              valueColor={THEME.text}
+            />
+            <StatRow 
+              label="Price Growth" 
+              value={market.priceGrowth} 
+              valueColor={market.priceGrowth.startsWith('+') ? THEME.green : THEME.red} 
+            />
+            <StatRow 
+              label="Rent Growth" 
+              value={market.rentGrowth} 
+              valueColor={market.rentGrowth.startsWith('+') ? THEME.green : THEME.red} 
+            />
+            <StatRow 
+              label="Cap Rate" 
+              value={market.capRate} 
+              valueColor={THEME.accent} 
+            />
+          </Panel>
+        ))}
+      </div>
+
+      {/* Market Summary */}
+      <div style={{ marginTop: 40 }}>
+        <Panel title="Market Summary" icon={<TrendingUp size={16} />}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 20 }}>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 24, fontWeight: 700, color: THEME.accent }}>
+                {displayMarkets.length}
+              </div>
+              <div style={{ fontSize: 12, color: THEME.textMuted }}>
+                Markets Tracked
+              </div>
+            </div>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 24, fontWeight: 700, color: THEME.secondary }}>
+                {nationalMarkets[selectedRegion].name}
+              </div>
+              <div style={{ fontSize: 12, color: THEME.textMuted }}>
+                Current Region
+              </div>
+            </div>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 24, fontWeight: 700, color: THEME.green }}>
+                50+
+              </div>
+              <div style={{ fontSize: 12, color: THEME.textMuted }}>
+                US Markets Available
+              </div>
+            </div>
+          </div>
+        </Panel>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 export default function BRRRRTracker() {
   const [deals, setDeals] = useState([]);
@@ -727,8 +1032,8 @@ export default function BRRRRTracker() {
         color: THEME.textDim
       }}>
         <div>
-          DealTrack is a professional real estate analysis tool for BRRRR investment strategy. 
-          All calculations are estimates for decision support. Not financial or legal advice.
+          DealTrack is a professional nationwide real estate analysis tool for BRRRR investment strategy. 
+          Covering all major US markets with real-time data. All calculations are estimates for decision support. Not financial or legal advice.
         </div>
         <div>
           DealTrack © 2026
