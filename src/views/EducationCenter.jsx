@@ -10,6 +10,7 @@ import {
   Shield, Sparkles, TrendingDown, TrendingUp, Users, Wrench, RotateCcw
 } from "lucide-react";
 import { THEME } from "../theme.js";
+import { isMobile } from "../utils.js";
 import { Panel } from "../primitives.jsx";
 
 const RepeatIcon = RotateCcw;

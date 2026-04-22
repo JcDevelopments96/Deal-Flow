@@ -5,7 +5,7 @@ import React, { useState, useMemo } from "react";
 import { Hammer, Calendar } from "lucide-react";
 import { THEME } from "../theme.js";
 import { fmtUSD, isMobile } from "../utils.js";
-import { Panel } from "../primitives.jsx";
+import { StatRow, Panel } from "../primitives.jsx";
 
 export const RehabSection = ({ deal, onUpdate }) => {
   const [rehabDetails, setRehabDetails] = useState(deal.rehabDetails || {

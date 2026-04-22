@@ -4,7 +4,7 @@
 import React, { useState, useMemo } from "react";
 import { Target } from "lucide-react";
 import { THEME } from "../theme.js";
-import { fmtUSD } from "../utils.js";
+import { fmtUSD, isMobile } from "../utils.js";
 import { Panel } from "../primitives.jsx";
 
 export const ExitStrategyComparisons = ({ deal, metrics }) => {
