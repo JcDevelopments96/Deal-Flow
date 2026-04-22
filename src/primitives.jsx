@@ -37,6 +37,14 @@ export const NumberField = ({ label, value, onChange, placeholder, helper, prefi
     if (!Number.isFinite(n)) return 0;
     return isInteger ? Math.round(n) : n;
   };
+  // Coerce the displayed value too, so computed defaults like `purchasePrice * 1.1`
+  // don't leak floating-point junk (e.g. 198000.00000000003) into the input.
+  const displayValue = (() => {
+    if (value === "" || value === null || value === undefined) return value ?? "";
+    const n = Number(value);
+    if (!Number.isFinite(n)) return "";
+    return isInteger ? Math.round(n) : n;
+  })();
   return (
     <div style={{ marginBottom: 14 }}>
       <div className="label-xs" style={{ marginBottom: 6 }}>{label}</div>
@@ -57,7 +65,7 @@ export const NumberField = ({ label, value, onChange, placeholder, helper, prefi
         <input
           type="number"
           step={step}
-          value={value}
+          value={displayValue}
           onChange={(e) => onChange(parse(e.target.value))}
           placeholder={placeholder}
           style={{

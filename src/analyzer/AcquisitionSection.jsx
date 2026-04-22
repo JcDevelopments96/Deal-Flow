@@ -40,7 +40,7 @@ export const AcquisitionSection = ({ deal, onUpdate, metrics }) => {
           <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "repeat(3, 1fr)", gap: 16 }}>
             <NumberField
               label="List Price"
-              value={deal.listPrice || deal.purchasePrice * 1.1}
+              value={deal.listPrice || Math.round(deal.purchasePrice * 1.1)}
               onChange={(val) => onUpdate({ listPrice: val })}
               prefix="$"
               helper="Original asking price"
