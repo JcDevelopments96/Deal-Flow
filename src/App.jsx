@@ -1579,11 +1579,119 @@ const ExitStrategyComparisons = ({ deal, metrics }) => {
    ADVANCED MARKET INTEL WITH LOCATION PREFERENCES
    ============================================================================ */
 const AdvancedMarketIntel = () => {
-  const [selectedRegion, setSelectedRegion] = useState("midwest");
   const [selectedMetric, setSelectedMetric] = useState("capRate");
   const [investmentGoal, setInvestmentGoal] = useState("cashFlow");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedState, setSelectedState] = useState(""); // For state dropdown
+  const [showStateResults, setShowStateResults] = useState(false);
+  const [searchQuery, setSearchQuery] = useState(""); // For search functionality
   const [showSearchResults, setShowSearchResults] = useState(false);
+
+  // Get all unique states from market data
+  const availableStates = useMemo(() => {
+    const states = new Set();
+    Object.values(marketData).forEach(region => {
+      region.markets.forEach(market => {
+        states.add(market.state);
+      });
+    });
+    return Array.from(states).sort();
+  }, []);
+
+  // Search functionality
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    
+    const query = searchQuery.toLowerCase().trim();
+    
+    // Check if searching for just a state code (e.g., "FL", "OH", "TX")
+    const isStateSearch = query.length === 2 && query.match(/^[a-z]{2}$/);
+    
+    const results = allMarkets.filter(market => {
+      const cityMatch = market.city.toLowerCase().includes(query);
+      const stateMatch = market.state.toLowerCase().includes(query);
+      const fullMatch = `${market.city.toLowerCase()}, ${market.state.toLowerCase()}`.includes(query);
+      const reverseMatch = `${market.state.toLowerCase()} ${market.city.toLowerCase()}`.includes(query);
+      
+      // For state-only searches, show all cities in that state
+      if (isStateSearch) {
+        return market.state.toLowerCase() === query;
+      }
+      
+      return cityMatch || stateMatch || fullMatch || reverseMatch;
+    });
+    
+    // If state search, show all results, otherwise limit to 8
+    return isStateSearch ? results : results.slice(0, 8);
+  }, [searchQuery, allMarkets]);
+
+  // Check if current search is a state search
+  const isStateSearch = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
+    return query.length === 2 && query.match(/^[a-z]{2}$/) && searchResults.length > 0;
+  }, [searchQuery, searchResults]);
+
+  // Get state display name and count
+  const getStateInfo = (stateCode) => {
+    const stateNames = {
+      "FL": "Florida",
+      "OH": "Ohio", 
+      "TX": "Texas",
+      "NY": "New York",
+      "PA": "Pennsylvania",
+      "NJ": "New Jersey",
+      "GA": "Georgia",
+      "NC": "North Carolina",
+      "SC": "South Carolina", 
+      "TN": "Tennessee",
+      "MI": "Michigan",
+      "IN": "Indiana",
+      "IL": "Illinois",
+      "AZ": "Arizona",
+      "CO": "Colorado"
+    };
+    
+    const cityCount = allMarkets.filter(market => market.state === stateCode).length;
+    return {
+      name: stateNames[stateCode] || stateCode,
+      count: cityCount
+    };
+  };
+
+  // Get markets for selected state
+  const getStateMarkets = () => {
+    if (!selectedState) return [];
+    return allMarkets.filter(market => market.state === selectedState);
+  };
+
+  const handleStateChange = (state) => {
+    setSelectedState(state);
+    setShowStateResults(state !== "");
+    // Clear search when using state dropdown
+    if (state && searchQuery) {
+      setSearchQuery("");
+      setShowSearchResults(false);
+    }
+  };
+
+  const clearStateSelection = () => {
+    setSelectedState("");
+    setShowStateResults(false);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery("");
+    setShowSearchResults(false);
+  };
+
+  const handleSearchChange = (value) => {
+    setSearchQuery(value);
+    setShowSearchResults(value.trim().length > 0);
+    // Clear state selection when using search
+    if (value.trim() && selectedState) {
+      setSelectedState("");
+      setShowStateResults(false);
+    }
+  };
 
   const marketData = {
     northeast: {
@@ -1888,46 +1996,6 @@ const AdvancedMarketIntel = () => {
     return Object.values(marketData).flatMap(region => region.markets);
   }, []);
 
-  // Search functionality
-  const searchResults = useMemo(() => {
-    if (!searchQuery.trim()) return [];
-    
-    const query = searchQuery.toLowerCase().trim();
-    
-    // Check if searching for just a state code (e.g., "FL", "OH", "TX")
-    const isStateSearch = query.length === 2 && query.match(/^[a-z]{2}$/);
-    
-    const results = allMarkets.filter(market => {
-      const cityMatch = market.city.toLowerCase().includes(query);
-      const stateMatch = market.state.toLowerCase().includes(query);
-      const fullMatch = `${market.city.toLowerCase()}, ${market.state.toLowerCase()}`.includes(query);
-      const reverseMatch = `${market.state.toLowerCase()} ${market.city.toLowerCase()}`.includes(query);
-      
-      // For state-only searches, show all cities in that state
-      if (isStateSearch) {
-        return market.state.toLowerCase() === query;
-      }
-      
-      return cityMatch || stateMatch || fullMatch || reverseMatch;
-    });
-    
-    // If state search, show all results, otherwise limit to 8
-    return isStateSearch ? results : results.slice(0, 8);
-  }, [searchQuery, allMarkets]);
-
-  const getDisplayMarkets = () => {
-    if (showSearchResults && searchQuery.trim()) {
-      return searchResults;
-    }
-    return Object.values(marketData[selectedRegion].markets || []);
-  };
-
-  // Check if current search is a state search
-  const isStateSearch = useMemo(() => {
-    const query = searchQuery.toLowerCase().trim();
-    return query.length === 2 && query.match(/^[a-z]{2}$/) && searchResults.length > 0;
-  }, [searchQuery, searchResults]);
-
   const getTopMarkets = (metric, count = 5) => {
     return allMarkets.sort((a, b) => b[metric] - a[metric]).slice(0, count);
   };
@@ -1945,19 +2013,9 @@ const AdvancedMarketIntel = () => {
     }
   };
 
-  const displayMarkets = getDisplayMarkets();
+  const stateMarkets = getStateMarkets();
   const topMarkets = getTopMarkets(selectedMetric);
   const recommendedMarkets = getRecommendedMarkets(investmentGoal);
-
-  const clearSearch = () => {
-    setSearchQuery("");
-    setShowSearchResults(false);
-  };
-
-  const handleSearchChange = (value) => {
-    setSearchQuery(value);
-    setShowSearchResults(value.trim().length > 0);
-  };
 
   return (
     <div style={{ maxWidth: 1400, margin: "0 auto", padding: "40px 32px" }}>
@@ -1965,6 +2023,30 @@ const AdvancedMarketIntel = () => {
       <p style={{ color: THEME.textMuted, marginBottom: 32, fontSize: 16 }}>
         Complete market analysis for both long-term and short-term rental investments across all US markets
       </p>
+
+      {/* Market Recommendations */}
+      <div style={{ marginBottom: 32 }}>
+        <Panel title={`Recommended Markets - ${investmentGoal === 'cashFlow' ? 'Cash Flow Focus' : investmentGoal === 'appreciation' ? 'Growth Focus' : 'Balanced Strategy'}`} icon={<Star size={16} />} accent>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "repeat(3, 1fr)", gap: 16 }}>
+            {recommendedMarkets.map(market => (
+              <div key={`${market.city}-${market.state}`} style={{
+                padding: 16,
+                border: `1px solid ${THEME.border}`,
+                borderRadius: 8,
+                background: THEME.bg
+              }}>
+                <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
+                  {market.city}, {market.state}
+                </div>
+                <StatRow label="Median Price" value={fmtUSD(market.medianPrice)} />
+                <StatRow label="Cap Rate" value={`${market.capRate}%`} valueColor={market.capRate >= 9 ? THEME.green : THEME.text} />
+                <StatRow label="Rent Growth" value={`+${market.rentGrowth}%`} valueColor={market.rentGrowth >= 12 ? THEME.green : THEME.text} />
+                <StatRow label="DealTrack Score" value={`${market.score}/100`} valueColor={THEME.accent} bold />
+              </div>
+            ))}
+          </div>
+        </Panel>
+      </div>
 
       {/* Market Search */}
       <div style={{ marginBottom: 32 }}>
@@ -2121,191 +2203,113 @@ const AdvancedMarketIntel = () => {
         </Panel>
       </div>
 
-      {/* Investment Goal Selection */}
-      <div style={{ marginBottom: 32 }}>
-        <Panel title="Investment Strategy" icon={<Target size={16} />}>
-          <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "repeat(3, 1fr)", gap: 16 }}>
-            {[
-              { id: "cashFlow", name: "Cash Flow Focus", desc: "High cap rates, immediate income" },
-              { id: "appreciation", name: "Growth Markets", desc: "Strong rent growth, appreciation" },
-              { id: "balanced", name: "Balanced Approach", desc: "Combination of cash flow and growth" }
-            ].map(goal => (
-              <button
-                key={goal.id}
-                onClick={() => setInvestmentGoal(goal.id)}
-                style={{
-                  padding: 16,
-                  border: `2px solid ${investmentGoal === goal.id ? THEME.accent : THEME.border}`,
-                  borderRadius: 8,
-                  background: investmentGoal === goal.id ? THEME.bgRaised : THEME.bgPanel,
-                  textAlign: "left",
-                  cursor: "pointer"
-                }}
-              >
-                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{goal.name}</div>
-                <div style={{ fontSize: 12, color: THEME.textMuted }}>{goal.desc}</div>
-              </button>
-            ))}
-          </div>
-        </Panel>
-      </div>
-
-      {/* Market Recommendations */}
-      <div style={{ marginBottom: 32 }}>
-        <Panel title={`Recommended Markets - ${investmentGoal === 'cashFlow' ? 'Cash Flow Focus' : investmentGoal === 'appreciation' ? 'Growth Focus' : 'Balanced Strategy'}`} icon={<Star size={16} />} accent>
-          <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "repeat(3, 1fr)", gap: 16 }}>
-            {recommendedMarkets.map(market => (
-              <div key={`${market.city}-${market.state}`} style={{
-                padding: 16,
-                border: `1px solid ${THEME.border}`,
-                borderRadius: 8,
-                background: THEME.bg
-              }}>
-                <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
-                  {market.city}, {market.state}
-                </div>
-                <StatRow label="Median Price" value={fmtUSD(market.medianPrice)} />
-                <StatRow label="Cap Rate" value={`${market.capRate}%`} valueColor={market.capRate >= 9 ? THEME.green : THEME.text} />
-                <StatRow label="Rent Growth" value={`+${market.rentGrowth}%`} valueColor={market.rentGrowth >= 12 ? THEME.green : THEME.text} />
-                <StatRow label="DealTrack Score" value={`${market.score}/100`} valueColor={THEME.accent} bold />
-              </div>
-            ))}
-          </div>
-        </Panel>
-      </div>
-
-      {/* Regional Breakdown / Search Results */}
-      {!showSearchResults && (
-        <div style={{ marginBottom: 32 }}>
-          <div style={{ display: "flex", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
-            <div>
-              <div className="label-xs" style={{ marginBottom: 6 }}>REGION</div>
-              <select
-                value={selectedRegion}
-                onChange={(e) => setSelectedRegion(e.target.value)}
-                style={{
-                  padding: "8px 12px",
-                  border: `1px solid ${THEME.border}`,
-                  borderRadius: 4,
-                  background: THEME.bgInput,
-                  fontSize: 14,
-                  minWidth: 150
-                }}
-              >
-                {Object.entries(marketData).map(([key, region]) => (
-                  <option key={key} value={key}>{region.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <div className="label-xs" style={{ marginBottom: 6 }}>SORT BY</div>
-              <select
-                value={selectedMetric}
-                onChange={(e) => setSelectedMetric(e.target.value)}
-                style={{
-                  padding: "8px 12px",
-                  border: `1px solid ${THEME.border}`,
-                  borderRadius: 4,
-                  background: THEME.bgInput,
-                  fontSize: 14,
-                  minWidth: 150
-                }}
-              >
-                <option value="capRate">Cap Rate</option>
-                <option value="rentGrowth">Rent Growth</option>
-                <option value="score">DealTrack Score</option>
-                <option value="medianPrice">Median Price</option>
-              </select>
-            </div>
-          </div>
-
-          <Panel title={`${marketData[selectedRegion].name} Markets`} icon={<MapPin size={16} />}>
-            <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "repeat(auto-fit, minmax(320px, 1fr))", gap: 20 }}>
-              {marketData[selectedRegion].markets.map(market => (
-                <div key={`${market.city}-${market.state}`} style={{
-                  padding: 16,
-                  border: `1px solid ${THEME.border}`,
-                  borderRadius: 8,
-                  background: THEME.bgPanel
-                }}>
-                  <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>
-                    {market.city}, {market.state}
-                  </h3>
-                  
-                  {/* Long-Term Rental Stats */}
-                  <div style={{ marginBottom: 12 }}>
-                    <div className="label-xs" style={{ marginBottom: 8, color: THEME.blue }}>LONG-TERM RENTAL</div>
-                    <StatRow label="Median Price" value={fmtUSD(market.medianPrice)} />
-                    <StatRow label="Median Rent" value={fmtUSD(market.medianRent)} />
-                    <StatRow label="Cap Rate" value={`${market.capRate}%`} valueColor={market.capRate >= 9 ? THEME.green : THEME.text} />
-                    <StatRow label="Rent Growth" value={`+${market.rentGrowth}%`} valueColor={market.rentGrowth >= 12 ? THEME.green : THEME.text} />
-                  </div>
-
-                  {/* Short-Term Rental Stats */}
-                  <div style={{ marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${THEME.borderLight}` }}>
-                    <div className="label-xs" style={{ marginBottom: 8, color: THEME.secondary }}>SHORT-TERM RENTAL (AIRBNB)</div>
-                    <StatRow label="Avg Nightly Rate" value={`$${market.airbnb.nightly}`} valueColor={THEME.secondary} />
-                    <StatRow label="Occupancy Rate" value={`${market.airbnb.occupancy}%`} valueColor={market.airbnb.occupancy >= 70 ? THEME.green : THEME.text} />
-                    <StatRow label="Monthly Revenue" value={fmtUSD(market.airbnb.monthlyRevenue)} valueColor={THEME.secondary} bold />
-                    <StatRow 
-                      label="Competition Level" 
-                      value={market.airbnb.competition} 
-                      valueColor={
-                        market.airbnb.competition === "Low" ? THEME.green :
-                        market.airbnb.competition === "Medium" ? THEME.orange :
-                        market.airbnb.competition === "High" ? THEME.red :
-                        THEME.purple
-                      }
-                    />
-                  </div>
-
-                  {/* Rental Restrictions */}
-                  <div style={{ marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${THEME.borderLight}` }}>
-                    <div className="label-xs" style={{ marginBottom: 8, color: THEME.purple }}>RENTAL REGULATIONS</div>
-                    <StatRow 
-                      label="STR Status" 
-                      value={market.restrictions.str} 
-                      valueColor={
-                        market.restrictions.str === "Allowed" ? THEME.green :
-                        market.restrictions.str === "Restricted" ? THEME.orange :
-                        THEME.red
-                      }
-                      bold
-                    />
-                    <StatRow label="Minimum Stay" value={market.restrictions.minStay} />
-                    <StatRow 
-                      label="License Required" 
-                      value={market.restrictions.license} 
-                      valueColor={
-                        market.restrictions.license === "Optional" ? THEME.green :
-                        market.restrictions.license === "Required" ? THEME.orange :
-                        THEME.red
-                      }
-                    />
-                    <div style={{ fontSize: 11, color: THEME.textMuted, marginTop: 8, fontStyle: "italic" }}>
-                      {market.restrictions.notes}
-                    </div>
-                  </div>
-
-                  {/* Comparison & Score */}
-                  <div style={{ paddingTop: 12, borderTop: `1px solid ${THEME.borderLight}` }}>
-                    <StatRow 
-                      label="STR vs LTR Revenue" 
-                      value={`${((market.airbnb.monthlyRevenue / market.medianRent) * 100).toFixed(0)}%`}
-                      valueColor={market.airbnb.monthlyRevenue > market.medianRent * 1.5 ? THEME.green : 
-                                 market.airbnb.monthlyRevenue > market.medianRent ? THEME.orange : THEME.red}
-                      bold
-                    />
-                    <StatRow label="Inventory (Months)" value={market.inventory} />
-                    <StatRow label="DealTrack Score" value={`${market.score}/100`} valueColor={THEME.accent} bold />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Panel>
+      {/* OR Divider */}
+      <div style={{ marginBottom: 32, textAlign: "center" }}>
+        <div style={{ 
+          display: "flex", 
+          alignItems: "center", 
+          justifyContent: "center",
+          gap: 16
+        }}>
+          <div style={{ 
+            height: 1, 
+            background: THEME.border,
+            flex: 1,
+            maxWidth: 100
+          }}></div>
+          <span style={{ 
+            color: THEME.textMuted, 
+            fontSize: 14,
+            background: THEME.bgPanel,
+            padding: "8px 16px",
+            borderRadius: 20,
+            border: `1px solid ${THEME.border}`
+          }}>
+            OR
+          </span>
+          <div style={{ 
+            height: 1, 
+            background: THEME.border,
+            flex: 1,
+            maxWidth: 100
+          }}></div>
         </div>
-      )}
+      </div>
+
+      {/* State Selection Dropdown */}
+      <div style={{ marginBottom: 32 }}>
+        <Panel title="Browse Markets by State" icon={<MapPin size={16} />}>
+          <div style={{ marginBottom: 16 }}>
+            <div className="label-xs" style={{ marginBottom: 8 }}>SELECT STATE</div>
+            <select
+              value={selectedState}
+              onChange={(e) => handleStateChange(e.target.value)}
+              style={{
+                width: "100%",
+                maxWidth: 400,
+                padding: "12px 16px",
+                fontSize: 16,
+                border: `2px solid ${selectedState ? THEME.accent : THEME.border}`,
+                borderRadius: 8,
+                background: THEME.bgInput,
+                cursor: "pointer",
+                transition: "all 0.2s ease"
+              }}
+            >
+              <option value="">Choose a state to explore markets...</option>
+              {availableStates.map(state => {
+                const stateInfo = getStateInfo(state);
+                return (
+                  <option key={state} value={state}>
+                    {stateInfo.name} ({stateInfo.count} cities)
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+          
+          {/* Quick State Suggestions */}
+          <div>
+            <div className="label-xs" style={{ marginBottom: 8 }}>POPULAR STATES</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {["FL", "OH", "TX", "NY", "MI", "TN"].map(state => {
+                const stateInfo = getStateInfo(state);
+                return (
+                  <button
+                    key={state}
+                    onClick={() => handleStateChange(state)}
+                    style={{
+                      padding: "8px 16px",
+                      fontSize: 14,
+                      background: selectedState === state ? THEME.accent : THEME.bgRaised,
+                      border: `1px solid ${selectedState === state ? THEME.accent : THEME.border}`,
+                      borderRadius: 20,
+                      color: selectedState === state ? "white" : THEME.text,
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                      fontWeight: selectedState === state ? 600 : 400
+                    }}
+                    onMouseEnter={(e) => {
+                      if (selectedState !== state) {
+                        e.target.style.background = THEME.accentDim;
+                        e.target.style.color = "white";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (selectedState !== state) {
+                        e.target.style.background = THEME.bgRaised;
+                        e.target.style.color = THEME.text;
+                      }
+                    }}
+                  >
+                    {stateInfo.name} ({stateInfo.count})
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </Panel>
+      </div>
 
       {/* Search Results Section */}
       {showSearchResults && searchQuery && (
@@ -2420,6 +2424,129 @@ const AdvancedMarketIntel = () => {
                 </button>
               </div>
             )}
+          </Panel>
+        </div>
+      )}
+
+      {/* State Results Section */}
+      {showStateResults && selectedState && (
+        <div style={{ marginBottom: 32 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+            <div>
+              <h2 style={{ fontSize: 24, margin: 0, marginBottom: 4 }}>
+                {getStateInfo(selectedState).name} Markets
+              </h2>
+              <p style={{ color: THEME.textMuted, margin: 0 }}>
+                {stateMarkets.length} cities • Complete LTR + STR data with rental restrictions
+              </p>
+            </div>
+            <button
+              onClick={clearStateSelection}
+              style={{
+                padding: "8px 16px",
+                background: THEME.bgRaised,
+                border: `1px solid ${THEME.border}`,
+                borderRadius: 6,
+                color: THEME.text,
+                cursor: "pointer",
+                fontSize: 14,
+                display: "flex",
+                alignItems: "center",
+                gap: 6
+              }}
+            >
+              <X size={14} />
+              Clear State
+            </button>
+          </div>
+
+          <Panel 
+            title={`${getStateInfo(selectedState).name} Investment Markets`} 
+            icon={<MapPin size={16} />}
+            accent
+          >
+            <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "repeat(auto-fit, minmax(320px, 1fr))", gap: 20 }}>
+              {stateMarkets.map(market => (
+                <div key={`${market.city}-${market.state}`} style={{
+                  padding: 16,
+                  border: `2px solid ${THEME.accent}40`,
+                  borderRadius: 8,
+                  background: THEME.bgRaised
+                }}>
+                  <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12, color: THEME.accent }}>
+                    {market.city}, {market.state}
+                  </h3>
+                  
+                  {/* Long-Term Rental Stats */}
+                  <div style={{ marginBottom: 12 }}>
+                    <div className="label-xs" style={{ marginBottom: 8, color: THEME.blue }}>LONG-TERM RENTAL</div>
+                    <StatRow label="Median Price" value={fmtUSD(market.medianPrice)} />
+                    <StatRow label="Median Rent" value={fmtUSD(market.medianRent)} />
+                    <StatRow label="Cap Rate" value={`${market.capRate}%`} valueColor={market.capRate >= 9 ? THEME.green : THEME.text} bold />
+                    <StatRow label="Rent Growth" value={`+${market.rentGrowth}%`} valueColor={market.rentGrowth >= 12 ? THEME.green : THEME.text} bold />
+                  </div>
+
+                  {/* Short-Term Rental Stats */}
+                  <div style={{ marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${THEME.borderLight}` }}>
+                    <div className="label-xs" style={{ marginBottom: 8, color: THEME.secondary }}>SHORT-TERM RENTAL (AIRBNB)</div>
+                    <StatRow label="Avg Nightly Rate" value={`$${market.airbnb.nightly}`} valueColor={THEME.secondary} bold />
+                    <StatRow label="Occupancy Rate" value={`${market.airbnb.occupancy}%`} valueColor={market.airbnb.occupancy >= 70 ? THEME.green : THEME.text} bold />
+                    <StatRow label="Monthly Revenue" value={fmtUSD(market.airbnb.monthlyRevenue)} valueColor={THEME.secondary} bold />
+                    <StatRow 
+                      label="Competition Level" 
+                      value={market.airbnb.competition} 
+                      valueColor={
+                        market.airbnb.competition === "Low" ? THEME.green :
+                        market.airbnb.competition === "Medium" ? THEME.orange :
+                        market.airbnb.competition === "High" ? THEME.red :
+                        THEME.purple
+                      }
+                    />
+                  </div>
+
+                  {/* Rental Restrictions */}
+                  <div style={{ marginBottom: 12, paddingTop: 12, borderTop: `1px solid ${THEME.borderLight}` }}>
+                    <div className="label-xs" style={{ marginBottom: 8, color: THEME.purple }}>RENTAL REGULATIONS</div>
+                    <StatRow 
+                      label="STR Status" 
+                      value={market.restrictions.str} 
+                      valueColor={
+                        market.restrictions.str === "Allowed" ? THEME.green :
+                        market.restrictions.str === "Restricted" ? THEME.orange :
+                        THEME.red
+                      }
+                      bold
+                    />
+                    <StatRow label="Minimum Stay" value={market.restrictions.minStay} />
+                    <StatRow 
+                      label="License Required" 
+                      value={market.restrictions.license} 
+                      valueColor={
+                        market.restrictions.license === "Optional" ? THEME.green :
+                        market.restrictions.license === "Required" ? THEME.orange :
+                        THEME.red
+                      }
+                    />
+                    <div style={{ fontSize: 11, color: THEME.textMuted, marginTop: 8, fontStyle: "italic" }}>
+                      {market.restrictions.notes}
+                    </div>
+                  </div>
+
+                  {/* Comparison & Score */}
+                  <div style={{ paddingTop: 12, borderTop: `1px solid ${THEME.borderLight}` }}>
+                    <StatRow 
+                      label="STR vs LTR Revenue" 
+                      value={`${((market.airbnb.monthlyRevenue / market.medianRent) * 100).toFixed(0)}%`}
+                      valueColor={market.airbnb.monthlyRevenue > market.medianRent * 1.5 ? THEME.green : 
+                                 market.airbnb.monthlyRevenue > market.medianRent ? THEME.orange : THEME.red}
+                      bold
+                    />
+                    <StatRow label="Inventory (Months)" value={market.inventory} />
+                    <StatRow label="DealTrack Score" value={`${market.score}/100`} valueColor={THEME.accent} bold />
+                  </div>
+                </div>
+              ))}
+            </div>
           </Panel>
         </div>
       )}
