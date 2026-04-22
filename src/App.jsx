@@ -10,7 +10,8 @@ import {
   Mail, MapPin as Location, Calendar as CalendarIcon, Eye, Settings,
   ChevronDown, ChevronUp, MoreHorizontal, Layout, Smartphone, Tablet,
   MonitorSpeaker, Wifi, WifiOff, Timer, Gauge, Layers, Hammer, 
-  PiggyBank, RepeatIcon, TrendingUpIcon, HomeIcon, ToolIcon
+  PiggyBank, RotateCcw as RepeatIcon, TrendingUp as TrendingUpIcon, 
+  Home as HomeIcon, Tool as ToolIcon, Trophy
 } from "lucide-react";
 
 // Advanced features imports
@@ -2193,7 +2194,448 @@ const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete, isDirty }) => {
   );
 };
 
-// ... [I need to continue with the rest of the components - Dashboard, Portfolio, Education, etc.]
+/* ============================================================================
+   COMPREHENSIVE EDUCATION CENTER
+   ============================================================================ */
+const EducationCenter = () => {
+  const [selectedTopic, setSelectedTopic] = useState("brrrr-basics");
+
+  const educationContent = {
+    "brrrr-basics": {
+      title: "BRRRR Strategy Fundamentals",
+      icon: <BookOpen size={20} />,
+      sections: [
+        {
+          title: "What is BRRRR?",
+          content: "BRRRR stands for Buy, Rehab, Rent, Refinance, Repeat. It's a real estate investment strategy that allows investors to recycle their capital and rapidly scale their portfolio while building long-term wealth through cash flow and appreciation."
+        },
+        {
+          title: "The 5 Steps Explained",
+          content: "**Buy** distressed properties below market value. **Rehab** to increase value and rent potential. **Rent** to generate monthly cash flow. **Refinance** to pull out invested capital. **Repeat** the process to scale your portfolio."
+        },
+        {
+          title: "Key Benefits",
+          content: "Capital recycling allows unlimited scaling. Forced appreciation through rehab. Monthly cash flow from rentals. Long-term appreciation. Tax advantages through depreciation."
+        }
+      ]
+    },
+    "70-percent-rule": {
+      title: "The 70% Rule",
+      icon: <Calculator size={20} />,
+      sections: [
+        {
+          title: "Formula & Application",
+          content: "Purchase Price + Rehab Budget ≤ 70% × After Repair Value (ARV). This ensures you have enough equity after renovation to refinance and recover most of your invested capital."
+        },
+        {
+          title: "Why 70%?",
+          content: "The 70% threshold accounts for: Refinance LTV limits (75-80%), closing costs, holding costs, market fluctuations, and profit margin. It's a conservative approach that protects your investment."
+        },
+        {
+          title: "Example Calculation",
+          content: "ARV: $200,000 → Maximum All-in Cost: $140,000. If Purchase = $110,000 and Rehab = $25,000, Total = $135,000. Since $135,000 < $140,000, this passes the 70% rule."
+        }
+      ]
+    },
+    "1-percent-rule": {
+      title: "The 1% Rule",
+      icon: <Percent size={20} />,
+      sections: [
+        {
+          title: "Quick Cash Flow Screen",
+          content: "Monthly rent should equal at least 1% of purchase price. A $150,000 property should rent for $1,500/month. This is a quick screening tool for positive cash flow potential."
+        },
+        {
+          title: "Market Variations",
+          content: "The 1% rule is harder to achieve in expensive markets but common in affordable areas. In high-appreciation markets, investors may accept 0.7-0.8% for appreciation potential."
+        },
+        {
+          title: "Beyond the 1% Rule",
+          content: "Use the 1% rule as an initial filter, then analyze actual expenses: taxes, insurance, vacancy, management, maintenance, and capital expenditures for accurate cash flow projections."
+        }
+      ]
+    },
+    "financing-strategies": {
+      title: "Financing Strategies",
+      icon: <PiggyBank size={20} />,
+      sections: [
+        {
+          title: "Hard Money Loans",
+          content: "Short-term (6-12 months) asset-based loans for acquisition and rehab. Typically 10-15% interest, 20-25% down. Fast approval but expensive - plan your exit strategy."
+        },
+        {
+          title: "Conventional Investment Loans",
+          content: "Traditional bank loans for rental properties. 25% down minimum, 30-year amortization, 7-9% rates. Requires good credit and income verification."
+        },
+        {
+          title: "Portfolio Lenders",
+          content: "Local banks that keep loans in-house. More flexible terms, can often do rehab loans. Build relationships for better rates and terms on multiple properties."
+        }
+      ]
+    },
+    "market-analysis": {
+      title: "Market Analysis",
+      icon: <TrendingUp size={20} />,
+      sections: [
+        {
+          title: "Identifying Good Markets",
+          content: "Look for: Population and job growth, diverse economy, reasonable price-to-rent ratios, landlord-friendly laws, and growing rental demand from young professionals or families."
+        },
+        {
+          title: "Neighborhood Research",
+          content: "Study: Crime rates, school ratings, proximity to employment centers, public transportation, future development plans, and comparable rental rates."
+        },
+        {
+          title: "Economic Indicators",
+          content: "Monitor: Unemployment rates, median income growth, new construction permits, business openings, and infrastructure investments as leading indicators of market strength."
+        }
+      ]
+    },
+    "risk-management": {
+      title: "Risk Management",
+      icon: <Shield size={20} />,
+      sections: [
+        {
+          title: "Common BRRRR Risks",
+          content: "Rehab cost overruns, longer renovation timelines, lower-than-expected ARV, difficulty finding tenants, and market downturns affecting refinance values."
+        },
+        {
+          title: "Mitigation Strategies",
+          content: "Build 15-20% contingency into budgets, get multiple contractor bids, order appraisals early, maintain 6 months reserves, and diversify across multiple markets."
+        },
+        {
+          title: "Exit Strategies",
+          content: "Always have a Plan B: wholesale assignment, live-in for house hacking, long-term rental without refinance, or sale if market conditions change."
+        }
+      ]
+    }
+  };
+
+  const topics = [
+    { id: "brrrr-basics", label: "BRRRR Basics", icon: <BookOpen size={16} /> },
+    { id: "70-percent-rule", label: "70% Rule", icon: <Calculator size={16} /> },
+    { id: "1-percent-rule", label: "1% Rule", icon: <Percent size={16} /> },
+    { id: "financing-strategies", label: "Financing", icon: <PiggyBank size={16} /> },
+    { id: "market-analysis", label: "Market Analysis", icon: <TrendingUp size={16} /> },
+    { id: "risk-management", label: "Risk Management", icon: <Shield size={16} /> }
+  ];
+
+  const currentContent = educationContent[selectedTopic];
+
+  return (
+    <div style={{ maxWidth: 1200, margin: "0 auto", padding: "40px 32px" }}>
+      <h1 style={{ fontSize: 28, marginBottom: 8 }}>BRRRR Education Center</h1>
+      <p style={{ color: THEME.textMuted, marginBottom: 32, fontSize: 16 }}>
+        Master the BRRRR strategy with comprehensive guides and real-world insights
+      </p>
+
+      <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "300px 1fr", gap: 32 }}>
+        {/* Topic Navigation */}
+        <div>
+          <h3 style={{ fontSize: 16, marginBottom: 16, color: THEME.text }}>Topics</h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {topics.map(topic => (
+              <button
+                key={topic.id}
+                onClick={() => setSelectedTopic(topic.id)}
+                style={{
+                  padding: "12px 16px",
+                  border: `2px solid ${selectedTopic === topic.id ? THEME.accent : THEME.border}`,
+                  borderRadius: 8,
+                  background: selectedTopic === topic.id ? THEME.bgRaised : THEME.bgPanel,
+                  color: selectedTopic === topic.id ? THEME.accent : THEME.text,
+                  fontSize: 14,
+                  fontWeight: selectedTopic === topic.id ? 600 : 400,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  cursor: "pointer",
+                  textAlign: "left",
+                  transition: "all 0.2s ease"
+                }}
+              >
+                {topic.icon} {topic.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Quick Reference Card */}
+          <div style={{ 
+            marginTop: 24, 
+            padding: 16, 
+            background: THEME.bgRaised, 
+            borderRadius: 8,
+            border: `1px solid ${THEME.border}`
+          }}>
+            <h4 style={{ fontSize: 14, marginBottom: 12, color: THEME.accent }}>
+              Quick Reference
+            </h4>
+            <div style={{ fontSize: 12, color: THEME.textMuted, lineHeight: 1.6 }}>
+              <div style={{ marginBottom: 8 }}>
+                <strong>70% Rule:</strong> Buy + Rehab ≤ 70% × ARV
+              </div>
+              <div style={{ marginBottom: 8 }}>
+                <strong>1% Rule:</strong> Rent ≥ 1% × Purchase Price
+              </div>
+              <div style={{ marginBottom: 8 }}>
+                <strong>Cash-on-Cash:</strong> Annual Cash Flow ÷ Cash Invested
+              </div>
+              <div>
+                <strong>Cap Rate:</strong> Annual NOI ÷ Purchase Price
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Content Area */}
+        <div>
+          <div style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            gap: 12, 
+            marginBottom: 24,
+            padding: "16px 0",
+            borderBottom: `2px solid ${THEME.border}`
+          }}>
+            {currentContent.icon}
+            <h2 style={{ fontSize: 24, margin: 0, color: THEME.text }}>
+              {currentContent.title}
+            </h2>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+            {currentContent.sections.map((section, index) => (
+              <div key={index} style={{
+                padding: 20,
+                background: THEME.bgPanel,
+                borderRadius: 8,
+                border: `1px solid ${THEME.border}`
+              }}>
+                <h3 style={{ 
+                  fontSize: 18, 
+                  marginBottom: 12, 
+                  color: THEME.accent,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8
+                }}>
+                  <span style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: "50%",
+                    background: THEME.accent,
+                    color: "white",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 12,
+                    fontWeight: 700
+                  }}>
+                    {index + 1}
+                  </span>
+                  {section.title}
+                </h3>
+                <div style={{ 
+                  fontSize: 14, 
+                  lineHeight: 1.6, 
+                  color: THEME.text,
+                  whiteSpace: "pre-line"
+                }}>
+                  {section.content.split('**').map((part, i) => 
+                    i % 2 === 0 ? part : <strong key={i} style={{ color: THEME.accent }}>{part}</strong>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Action Cards */}
+          <div style={{ 
+            marginTop: 32,
+            display: "grid", 
+            gridTemplateColumns: isMobile() ? "1fr" : "repeat(3, 1fr)", 
+            gap: 16 
+          }}>
+            <div style={{
+              padding: 16,
+              background: THEME.bgRaised,
+              borderRadius: 8,
+              border: `1px solid ${THEME.accent}40`,
+              textAlign: "center"
+            }}>
+              <Calculator size={24} style={{ color: THEME.accent, marginBottom: 8 }} />
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
+                Try the Analyzer
+              </div>
+              <div style={{ fontSize: 12, color: THEME.textMuted }}>
+                Run the numbers on your first BRRRR deal
+              </div>
+            </div>
+
+            <div style={{
+              padding: 16,
+              background: THEME.bgRaised,
+              borderRadius: 8,
+              border: `1px solid ${THEME.secondary}40`,
+              textAlign: "center"
+            }}>
+              <MapPin size={24} style={{ color: THEME.secondary, marginBottom: 8 }} />
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
+                Explore Markets
+              </div>
+              <div style={{ fontSize: 12, color: THEME.textMuted }}>
+                Find profitable markets nationwide
+              </div>
+            </div>
+
+            <div style={{
+              padding: 16,
+              background: THEME.bgRaised,
+              borderRadius: 8,
+              border: `1px solid ${THEME.green}40`,
+              textAlign: "center"
+            }}>
+              <Target size={24} style={{ color: THEME.green, marginBottom: 8 }} />
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
+                Set Goals
+              </div>
+              <div style={{ fontSize: 12, color: THEME.textMuted }}>
+                Plan your portfolio growth strategy
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ============================================================================
+   SIMPLE DASHBOARD (PLACEHOLDER)
+   ============================================================================ */
+const Dashboard = ({ deals, onNewDeal, onOpenDeal, onDeleteDeal }) => {
+  if (!deals.length) {
+    return (
+      <div style={{
+        maxWidth: 1400,
+        margin: "0 auto",
+        padding: "80px 32px",
+        textAlign: "center"
+      }}>
+        <div style={{
+          display: "inline-block",
+          padding: "48px 56px",
+          border: `2px solid ${THEME.border}`,
+          borderRadius: 8,
+          background: THEME.bgPanel
+        }}>
+          <Building2 size={64} style={{ color: THEME.accent, marginBottom: 24 }} />
+          <h2 style={{
+            fontSize: 32,
+            fontWeight: 400,
+            marginBottom: 16,
+            color: THEME.text,
+            fontFamily: "Fraunces, serif"
+          }}>
+            Welcome to DealTrack
+          </h2>
+          <p style={{
+            fontSize: 16,
+            color: THEME.textMuted,
+            marginBottom: 32,
+            maxWidth: 400
+          }}>
+            Professional BRRRR investment analysis for nationwide markets. Track deals, analyze markets across all 50 states, and build your portfolio.
+          </p>
+          
+          <MobileOptimizedButton onClick={onNewDeal} variant="primary">
+            <Plus size={16} /> Add First Deal
+          </MobileOptimizedButton>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ maxWidth: 1400, margin: "0 auto", padding: "40px 32px" }}>
+      <div style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 32
+      }}>
+        <h1 style={{ fontSize: 28, fontWeight: 600, margin: 0 }}>Your Deals</h1>
+        <MobileOptimizedButton onClick={onNewDeal} variant="primary">
+          <Plus size={16} /> New Deal
+        </MobileOptimizedButton>
+      </div>
+
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+        gap: 20
+      }}>
+        {deals.map(deal => {
+          const metrics = calcMetrics(deal);
+          return (
+            <div
+              key={deal.id}
+              onClick={() => onOpenDeal(deal.id)}
+              style={{
+                background: THEME.bgPanel,
+                border: `1px solid ${THEME.border}`,
+                borderRadius: 8,
+                padding: 20,
+                cursor: "pointer",
+                transition: "all 0.2s ease"
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+                <h3 style={{ margin: 0, fontSize: 16 }}>{deal.address || "New Deal"}</h3>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteDeal(deal.id);
+                  }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: THEME.red,
+                    cursor: "pointer",
+                    padding: 4
+                  }}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+              
+              <div style={{ fontSize: 13, color: THEME.textMuted, marginBottom: 16 }}>
+                {deal.city}, {deal.state} • {deal.propertyType}
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <StatRow label="Purchase" value={fmtUSD(deal.purchasePrice)} />
+                <StatRow label="ARV" value={fmtUSD(deal.arv)} />
+                <StatRow 
+                  label="Cash Flow" 
+                  value={`${fmtUSD(Math.round(metrics.monthlyCashFlow))}/mo`}
+                  valueColor={metrics.monthlyCashFlow > 0 ? THEME.green : THEME.red}
+                />
+                <StatRow 
+                  label="Score" 
+                  value={`${metrics.score}/100`}
+                  valueColor={THEME.accent}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// ... [Continue with the rest of the components]
 
 export default function BRRRRTracker() {
   const [deals, setDeals] = useState([]);
@@ -2343,13 +2785,47 @@ export default function BRRRRTracker() {
         />
       )}
 
+      {view === "dashboard" && (
+        <Dashboard
+          deals={deals}
+          onNewDeal={onNewDeal}
+          onOpenDeal={onOpenDeal}
+          onDeleteDeal={onDeleteDeal}
+        />
+      )}
+
       {view === "market" && <AdvancedMarketIntel />}
+      
+      {view === "education" && <EducationCenter />}
 
       {/* Simplified placeholder views for other sections */}
-      {view === "dashboard" && (
-        <div style={{ padding: 40, textAlign: "center" }}>
-          <h2>Dashboard - Implementation continues...</h2>
-          <MobileOptimizedButton onClick={onNewDeal}>Add New Deal</MobileOptimizedButton>
+      {view === "portfolio" && (
+        <div style={{ padding: 40, textAlign: "center", maxWidth: 1200, margin: "0 auto" }}>
+          <h2 style={{ fontSize: 28, marginBottom: 16 }}>Portfolio Analytics</h2>
+          <p style={{ color: THEME.textMuted, marginBottom: 32 }}>
+            Comprehensive portfolio tracking and analytics - Coming soon!
+          </p>
+          <MobileOptimizedButton onClick={onNewDeal} variant="primary">
+            Add New Deal to Portfolio
+          </MobileOptimizedButton>
+        </div>
+      )}
+
+      {view === "sourcing" && (
+        <div style={{ padding: 40, textAlign: "center", maxWidth: 1200, margin: "0 auto" }}>
+          <h2 style={{ fontSize: 28, marginBottom: 16 }}>Deal Sourcing</h2>
+          <p style={{ color: THEME.textMuted, marginBottom: 32 }}>
+            Automated deal sourcing and lead generation - Coming soon!
+          </p>
+        </div>
+      )}
+
+      {view === "competition" && (
+        <div style={{ padding: 40, textAlign: "center", maxWidth: 1200, margin: "0 auto" }}>
+          <h2 style={{ fontSize: 28, marginBottom: 16 }}>Competition Analysis</h2>
+          <p style={{ color: THEME.textMuted, marginBottom: 32 }}>
+            Track local investors and market competition - Coming soon!
+          </p>
         </div>
       )}
 
