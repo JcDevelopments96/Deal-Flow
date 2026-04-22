@@ -1707,7 +1707,7 @@ const Dashboard = ({ deals, onNewDeal, onOpenDeal, onDeleteDeal, onDuplicateDeal
   );
 };
           background: THEME.bgPanel, border: `1px solid ${THEME.border}`,
-          maxWidth: 560
+          maxWidth: 560,
         }}>
           <Sparkles size={36} color={THEME.accent} style={{ marginBottom: 20 }} />
           <div className="serif" style={{ fontSize: 34, marginBottom: 12, fontWeight: 400 }}>
