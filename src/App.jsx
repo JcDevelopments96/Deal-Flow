@@ -2420,6 +2420,28 @@ const PROVIDERS = {
   }
 };
 
+// A small curated set of royalty-free Unsplash house photos (direct CDN URLs — no API key needed).
+// Used as deterministic placeholders in demo mode so each card has a visually-distinct image.
+const DEMO_HOUSE_IMAGES = [
+  "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=600&h=400&fit=crop", // suburban house
+  "https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=600&h=400&fit=crop", // modern craftsman
+  "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=600&h=400&fit=crop", // white bungalow
+  "https://images.unsplash.com/photo-1583608205776-bfd35f0d9f83?w=600&h=400&fit=crop", // colonial
+  "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=600&h=400&fit=crop", // modern two-story
+  "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&h=400&fit=crop", // mid-century
+  "https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=600&h=400&fit=crop", // ranch
+  "https://images.unsplash.com/photo-1605146769289-440113cc3d00?w=600&h=400&fit=crop"  // brick cottage
+];
+
+const DEMO_RENTAL_IMAGES = [
+  "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=600&h=400&fit=crop", // duplex
+  "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=600&h=400&fit=crop", // apartment living room
+  "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=600&h=400&fit=crop", // interior
+  "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=600&h=400&fit=crop", // condo
+  "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600&h=400&fit=crop", // kitchen
+  "https://images.unsplash.com/photo-1484154218962-a197022b5858?w=600&h=400&fit=crop"  // townhome
+];
+
 const buildDemoListings = (state, city, marketRef) => {
   if (!marketRef) return [];
   const base = marketRef.medianPrice || 275000;
@@ -2444,6 +2466,7 @@ const buildDemoListings = (state, city, marketRef) => {
       pricePerSqft: Math.round(price / sqft),
       daysOnMarket: 7 + i * 9,
       status: "Active",
+      imageUrl: DEMO_HOUSE_IMAGES[i % DEMO_HOUSE_IMAGES.length],
       demo: true
     };
   });
@@ -2472,9 +2495,26 @@ const buildDemoComps = (state, city, marketRef) => {
       pricePerSqft: +(rent / sqft).toFixed(2),
       daysOnMarket: 5 + i * 7,
       status: "Active",
+      imageUrl: DEMO_RENTAL_IMAGES[i % DEMO_RENTAL_IMAGES.length],
       demo: true
     };
   });
+};
+
+// Pick the first usable photo URL from a variety of shapes the RentCast responses use.
+const extractRentCastImage = (raw) => {
+  if (!raw) return null;
+  if (Array.isArray(raw.photos) && raw.photos.length > 0) {
+    const first = raw.photos[0];
+    if (typeof first === "string") return first;
+    if (first && typeof first === "object") return first.url || first.href || first.src || null;
+  }
+  if (Array.isArray(raw.images) && raw.images.length > 0) {
+    const first = raw.images[0];
+    if (typeof first === "string") return first;
+    if (first && typeof first === "object") return first.url || first.href || first.src || null;
+  }
+  return raw.primaryPhoto || raw.photoUrl || raw.imageUrl || null;
 };
 
 const formatRentCastListing = (raw) => ({
@@ -2494,30 +2534,66 @@ const formatRentCastListing = (raw) => ({
   daysOnMarket: raw.daysOnMarket,
   status: raw.status || "Active",
   latitude: raw.latitude,
-  longitude: raw.longitude
+  longitude: raw.longitude,
+  imageUrl: extractRentCastImage(raw)
 });
 
-const ListingCard = ({ listing, type = "sale", onUseInDeal }) => {
-  const isRental = type === "rental";
+const ListingImage = ({ url, demo }) => {
+  const [errored, setErrored] = useState(false);
+  const showImage = url && !errored;
   return (
     <div style={{
-      padding: 14,
-      border: `1px solid ${THEME.border}`,
-      borderRadius: 8,
-      background: THEME.bg,
-      position: "relative"
+      position: "relative",
+      width: "100%",
+      aspectRatio: "16 / 10",
+      borderRadius: 6,
+      overflow: "hidden",
+      background: showImage ? THEME.bgPanel : `linear-gradient(135deg, ${THEME.bgTeal}, ${THEME.bgRaised})`,
+      marginBottom: 10,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center"
     }}>
-      {listing.demo && (
+      {showImage ? (
+        <img
+          src={url}
+          alt=""
+          onError={() => setErrored(true)}
+          loading="lazy"
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+        />
+      ) : (
+        <Building2 size={32} color={THEME.textDim} />
+      )}
+      {demo && (
         <div style={{
           position: "absolute", top: 8, right: 8,
           padding: "2px 7px", fontSize: 9, fontWeight: 700,
-          background: THEME.bgOrange, color: THEME.orange,
+          background: "rgba(15, 23, 42, 0.72)", color: "#fff",
           borderRadius: 4, letterSpacing: "0.06em", textTransform: "uppercase"
         }}>
           Demo
         </div>
       )}
-      <div style={{ fontSize: 13, fontWeight: 700, color: THEME.text, marginBottom: 4, paddingRight: 48 }}>
+    </div>
+  );
+};
+
+const ListingCard = ({ listing, type = "sale", onUseInDeal }) => {
+  const isRental = type === "rental";
+  return (
+    <div style={{
+      padding: 12,
+      border: `1px solid ${THEME.border}`,
+      borderRadius: 8,
+      background: THEME.bg,
+      position: "relative",
+      display: "flex",
+      flexDirection: "column"
+    }}>
+      <ListingImage url={listing.imageUrl} demo={listing.demo} />
+
+      <div style={{ fontSize: 13, fontWeight: 700, color: THEME.text, marginBottom: 4 }}>
         {listing.formattedAddress}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
@@ -2556,6 +2632,19 @@ const ListingCard = ({ listing, type = "sale", onUseInDeal }) => {
         <span>{listing.propertyType || "—"}</span>
         {listing.yearBuilt && <span>Built {listing.yearBuilt}</span>}
       </div>
+      {listing.externalUrl && (
+        <a
+          href={listing.externalUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            marginTop: 8, fontSize: 11, color: THEME.accent,
+            textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4
+          }}
+        >
+          <ExternalLink size={11} /> View full listing
+        </a>
+      )}
       {onUseInDeal && !isRental && (
         <button
           onClick={() => onUseInDeal(listing)}
@@ -2575,6 +2664,10 @@ const formatZillowListing = (raw) => {
   const address = raw.address && typeof raw.address === "object"
     ? `${raw.address.streetAddress || ""}, ${raw.address.city || ""}, ${raw.address.state || ""}`.trim()
     : (raw.address || raw.streetAddress || "");
+  const image = raw.imgSrc
+    || (Array.isArray(raw.carouselPhotos) && raw.carouselPhotos[0] && (raw.carouselPhotos[0].url || raw.carouselPhotos[0]))
+    || raw.hiResImageLink
+    || null;
   return {
     id: raw.zpid || raw.id || `${address}`,
     formattedAddress: address,
@@ -2593,7 +2686,10 @@ const formatZillowListing = (raw) => {
     status: raw.listingStatus || "Active",
     latitude: raw.latitude,
     longitude: raw.longitude,
-    externalUrl: raw.detailUrl ? `https://www.zillow.com${raw.detailUrl}` : null
+    imageUrl: image,
+    externalUrl: raw.detailUrl
+      ? (raw.detailUrl.startsWith("http") ? raw.detailUrl : `https://www.zillow.com${raw.detailUrl}`)
+      : null
   };
 };
 
@@ -2610,7 +2706,26 @@ const loadProviderPrefs = () => {
   }
 };
 
-const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarkets }) => {
+// Parse "any" | "3" | "5+" | "1.5" into { min, max }.
+const parseFilterRange = (raw) => {
+  if (!raw || raw === "any") return { min: null, max: null };
+  if (typeof raw === "string" && raw.endsWith("+")) {
+    const n = parseFloat(raw.slice(0, -1));
+    return { min: n, max: null };
+  }
+  const n = parseFloat(raw);
+  return Number.isFinite(n) ? { min: n, max: n } : { min: null, max: null };
+};
+
+const matchesRange = (value, range) => {
+  if (range.min === null && range.max === null) return true;
+  if (value === null || value === undefined || Number.isNaN(value)) return false;
+  if (range.min !== null && value < range.min) return false;
+  if (range.max !== null && value > range.max) return false;
+  return true;
+};
+
+const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarkets, bedsFilter = "any", bathsFilter = "any" }) => {
   const initial = useMemo(loadProviderPrefs, []);
   const [provider, setProvider] = useState(initial.provider);
   const [keys, setKeys] = useState(initial.keys);
@@ -2637,12 +2752,22 @@ const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarket
 
   const targetCity = selectedCity || (referenceMarket && referenceMarket.city);
 
+  const bedsRange = useMemo(() => parseFilterRange(bedsFilter), [bedsFilter]);
+  const bathsRange = useMemo(() => parseFilterRange(bathsFilter), [bathsFilter]);
+
   const fetchRentCast = async () => {
     const params = new URLSearchParams({
       city: targetCity,
       state: selectedState,
-      limit: "10"
+      limit: "20"
     });
+    // RentCast supports `bedrooms` / `bathrooms` for exact match — only set when user picked a specific count.
+    if (bedsRange.min !== null && bedsRange.min === bedsRange.max) {
+      params.set("bedrooms", String(bedsRange.min));
+    }
+    if (bathsRange.min !== null && bathsRange.min === bathsRange.max) {
+      params.set("bathrooms", String(bathsRange.min));
+    }
     const [saleRes, rentRes] = await Promise.all([
       fetch(`https://api.rentcast.io/v1/listings/sale?${params.toString()}`, {
         headers: { "X-Api-Key": apiKey, "accept": "application/json" }
@@ -2664,16 +2789,26 @@ const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarket
 
   const fetchZillow = async () => {
     const location = `${targetCity}, ${selectedState}`;
-    const forSaleUrl = `https://zillow-com1.p.rapidapi.com/propertyExtendedSearch?location=${encodeURIComponent(location)}&home_type=Houses&status_type=ForSale`;
-    const forRentUrl = `https://zillow-com1.p.rapidapi.com/propertyExtendedSearch?location=${encodeURIComponent(location)}&home_type=Houses&status_type=ForRent`;
+    const buildUrl = (status) => {
+      const qs = new URLSearchParams({
+        location,
+        home_type: "Houses",
+        status_type: status
+      });
+      if (bedsRange.min !== null) qs.set("bedsMin", String(bedsRange.min));
+      if (bedsRange.max !== null) qs.set("bedsMax", String(bedsRange.max));
+      if (bathsRange.min !== null) qs.set("bathsMin", String(bathsRange.min));
+      if (bathsRange.max !== null) qs.set("bathsMax", String(bathsRange.max));
+      return `https://zillow-com1.p.rapidapi.com/propertyExtendedSearch?${qs.toString()}`;
+    };
     const headers = {
       "X-RapidAPI-Key": apiKey,
       "X-RapidAPI-Host": "zillow-com1.p.rapidapi.com",
       "accept": "application/json"
     };
     const [saleRes, rentRes] = await Promise.all([
-      fetch(forSaleUrl, { headers }),
-      fetch(forRentUrl, { headers })
+      fetch(buildUrl("ForSale"), { headers }),
+      fetch(buildUrl("ForRent"), { headers })
     ]);
     if (!saleRes.ok) throw new Error(`Zillow request failed (${saleRes.status}). Check your RapidAPI key and subscription.`);
     const saleJson = await saleRes.json();
@@ -2721,9 +2856,20 @@ const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarket
     } finally {
       setLoading(false);
     }
-  }, [apiKey, provider, selectedState, targetCity, referenceMarket, activeProvider.name]);
+  }, [apiKey, provider, selectedState, targetCity, referenceMarket, activeProvider.name, bedsFilter, bathsFilter]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Client-side filter pass — catches demo results and any upstream results that don't
+  // honor the query params. Rental "bedrooms" are not always accurate, so we soft-filter there.
+  const filteredListings = useMemo(
+    () => listings.filter(l => matchesRange(l.bedrooms, bedsRange) && matchesRange(l.bathrooms, bathsRange)),
+    [listings, bedsRange, bathsRange]
+  );
+  const filteredComps = useMemo(
+    () => rentComps.filter(l => matchesRange(l.bedrooms, bedsRange) && matchesRange(l.bathrooms, bathsRange)),
+    [rentComps, bedsRange, bathsRange]
+  );
 
   const saveKey = (providerId, val) => {
     const trimmed = (val || "").trim();
@@ -2911,17 +3057,35 @@ const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarket
 
       {!loading && (
         <>
+          {(bedsFilter !== "any" || bathsFilter !== "any") && (
+            <div style={{
+              fontSize: 11, marginBottom: 12, color: THEME.textMuted,
+              padding: "6px 10px", background: THEME.bgRaised, borderRadius: 4,
+              display: "inline-flex", alignItems: "center", gap: 8
+            }}>
+              <Filter size={11} />
+              Filters:
+              {bedsFilter !== "any" && <span><strong>{bedsFilter} bed{bedsFilter === "1" ? "" : "s"}</strong></span>}
+              {bathsFilter !== "any" && <span><strong>{bathsFilter} bath{bathsFilter === "1" ? "" : "s"}</strong></span>}
+              <span style={{ color: THEME.textDim }}>
+                ({filteredListings.length} for sale · {filteredComps.length} rentals)
+              </span>
+            </div>
+          )}
+
           <div style={{
             fontSize: 12, fontWeight: 700, color: THEME.accent,
             textTransform: "uppercase", letterSpacing: "0.1em",
             marginBottom: 10, display: "flex", alignItems: "center", gap: 8
           }}>
             <Building2 size={13} />
-            Properties For Sale ({listings.length})
+            Properties For Sale ({filteredListings.length})
           </div>
-          {listings.length === 0 ? (
+          {filteredListings.length === 0 ? (
             <div style={{ padding: 20, textAlign: "center", color: THEME.textMuted, fontSize: 12 }}>
-              No active listings found for this area.
+              {listings.length > 0
+                ? "No listings match the current bed/bath filters — try widening them."
+                : "No active listings found for this area."}
             </div>
           ) : (
             <div style={{
@@ -2929,7 +3093,7 @@ const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarket
               gridTemplateColumns: isMobile() ? "1fr" : "repeat(auto-fill, minmax(260px, 1fr))",
               gap: 10, marginBottom: 24
             }}>
-              {listings.map(l => <ListingCard key={l.id} listing={l} type="sale" />)}
+              {filteredListings.map(l => <ListingCard key={l.id} listing={l} type="sale" />)}
             </div>
           )}
 
@@ -2939,11 +3103,13 @@ const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarket
             marginBottom: 10, display: "flex", alignItems: "center", gap: 8
           }}>
             <Home size={13} />
-            Rental Comparables ({rentComps.length})
+            Rental Comparables ({filteredComps.length})
           </div>
-          {rentComps.length === 0 ? (
+          {filteredComps.length === 0 ? (
             <div style={{ padding: 20, textAlign: "center", color: THEME.textMuted, fontSize: 12 }}>
-              No rental comparables found for this area.
+              {rentComps.length > 0
+                ? "No rental comps match the current bed/bath filters — try widening them."
+                : "No rental comparables found for this area."}
             </div>
           ) : (
             <div style={{
@@ -2951,7 +3117,7 @@ const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarket
               gridTemplateColumns: isMobile() ? "1fr" : "repeat(auto-fill, minmax(260px, 1fr))",
               gap: 10
             }}>
-              {rentComps.map(l => <ListingCard key={l.id} listing={l} type="rental" />)}
+              {filteredComps.map(l => <ListingCard key={l.id} listing={l} type="rental" />)}
             </div>
           )}
         </>
@@ -2967,6 +3133,10 @@ const AdvancedMarketIntel = () => {
   const [showStateResults, setShowStateResults] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
+
+  // Bed / bath filters applied to Live Listings + Comparables
+  const [bedsFilter, setBedsFilter] = useState("any");   // "any" | "1" | "2" | "3" | "4" | "5+"
+  const [bathsFilter, setBathsFilter] = useState("any"); // "any" | "1" | "1.5" | "2" | "3" | "4+"
 
   const marketData = {
     northeast: {
@@ -4205,6 +4375,74 @@ const AdvancedMarketIntel = () => {
             ))}
           </div>
         </div>
+
+        {/* Bed / Bath filters — applied to Live Listings & Comparables below */}
+        <div style={{
+          marginTop: 16,
+          padding: 12,
+          background: THEME.bg,
+          border: `1px solid ${THEME.border}`,
+          borderRadius: 6,
+          display: "grid",
+          gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr",
+          gap: 14
+        }}>
+          <div>
+            <div className="label-xs" style={{ marginBottom: 6, display: "inline-flex", alignItems: "center" }}>
+              Bedrooms
+              <CalcTooltip
+                size={12}
+                title="Bedrooms Filter"
+                description="Filters listings by bedroom count. '5+' means five or more."
+              />
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {["any", "1", "2", "3", "4", "5+"].map(opt => (
+                <button
+                  key={opt}
+                  onClick={() => setBedsFilter(opt)}
+                  style={{
+                    padding: "5px 12px", fontSize: 12, fontWeight: 600,
+                    background: bedsFilter === opt ? THEME.accent : THEME.bg,
+                    color: bedsFilter === opt ? "#fff" : THEME.textMuted,
+                    border: `1px solid ${bedsFilter === opt ? THEME.accent : THEME.border}`,
+                    borderRadius: 14, cursor: "pointer", minWidth: 44
+                  }}
+                >
+                  {opt === "any" ? "Any" : opt}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="label-xs" style={{ marginBottom: 6, display: "inline-flex", alignItems: "center" }}>
+              Bathrooms
+              <CalcTooltip
+                size={12}
+                title="Bathrooms Filter"
+                description="Filters listings by bathroom count. '4+' means four or more."
+              />
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {["any", "1", "1.5", "2", "3", "4+"].map(opt => (
+                <button
+                  key={opt}
+                  onClick={() => setBathsFilter(opt)}
+                  style={{
+                    padding: "5px 12px", fontSize: 12, fontWeight: 600,
+                    background: bathsFilter === opt ? THEME.teal : THEME.bg,
+                    color: bathsFilter === opt ? "#fff" : THEME.textMuted,
+                    border: `1px solid ${bathsFilter === opt ? THEME.teal : THEME.border}`,
+                    borderRadius: 14, cursor: "pointer", minWidth: 44
+                  }}
+                >
+                  {opt === "any" ? "Any" : opt}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       </Panel>
 
       {/* 2. MAP — below the filter */}
@@ -4227,6 +4465,8 @@ const AdvancedMarketIntel = () => {
           selectedCity={liveListingsCity}
           stateName={stateInfo ? stateInfo.name : null}
           stateMarkets={liveListingsStateMarkets}
+          bedsFilter={bedsFilter}
+          bathsFilter={bathsFilter}
         />
       )}
 
