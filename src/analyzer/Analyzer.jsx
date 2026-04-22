@@ -81,7 +81,7 @@ export const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete, onPdfError,
               ))}
             </select>
           </label>
-          <button className="btn-secondary" onClick={handleExportPDF}>
+          <button className="btn-accent-orange" onClick={handleExportPDF}>
             <FileDown size={14} />
             Export PDF
           </button>

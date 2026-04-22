@@ -10,8 +10,8 @@
      green / red     — positive / negative semantics (cash flow, delete)
    ============================================================================ */
 
-const NAVY = "#1E3A8A";      // Navy-900 — primary
-const NAVY_DIM = "#1E40AF";  // Navy-800 — hover
+const NAVY = "#172554";      // Blue-950 — deep primary (darker)
+const NAVY_DIM = "#1E3A8A";  // Blue-900 — hover (one shade lighter)
 const TEAL = "#0D9488";      // Teal-600 — secondary emphasis
 const TEAL_DIM = "#0F766E";  // Teal-700 — teal hover
 const ORANGE = "#EA580C";    // Orange-600 — tertiary highlight
@@ -79,7 +79,7 @@ input, select, textarea {
 }
 input::placeholder, textarea::placeholder { color: ${THEME.textDim}; }
 input:focus, select:focus, textarea:focus {
-  border-color: ${THEME.accent}; box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.15);
+  border-color: ${THEME.accent}; box-shadow: 0 0 0 3px rgba(23, 37, 84, 0.18);
 }
 input[type="checkbox"] { accent-color: ${THEME.accent}; }
 input[type="range"] { accent-color: ${THEME.accent}; }

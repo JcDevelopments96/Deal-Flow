@@ -114,7 +114,7 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose }) => {
 
           {/* Price row */}
           <div style={{ display: "flex", alignItems: "baseline", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
-            <div className="mono" style={{ fontSize: 34, fontWeight: 700, color: isRental ? THEME.teal : THEME.accent }}>
+            <div className="mono" style={{ fontSize: 34, fontWeight: 700, color: isRental ? THEME.teal : THEME.orange }}>
               {fmtUSD(listing.price)}{isRental && <span style={{ fontSize: 16, fontWeight: 500, color: THEME.textMuted }}> /mo</span>}
             </div>
             {listing.pricePerSqft && (
