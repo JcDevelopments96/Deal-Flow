@@ -1,7 +1,7 @@
 /* ============================================================================
    BASIC PRIMITIVES — reusable field + layout components.
    ============================================================================ */
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Info } from "lucide-react";
 import { THEME } from "./theme.js";
 
@@ -31,20 +31,58 @@ export const TextField = ({ label, value, onChange, placeholder, helper }) => (
  */
 export const NumberField = ({ label, value, onChange, placeholder, helper, prefix, integer }) => {
   const isInteger = integer !== undefined ? integer : prefix === "$";
-  const step = isInteger ? 1 : "any";
+  const [focused, setFocused] = useState(false);
+  const [text, setText] = useState("");
+
+  // Format the stored value the way we want to DISPLAY it (blurred view).
+  const formatForDisplay = (v) => {
+    if (v === "" || v === null || v === undefined) return "";
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "";
+    const rounded = isInteger ? Math.round(n) : n;
+    return rounded.toLocaleString("en-US", { maximumFractionDigits: isInteger ? 0 : 10 });
+  };
+
+  // Format for the EDITING view — plain digits, no commas so the user can
+  // type freely without the caret fighting commas mid-word.
+  const formatForEdit = (v) => {
+    if (v === "" || v === null || v === undefined) return "";
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "";
+    return String(isInteger ? Math.round(n) : n);
+  };
+
+  // Keep local text in sync with parent value when not focused.
+  useEffect(() => {
+    if (!focused) setText(formatForDisplay(value));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, focused, isInteger]);
+
   const parse = (raw) => {
-    const n = parseFloat(raw);
+    // Allow user to type commas / spaces / currency symbols and still parse correctly.
+    const allowed = isInteger ? /[^\d-]/g : /[^\d.-]/g;
+    const cleaned = String(raw).replace(allowed, "");
+    const n = parseFloat(cleaned);
     if (!Number.isFinite(n)) return 0;
     return isInteger ? Math.round(n) : n;
   };
-  // Coerce the displayed value too, so computed defaults like `purchasePrice * 1.1`
-  // don't leak floating-point junk (e.g. 198000.00000000003) into the input.
-  const displayValue = (() => {
-    if (value === "" || value === null || value === undefined) return value ?? "";
-    const n = Number(value);
-    if (!Number.isFinite(n)) return "";
-    return isInteger ? Math.round(n) : n;
-  })();
+
+  const handleChange = (e) => {
+    const raw = e.target.value;
+    setText(raw);           // preserve exactly what the user typed so the caret stays put
+    onChange(parse(raw));   // propagate the numeric value to the parent
+  };
+
+  const handleFocus = () => {
+    setFocused(true);
+    setText(formatForEdit(value));
+  };
+
+  const handleBlur = () => {
+    setFocused(false);
+    setText(formatForDisplay(value));
+  };
+
   return (
     <div style={{ marginBottom: 14 }}>
       <div className="label-xs" style={{ marginBottom: 6 }}>{label}</div>
@@ -63,10 +101,12 @@ export const NumberField = ({ label, value, onChange, placeholder, helper, prefi
           </span>
         )}
         <input
-          type="number"
-          step={step}
-          value={displayValue}
-          onChange={(e) => onChange(parse(e.target.value))}
+          type="text"
+          inputMode={isInteger ? "numeric" : "decimal"}
+          value={text}
+          onChange={handleChange}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
           placeholder={placeholder}
           style={{
             width: "100%",
