@@ -4956,7 +4956,7 @@ const AdvancedMarketIntel = () => {
 /* ============================================================================
    HEADER
    ============================================================================ */
-const Header = ({ view, onChangeView, onNewDeal, watchlistCount = 0 }) => (
+const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchlistCount = 0 }) => (
   <div style={{
     borderBottom: `1px solid ${THEME.border}`,
     background: THEME.bg,
@@ -5023,7 +5023,20 @@ const Header = ({ view, onChangeView, onNewDeal, watchlistCount = 0 }) => (
           </button>
         ))}
 
-        <button className="btn-primary" onClick={onNewDeal} style={{ marginLeft: 8 }} aria-label="New deal">
+        {onOpenCalculator && (
+          <button
+            className="btn-secondary"
+            onClick={onOpenCalculator}
+            style={{ marginLeft: 4 }}
+            aria-label="Open mortgage and affordability calculator"
+            title="Mortgage & Affordability Calculator"
+          >
+            <Calculator size={14} />
+            {!isMobile() && "Calculator"}
+          </button>
+        )}
+
+        <button className="btn-primary" onClick={onNewDeal} style={{ marginLeft: 4 }} aria-label="New deal">
           <Plus size={14} />
           {!isMobile() && "New Deal"}
         </button>
@@ -7520,10 +7533,26 @@ const DASHBOARD_SORT_OPTIONS = [
   { key: "coc", label: "Cash-on-Cash %" }
 ];
 
-const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal }) => {
+const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal, recentIds = [] }) => {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortKey, setSortKey] = useState("updated");
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareSelected, setCompareSelected] = useState([]);
+  const [compareOpen, setCompareOpen] = useState(false);
+
+  const toggleCompare = useCallback((dealId) => {
+    setCompareSelected(prev => {
+      if (prev.includes(dealId)) return prev.filter(id => id !== dealId);
+      if (prev.length >= 3) return prev; // cap at 3
+      return [...prev, dealId];
+    });
+  }, []);
+
+  const recentDeals = useMemo(
+    () => recentIds.map(id => deals.find(d => d.id === id)).filter(Boolean),
+    [recentIds, deals]
+  );
 
   // Status counts for the filter chip labels
   const statusCounts = useMemo(() => {
@@ -7604,7 +7633,76 @@ const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal }) => {
             )}
           </div>
         </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <button
+            onClick={() => {
+              setCompareMode(m => !m);
+              if (compareMode) setCompareSelected([]);
+            }}
+            className={compareMode ? "btn-accent-teal" : "btn-secondary"}
+            style={{ padding: "8px 14px", fontSize: 12 }}
+          >
+            <Layers size={13} /> {compareMode ? `Compare (${compareSelected.length})` : "Compare Deals"}
+          </button>
+          {compareMode && compareSelected.length >= 2 && (
+            <button
+              onClick={() => setCompareOpen(true)}
+              className="btn-primary"
+              style={{ padding: "8px 14px", fontSize: 12 }}
+            >
+              <ArrowRight size={13} /> Open Comparison
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Recently Viewed strip */}
+      {recentDeals.length > 0 && (
+        <div style={{ marginBottom: 20 }}>
+          <div className="label-xs" style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+            <Clock size={12} /> Recently Viewed
+          </div>
+          <div style={{
+            display: "flex", gap: 10, overflowX: "auto",
+            paddingBottom: 4, WebkitOverflowScrolling: "touch"
+          }}>
+            {recentDeals.map(deal => {
+              const m = calcMetrics(deal);
+              return (
+                <div
+                  key={deal.id}
+                  onClick={() => onOpenDeal(deal.id)}
+                  style={{
+                    flex: "0 0 auto", minWidth: 220, maxWidth: 240,
+                    padding: 12,
+                    background: THEME.bgPanel,
+                    border: `1px solid ${THEME.border}`, borderRadius: 8,
+                    cursor: "pointer", transition: "border-color 0.15s ease"
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = THEME.accent; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = THEME.border; }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {deal.address || "Untitled"}
+                  </div>
+                  <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 8 }}>
+                    {deal.city}, {deal.state}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                    <StatusChip status={getDealStatus(deal)} size="sm" />
+                    <span className="mono" style={{
+                      fontSize: 12, fontWeight: 700,
+                      color: m.monthlyCashFlow > 0 ? THEME.green : THEME.red
+                    }}>
+                      {fmtUSD(m.monthlyCashFlow)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Toolbar — search + sort + status filter chips */}
       <div style={{
@@ -7690,24 +7788,47 @@ const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal }) => {
           gridTemplateColumns: isMobile() ? "1fr" : "repeat(auto-fill, minmax(320px, 1fr))",
           gap: 16
         }}>
-          {filteredSorted.map(({ d: deal, m: metrics }) => (
+          {filteredSorted.map(({ d: deal, m: metrics }) => {
+            const isSelected = compareSelected.includes(deal.id);
+            return (
             <div
               key={deal.id}
-              onClick={() => onOpenDeal(deal.id)}
+              onClick={() => {
+                if (compareMode) toggleCompare(deal.id);
+                else onOpenDeal(deal.id);
+              }}
               style={{
                 padding: 18, background: THEME.bgPanel,
-                border: `1px solid ${THEME.border}`, borderRadius: 8,
-                cursor: "pointer", transition: "all 0.15s ease"
+                border: `1px solid ${isSelected ? THEME.teal : THEME.border}`,
+                borderRadius: 8,
+                cursor: "pointer", transition: "all 0.15s ease",
+                position: "relative",
+                boxShadow: isSelected ? `0 0 0 2px ${THEME.bgTeal}` : "none"
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.borderColor = THEME.accent;
+                e.currentTarget.style.borderColor = isSelected ? THEME.teal : THEME.accent;
                 e.currentTarget.style.transform = "translateY(-1px)";
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.borderColor = THEME.border;
+                e.currentTarget.style.borderColor = isSelected ? THEME.teal : THEME.border;
                 e.currentTarget.style.transform = "translateY(0)";
               }}
             >
+              {compareMode && (
+                <div
+                  aria-label={isSelected ? "Selected for compare" : "Add to compare"}
+                  style={{
+                    position: "absolute", top: 12, right: 12,
+                    width: 22, height: 22, borderRadius: 4,
+                    border: `2px solid ${isSelected ? THEME.teal : THEME.border}`,
+                    background: isSelected ? THEME.teal : THEME.bg,
+                    color: "#fff",
+                    display: "flex", alignItems: "center", justifyContent: "center"
+                  }}
+                >
+                  {isSelected && <CheckCircle2 size={14} />}
+                </div>
+              )}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -7724,7 +7845,8 @@ const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal }) => {
                              metrics.grade === "C" ? THEME.bgTeal : THEME.redDim,
                   color: metrics.grade === "A" ? THEME.green :
                          metrics.grade.startsWith("B") ? THEME.orange :
-                         metrics.grade === "C" ? THEME.teal : THEME.red
+                         metrics.grade === "C" ? THEME.teal : THEME.red,
+                  marginRight: compareMode ? 32 : 0
                 }}>
                   {metrics.grade}
                 </div>
@@ -7775,9 +7897,463 @@ const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal }) => {
                 </button>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
+
+      {compareOpen && (
+        <CompareModal
+          deals={compareSelected.map(id => deals.find(d => d.id === id)).filter(Boolean)}
+          onClose={() => setCompareOpen(false)}
+          onOpenDeal={(id) => { setCompareOpen(false); onOpenDeal(id); }}
+        />
+      )}
+    </div>
+  );
+};
+
+/* ============================================================================
+   COMPARE DEALS MODAL — up to 3 deals side-by-side, winner highlighted per row
+   ============================================================================ */
+const COMPARE_ROWS = [
+  { label: "Status", get: (d) => DEAL_STATUSES[getDealStatus(d)]?.label || "—", higherIsBetter: null, fmt: null },
+  { label: "Purchase Price", get: (d) => d.purchasePrice, higherIsBetter: false, fmt: fmtUSD },
+  { label: "Rehab Budget",   get: (d) => d.rehabBudget,   higherIsBetter: false, fmt: fmtUSD },
+  { label: "ARV",            get: (d, m) => d.arv,        higherIsBetter: true,  fmt: fmtUSD },
+  { label: "Total All-In",   get: (d, m) => m.totalAllIn, higherIsBetter: false, fmt: fmtUSD },
+  { label: "All-In / ARV %", get: (d, m) => m.allInToArv, higherIsBetter: false, fmt: (v) => `${(v || 0).toFixed(1)}%` },
+  { label: "Monthly Rent",   get: (d) => d.rentEstimate,  higherIsBetter: true,  fmt: fmtUSD },
+  { label: "Monthly Cash Flow", get: (d, m) => m.monthlyCashFlow, higherIsBetter: true, fmt: fmtUSD },
+  { label: "Annual Cash Flow",  get: (d, m) => m.annualCashFlow,  higherIsBetter: true, fmt: fmtUSD },
+  { label: "Cap Rate",       get: (d, m) => m.capRate,     higherIsBetter: true, fmt: (v) => `${(v || 0).toFixed(1)}%` },
+  { label: "Cash-on-Cash",   get: (d, m) => m.cashOnCash,  higherIsBetter: true, fmt: (v) => `${(v || 0).toFixed(1)}%` },
+  { label: "Deal Score",     get: (d, m) => m.score,       higherIsBetter: true, fmt: (v) => `${v}/100` },
+  { label: "Grade",          get: (d, m) => m.grade,       higherIsBetter: null, fmt: null },
+  { label: "70% Rule",       get: (d, m) => m.seventyPercentRule ? "PASS" : "FAIL", higherIsBetter: null, fmt: null },
+  { label: "1% Rule",        get: (d, m) => m.onePercentRule ? "PASS" : "FAIL",     higherIsBetter: null, fmt: null }
+];
+
+const CompareModal = ({ deals, onClose, onOpenDeal }) => {
+  useEffect(() => {
+    const h = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  const metrics = useMemo(() => deals.map(d => ({ d, m: calcMetrics(d) })), [deals]);
+
+  // Overall winner: highest deal-score
+  const overallWinnerId = useMemo(() => {
+    if (metrics.length === 0) return null;
+    return metrics.reduce((best, cur) => (cur.m.score > best.m.score ? cur : best)).d.id;
+  }, [metrics]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="compare-title"
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0,
+        background: "rgba(15, 23, 42, 0.6)",
+        display: "flex", alignItems: "flex-start", justifyContent: "center",
+        zIndex: 150, padding: 16, overflowY: "auto"
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: THEME.bg, borderRadius: 12,
+          maxWidth: 1100, width: "100%",
+          marginTop: 40, marginBottom: 40,
+          boxShadow: "0 20px 60px rgba(15, 23, 42, 0.22)",
+          animation: "modalFadeIn 0.2s ease-out",
+          overflow: "hidden"
+        }}
+      >
+        <div style={{
+          padding: "16px 24px", borderBottom: `1px solid ${THEME.border}`,
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10
+        }}>
+          <div>
+            <h2 id="compare-title" className="serif" style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>
+              Compare Deals ({deals.length})
+            </h2>
+            <div style={{ fontSize: 12, color: THEME.textMuted, marginTop: 2 }}>
+              Best value in each row is highlighted. Overall winner: best deal score.
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close compare"
+            style={{
+              width: 34, height: 34, borderRadius: "50%",
+              background: "transparent", border: `1px solid ${THEME.border}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: THEME.textMuted, cursor: "pointer"
+            }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div style={{ padding: 16, overflowX: "auto" }}>
+          <table style={{
+            width: "100%", borderCollapse: "collapse",
+            fontSize: 13, minWidth: 700
+          }}>
+            <thead>
+              <tr>
+                <th style={{
+                  textAlign: "left", padding: "10px 12px",
+                  color: THEME.textMuted, fontSize: 10,
+                  textTransform: "uppercase", letterSpacing: "0.1em",
+                  borderBottom: `1px solid ${THEME.border}`,
+                  width: 180, verticalAlign: "bottom"
+                }}>
+                  Metric
+                </th>
+                {metrics.map(({ d }) => {
+                  const isWinner = d.id === overallWinnerId;
+                  return (
+                    <th key={d.id} style={{
+                      padding: "10px 12px",
+                      textAlign: "left",
+                      borderBottom: `2px solid ${isWinner ? THEME.green : THEME.border}`,
+                      background: isWinner ? THEME.greenDim : "transparent",
+                      verticalAlign: "bottom"
+                    }}>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>
+                        {d.address || "Untitled"}
+                      </div>
+                      <div style={{ fontSize: 11, color: THEME.textMuted, marginTop: 2 }}>
+                        {d.city}, {d.state}
+                      </div>
+                      {isWinner && (
+                        <div style={{
+                          marginTop: 6,
+                          fontSize: 10, fontWeight: 700,
+                          color: THEME.green,
+                          textTransform: "uppercase", letterSpacing: "0.1em"
+                        }}>
+                          <Trophy size={11} style={{ verticalAlign: "middle" }} /> Best Overall
+                        </div>
+                      )}
+                      <button
+                        onClick={() => onOpenDeal(d.id)}
+                        className="btn-ghost"
+                        style={{ marginTop: 8, padding: "4px 10px", fontSize: 11 }}
+                      >
+                        Open <ChevronRight size={11} />
+                      </button>
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {COMPARE_ROWS.map(row => {
+                // Determine the winning deal for this row when applicable
+                const rawValues = metrics.map(({ d, m }) => row.get(d, m));
+                let winnerIdx = -1;
+                if (row.higherIsBetter !== null) {
+                  const numeric = rawValues.map(v => (typeof v === "number" ? v : Number.NaN));
+                  const valid = numeric
+                    .map((v, i) => ({ v, i }))
+                    .filter(x => Number.isFinite(x.v));
+                  if (valid.length > 0) {
+                    const target = row.higherIsBetter
+                      ? valid.reduce((a, b) => (a.v >= b.v ? a : b))
+                      : valid.reduce((a, b) => (a.v <= b.v ? a : b));
+                    winnerIdx = target.i;
+                  }
+                }
+                return (
+                  <tr key={row.label}>
+                    <td style={{
+                      padding: "10px 12px",
+                      borderBottom: `1px solid ${THEME.borderLight}`,
+                      color: THEME.textMuted, fontWeight: 500
+                    }}>
+                      {row.label}
+                    </td>
+                    {rawValues.map((v, idx) => {
+                      const isWin = idx === winnerIdx;
+                      const display = row.fmt ? row.fmt(v) : v;
+                      return (
+                        <td
+                          key={idx}
+                          style={{
+                            padding: "10px 12px",
+                            borderBottom: `1px solid ${THEME.borderLight}`,
+                            fontWeight: isWin ? 700 : 500,
+                            color: isWin ? THEME.green : THEME.text,
+                            background: isWin ? THEME.greenDim : "transparent"
+                          }}
+                        >
+                          {display ?? "—"}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ============================================================================
+   MORTGAGE + AFFORDABILITY CALCULATOR — standalone tool reachable from header
+   ============================================================================ */
+const calcMonthlyPI = (loan, rate, years) => {
+  if (!loan || !rate || !years) return 0;
+  const r = rate / 100 / 12;
+  const n = years * 12;
+  return loan * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+};
+
+const MortgageCalculatorModal = ({ onClose }) => {
+  const [mode, setMode] = useState("payment"); // "payment" | "affordability"
+
+  // Payment mode
+  const [price, setPrice] = useState(350000);
+  const [downPct, setDownPct] = useState(20);
+  const [rate, setRate] = useState(7.25);
+  const [term, setTerm] = useState(30);
+  const [propTax, setPropTax] = useState(3500); // annual
+  const [insurance, setInsurance] = useState(1800); // annual
+  const [hoa, setHoa] = useState(0); // monthly
+
+  // Affordability mode
+  const [income, setIncome] = useState(120000);
+  const [debts, setDebts] = useState(500); // existing monthly debt
+  const [dti, setDti] = useState(36); // back-end DTI target %
+  const [downCash, setDownCash] = useState(40000); // cash on hand
+
+  const payment = useMemo(() => {
+    const p = n(price), dp = n(downPct), r = n(rate), t = n(term);
+    const loan = p - (p * dp / 100);
+    const pi = calcMonthlyPI(loan, r, t);
+    const taxIns = (n(propTax) + n(insurance)) / 12;
+    const total = pi + taxIns + n(hoa);
+    return { loan, pi, taxIns, hoa: n(hoa), total };
+  }, [price, downPct, rate, term, propTax, insurance, hoa]);
+
+  const afford = useMemo(() => {
+    const grossMonthly = n(income) / 12;
+    const targetPayment = Math.max(0, grossMonthly * (n(dti) / 100) - n(debts));
+    // Back-solve for loan amount that produces `targetPayment` of P&I only (conservative).
+    const r = n(rate) / 100 / 12;
+    const nn = n(term) * 12;
+    if (!r || !nn || targetPayment <= 0) return { maxPrice: 0, maxLoan: 0, targetPayment };
+    const maxLoan = targetPayment * (Math.pow(1 + r, nn) - 1) / (r * Math.pow(1 + r, nn));
+    // Max price factoring down cash available: down must cover (price - loan).
+    // If downPct is locked, compute directly; otherwise use downCash as the cap.
+    // For simplicity: price = loan + downCash (assumes user will bring all downCash).
+    const maxPrice = maxLoan + n(downCash);
+    return { maxPrice, maxLoan, targetPayment };
+  }, [income, debts, dti, rate, term, downCash]);
+
+  useEffect(() => {
+    const h = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="mortgage-title"
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0,
+        background: "rgba(15, 23, 42, 0.6)",
+        display: "flex", alignItems: "flex-start", justifyContent: "center",
+        zIndex: 150, padding: 16, overflowY: "auto"
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: THEME.bg, borderRadius: 12,
+          maxWidth: 720, width: "100%",
+          marginTop: 40, marginBottom: 40,
+          boxShadow: "0 20px 60px rgba(15, 23, 42, 0.22)",
+          animation: "modalFadeIn 0.2s ease-out",
+          overflow: "hidden"
+        }}
+      >
+        <div style={{
+          padding: "16px 24px", borderBottom: `1px solid ${THEME.border}`,
+          display: "flex", alignItems: "center", justifyContent: "space-between"
+        }}>
+          <div>
+            <h2 id="mortgage-title" className="serif" style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>
+              Mortgage & Affordability
+            </h2>
+            <div style={{ fontSize: 12, color: THEME.textMuted, marginTop: 2 }}>
+              Quick what-ifs without leaving the page.
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close calculator"
+            style={{
+              width: 34, height: 34, borderRadius: "50%",
+              background: "transparent", border: `1px solid ${THEME.border}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: THEME.textMuted, cursor: "pointer"
+            }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div style={{ padding: 24 }}>
+          {/* Mode toggle */}
+          <div style={{
+            display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8,
+            marginBottom: 20, padding: 4,
+            background: THEME.bgPanel, borderRadius: 8
+          }}>
+            {[
+              { key: "payment", label: "Monthly Payment", icon: <DollarSign size={13} /> },
+              { key: "affordability", label: "Affordability", icon: <Gauge size={13} /> }
+            ].map(t => (
+              <button
+                key={t.key}
+                onClick={() => setMode(t.key)}
+                style={{
+                  padding: "8px 14px", fontSize: 13, fontWeight: 600,
+                  background: mode === t.key ? THEME.bg : "transparent",
+                  color: mode === t.key ? THEME.accent : THEME.textMuted,
+                  border: `1px solid ${mode === t.key ? THEME.border : "transparent"}`,
+                  borderRadius: 6,
+                  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  cursor: "pointer",
+                  boxShadow: mode === t.key ? "0 1px 2px rgba(15,23,42,0.06)" : "none"
+                }}
+              >
+                {t.icon} {t.label}
+              </button>
+            ))}
+          </div>
+
+          {mode === "payment" ? (
+            <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr", gap: 18 }}>
+              <div>
+                <NumberField label="Home Price" value={price} onChange={setPrice} prefix="$" />
+                <NumberField label="Down Payment %" value={downPct} onChange={setDownPct} prefix="%" />
+                <NumberField label="Interest Rate %" value={rate} onChange={setRate} prefix="%" />
+                <NumberField label="Loan Term (Years)" value={term} onChange={setTerm} />
+                <NumberField label="Property Tax (Annual)" value={propTax} onChange={setPropTax} prefix="$" />
+                <NumberField label="Insurance (Annual)" value={insurance} onChange={setInsurance} prefix="$" />
+                <NumberField label="HOA (Monthly)" value={hoa} onChange={setHoa} prefix="$" />
+              </div>
+              <div>
+                <div style={{
+                  padding: 18, background: THEME.bgPanel,
+                  border: `1px solid ${THEME.border}`, borderRadius: 8
+                }}>
+                  <div className="label-xs" style={{ marginBottom: 10, color: THEME.accent }}>
+                    Results
+                  </div>
+                  <StatRow label="Loan Amount" value={fmtUSD(payment.loan)} bold />
+                  <StatRow label="Monthly P&I" value={fmtUSD(payment.pi)} tooltip={{
+                    title: "Principal & Interest",
+                    description: "Standard amortized payment.",
+                    formula: "L·r/(1 − (1+r)^-n)"
+                  }} />
+                  <StatRow label="Monthly Tax + Insurance" value={fmtUSD(payment.taxIns)} />
+                  <StatRow label="Monthly HOA" value={fmtUSD(payment.hoa)} />
+                  <StatRow
+                    label="Total Monthly Payment (PITI + HOA)"
+                    value={fmtUSD(payment.total)}
+                    bold
+                    borderTop
+                    valueColor={THEME.accent}
+                  />
+                </div>
+                <div style={{
+                  marginTop: 12, padding: 12,
+                  background: THEME.bgRaised, borderRadius: 6,
+                  fontSize: 11, color: THEME.textMuted, lineHeight: 1.5
+                }}>
+                  <Info size={11} style={{ verticalAlign: "middle", marginRight: 4 }} />
+                  Totals cover PITI + HOA. Does not include PMI or HOA special assessments.
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr", gap: 18 }}>
+              <div>
+                <NumberField label="Gross Annual Income" value={income} onChange={setIncome} prefix="$" helper="Pre-tax" />
+                <NumberField label="Existing Monthly Debts" value={debts} onChange={setDebts} prefix="$" helper="Car, student loans, CC mins" />
+                <NumberField label="Target DTI %" value={dti} onChange={setDti} prefix="%" helper="Lenders typically accept 36-43%" />
+                <NumberField label="Down Payment Cash" value={downCash} onChange={setDownCash} prefix="$" />
+                <NumberField label="Interest Rate %" value={rate} onChange={setRate} prefix="%" />
+                <NumberField label="Loan Term (Years)" value={term} onChange={setTerm} />
+              </div>
+              <div>
+                <div style={{
+                  padding: 18, background: THEME.bgPanel,
+                  border: `1px solid ${THEME.border}`, borderRadius: 8
+                }}>
+                  <div className="label-xs" style={{ marginBottom: 10, color: THEME.teal }}>
+                    What you can afford
+                  </div>
+                  <StatRow
+                    label="Target Monthly Payment"
+                    value={fmtUSD(afford.targetPayment)}
+                    tooltip={{
+                      title: "Target monthly housing cost",
+                      description: "Based on your DTI target, minus existing debts.",
+                      formula: "(Income/12 × DTI%) − Existing Debts"
+                    }}
+                  />
+                  <StatRow
+                    label="Max Loan Supported"
+                    value={fmtUSD(afford.maxLoan)}
+                    tooltip={{
+                      title: "Max Loan at Target Payment",
+                      description: "Reverse-amortized from the target payment.",
+                      formula: "Payment × (1 − (1+r)^-n) / r"
+                    }}
+                  />
+                  <StatRow
+                    label="Max Home Price"
+                    value={fmtUSD(afford.maxPrice)}
+                    bold
+                    valueColor={THEME.teal}
+                    borderTop
+                    tooltip={{
+                      title: "Max Home Price",
+                      description: "Max Loan + the down-payment cash you said you have.",
+                      formula: "Max Loan + Down Cash"
+                    }}
+                  />
+                </div>
+                <div style={{
+                  marginTop: 12, padding: 12,
+                  background: THEME.bgRaised, borderRadius: 6,
+                  fontSize: 11, color: THEME.textMuted, lineHeight: 1.5
+                }}>
+                  <Info size={11} style={{ verticalAlign: "middle", marginRight: 4 }} />
+                  This is a rough screen. Real lenders also weigh credit score, reserves, and
+                  property type. Tax/insurance impact isn't folded into the target payment here.
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
@@ -8072,6 +8648,8 @@ const createBlankDeal = (template = null) => {
 };
 
 const WATCHLIST_STORAGE_KEY = "dealtrack-watchlist";
+const RECENT_STORAGE_KEY = "dealtrack-recent-deals";
+const RECENT_MAX = 5;
 
 /* ============================================================================
    DEAL PIPELINE STATUSES — workflow states a saved deal passes through
@@ -8123,8 +8701,10 @@ function BRRRRTrackerInner() {
   const [isDraftDirty, setIsDraftDirty] = useState(false);
   const [pendingNav, setPendingNav] = useState(null); // { type: "view"|"back", payload }
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [showCalculator, setShowCalculator] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [watchlist, setWatchlist] = useState([]);
+  const [recentIds, setRecentIds] = useState([]); // most-recently-opened deal IDs (max 5)
 
   // Load deals from localStorage on mount
   useEffect(() => {
@@ -8181,6 +8761,48 @@ function BRRRRTrackerInner() {
     }
   }, [watchlist, loaded]);
 
+  // Load recently-viewed deal IDs
+  useEffect(() => {
+    try {
+      const raw = typeof window !== "undefined" && window.localStorage
+        ? window.localStorage.getItem(RECENT_STORAGE_KEY)
+        : null;
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setRecentIds(parsed);
+      }
+    } catch (err) {
+      console.warn("Could not load recent deals:", err);
+    }
+  }, []);
+
+  // Persist recently-viewed deal IDs
+  useEffect(() => {
+    if (!loaded) return;
+    try {
+      if (typeof window !== "undefined" && window.localStorage) {
+        window.localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(recentIds));
+      }
+    } catch (err) {
+      console.warn("Could not save recent deals:", err);
+    }
+  }, [recentIds, loaded]);
+
+  // Drop ids of deals that no longer exist (e.g. after delete) from the recents list
+  useEffect(() => {
+    if (!loaded || recentIds.length === 0) return;
+    const existingIds = new Set(deals.map(d => d.id));
+    const pruned = recentIds.filter(id => existingIds.has(id));
+    if (pruned.length !== recentIds.length) setRecentIds(pruned);
+  }, [deals, loaded, recentIds]);
+
+  const pushRecent = useCallback((dealId) => {
+    setRecentIds(prev => {
+      const filtered = prev.filter(id => id !== dealId);
+      return [dealId, ...filtered].slice(0, RECENT_MAX);
+    });
+  }, []);
+
   const activeDeal = useMemo(() => {
     if (draftDeal) return draftDeal;
     return deals.find(d => d.id === activeDealId) || null;
@@ -8204,7 +8826,8 @@ function BRRRRTrackerInner() {
     setDraftDeal(null);
     setIsDraftDirty(false);
     setView("analyzer");
-  }, []);
+    pushRecent(dealId);
+  }, [pushRecent]);
 
   const handleUpdateDraft = useCallback((updates) => {
     if (draftDeal) {
@@ -8366,12 +8989,14 @@ function BRRRRTrackerInner() {
         view={view}
         onChangeView={handleChangeView}
         onNewDeal={handleNewDeal}
+        onOpenCalculator={() => setShowCalculator(true)}
         watchlistCount={watchlist.length}
       />
 
       {view === "dashboard" && (
         <Dashboard
           deals={deals}
+          recentIds={recentIds}
           onOpenDeal={handleOpenDeal}
           onNewDeal={handleNewDeal}
           onDeleteDeal={handleDeleteDeal}
@@ -8434,6 +9059,10 @@ function BRRRRTrackerInner() {
           onDiscard={() => resolvePendingNav("discard")}
           onCancel={() => resolvePendingNav("cancel")}
         />
+      )}
+
+      {showCalculator && (
+        <MortgageCalculatorModal onClose={() => setShowCalculator(false)} />
       )}
 
       <div style={{
