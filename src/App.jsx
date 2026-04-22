@@ -22,23 +22,36 @@ const getJsPDF = () => (typeof window !== "undefined" && window.jspdf && window.
   || null;
 
 /* ============================================================================
-   THEME + FONTS
+   THEME + FONTS (DARK MODE)
    ============================================================================ */
 const THEME = {
-  bg: "#FFFFFF", bgPanel: "#F8FAFB", bgInput: "#FFFFFF", bgRaised: "#F5F7F9",
-  border: "#E2E8F0", borderLight: "#F1F5F9",
-  text: "#1E293B", textMuted: "#64748B", textDim: "#94A3B8",
-  accent: "#0D9488", accentDim: "#14B8A6", // Teal primary
-  secondary: "#EA580C", secondaryDim: "#FB923C", // Orange secondary
-  green: "#16A34A", greenDim: "#BBF7D0",
-  red: "#DC2626", redDim: "#FEE2E2",
-  orange: "#EA580C", blue: "#2563EB", purple: "#9333EA"
+  bg: "#0B1220",          // Deep navy-black app background
+  bgPanel: "#111B2E",     // Panel background
+  bgInput: "#0F1828",     // Input background
+  bgRaised: "#1A2640",    // Raised/hover surface
+  border: "#22304A",      // Standard border
+  borderLight: "#2C3B58", // Subtle divider
+  text: "#E6EEF8",        // Primary text
+  textMuted: "#94A3B8",   // Secondary text
+  textDim: "#64748B",     // Tertiary text
+  accent: "#2DD4BF",      // Teal-400 — brighter for dark bg
+  accentDim: "#5EEAD4",   // Teal-300
+  secondary: "#FB923C",   // Orange-400 (retained)
+  secondaryDim: "#FDBA74",
+  green: "#4ADE80",       // Emerald-400
+  greenDim: "rgba(74, 222, 128, 0.15)",
+  red: "#F87171",         // Red-400
+  redDim: "rgba(248, 113, 113, 0.15)",
+  orange: "#FB923C",
+  blue: "#60A5FA",        // Blue-400
+  purple: "#C084FC"       // Purple-400
 };
 
 const STYLE_TAG = `
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@400;500;700&display=swap');
 * { box-sizing: border-box; }
-body { margin: 0; background: ${THEME.bg}; }
+html, body { background: ${THEME.bg}; color-scheme: dark; }
+body { margin: 0; }
 .brrrr-root {
   font-family: 'DM Sans', sans-serif;
   color: ${THEME.text};
@@ -63,45 +76,43 @@ input, select, textarea {
   font-family: inherit; background: ${THEME.bgInput}; color: ${THEME.text};
   border: 1px solid ${THEME.border}; outline: none; border-radius: 2px;
 }
+input::placeholder, textarea::placeholder { color: ${THEME.textDim}; }
 input:focus, select:focus, textarea:focus {
-  border-color: ${THEME.accent}; box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+  border-color: ${THEME.accent}; box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.18);
 }
+select option { background: ${THEME.bgInput}; color: ${THEME.text}; }
+input[type="date"] { color-scheme: dark; }
+input[type="checkbox"] { accent-color: ${THEME.accent}; }
+input[type="range"] { accent-color: ${THEME.accent}; }
 button {
   font-family: inherit; border: none; outline: none; cursor: pointer;
   background: transparent; color: ${THEME.textMuted}; border-radius: 2px;
   transition: all 0.15s ease;
 }
 .btn-primary {
-  background: ${THEME.accent}; color: ${THEME.bg}; font-weight: 600;
+  background: ${THEME.accent}; color: #0B1220; font-weight: 600;
   padding: 8px 14px; font-size: 13px; display: inline-flex;
   align-items: center; gap: 6px; transition: all 0.15s ease;
-  box-shadow: 0 1px 2px rgba(13, 148, 136, 0.15);
 }
-.btn-primary:hover {
-  background: linear-gradient(135deg, ${THEME.accent} 0%, ${THEME.secondary} 100%);
-  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.25);
-}
+.btn-primary:hover { background: ${THEME.accentDim}; }
 .btn-secondary {
   border: 1px solid ${THEME.accent};
   color: ${THEME.accent}; padding: 8px 14px; font-size: 13px;
   display: inline-flex; align-items: center; gap: 6px;
+  background: transparent;
 }
 .btn-secondary:hover {
-  background: ${THEME.secondary};
-  border-color: ${THEME.secondary};
-  color: ${THEME.bg};
+  background: ${THEME.accent};
+  color: #0B1220;
 }
-.btn-accent-orange {
-  background: ${THEME.secondary}; color: ${THEME.bg}; font-weight: 600;
-  padding: 8px 14px; font-size: 13px; display: inline-flex;
-  align-items: center; gap: 6px; transition: all 0.15s ease;
-  box-shadow: 0 1px 2px rgba(234, 88, 12, 0.2);
-}
-.btn-accent-orange:hover { background: ${THEME.secondaryDim}; }
 .btn-ghost { color: ${THEME.textMuted}; }
 .btn-ghost:hover { color: ${THEME.accent}; background: ${THEME.bgRaised}; }
 .btn-danger { color: ${THEME.red}; }
-.btn-danger:hover { color: #EA8A85; background: ${THEME.redDim}44; }
+.btn-danger:hover { color: #FCA5A5; background: ${THEME.redDim}; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: ${THEME.bg}; }
+::-webkit-scrollbar-thumb { background: ${THEME.border}; border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: ${THEME.borderLight}; }
 `;
 
 /* ============================================================================
@@ -221,11 +232,11 @@ const MobileOptimizedButton = ({ onClick, children, style = {}, disabled = false
   const variantStyles = {
     primary: {
       background: disabled ? THEME.border : THEME.accent,
-      color: disabled ? THEME.textMuted : "#FFFFFF"
+      color: disabled ? THEME.textMuted : THEME.bg
     },
     secondary: {
       background: disabled ? THEME.bgPanel : THEME.secondary,
-      color: disabled ? THEME.textMuted : "#FFFFFF"
+      color: disabled ? THEME.textMuted : THEME.bg
     },
     outline: {
       background: "transparent",
@@ -469,18 +480,8 @@ const Panel = ({ title, icon, children, accent, action, style = {} }) => (
     background: THEME.bgPanel,
     border: `1px solid ${THEME.border}`,
     borderRadius: 8,
-    overflow: "hidden",
-    position: "relative",
     ...style
   }}>
-    {accent && (
-      <div style={{
-        position: "absolute",
-        top: 0, left: 0, right: 0,
-        height: 3,
-        background: `linear-gradient(90deg, ${THEME.accent} 0%, ${THEME.secondary} 100%)`
-      }} />
-    )}
     {title && (
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -845,9 +846,9 @@ const RehabSection = ({ deal, onUpdate }) => {
                 return (
                   <div key={itemKey} style={{
                     padding: 16,
-                    border: `1px solid ${item.cost > 0 ? category.color + '40' : THEME.border}`,
+                    border: `1px solid ${item.cost > 0 ? category.color + '66' : THEME.border}`,
                     borderRadius: 6,
-                    background: item.cost > 0 ? category.color + '08' : THEME.bgPanel
+                    background: item.cost > 0 ? category.color + '1A' : THEME.bgPanel
                   }}>
                     <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "2fr 1fr 1fr 1fr", gap: 12, alignItems: "end" }}>
                       <div>
@@ -2550,11 +2551,9 @@ const AdvancedMarketIntel = () => {
             {showRank && (
               <div style={{
                 width: 24, height: 24, borderRadius: "50%",
-                background: `linear-gradient(135deg, ${THEME.accent} 0%, ${THEME.secondary} 100%)`,
-                color: "white",
+                background: THEME.accent, color: THEME.bg,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 12, fontWeight: 700,
-                boxShadow: "0 1px 3px rgba(234, 88, 12, 0.3)"
+                fontSize: 12, fontWeight: 700
               }}>
                 {rank}
               </div>
@@ -2802,7 +2801,7 @@ const AdvancedMarketIntel = () => {
                 style={{
                   padding: "6px 12px", fontSize: 12,
                   background: selectedMetric === metric.key ? THEME.accent : THEME.bgPanel,
-                  color: selectedMetric === metric.key ? "white" : THEME.text,
+                  color: selectedMetric === metric.key ? THEME.bg : THEME.text,
                   border: `1px solid ${selectedMetric === metric.key ? THEME.accent : THEME.border}`,
                   borderRadius: 4, fontWeight: 600, cursor: "pointer"
                 }}
@@ -2837,9 +2836,8 @@ const Header = ({ view, onChangeView, onNewDeal }) => (
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <div style={{
           width: 36, height: 36, borderRadius: 8,
-          background: `linear-gradient(135deg, ${THEME.accent} 0%, ${THEME.secondary} 100%)`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          boxShadow: `0 2px 8px rgba(234, 88, 12, 0.25)`
+          background: `linear-gradient(135deg, ${THEME.accent}, ${THEME.accentDim})`,
+          display: "flex", alignItems: "center", justifyContent: "center"
         }}>
           <Building2 size={20} color="white" />
         </div>
@@ -2868,7 +2866,6 @@ const Header = ({ view, onChangeView, onNewDeal }) => (
               background: view === tab.key ? THEME.bgRaised : "transparent",
               color: view === tab.key ? THEME.accent : THEME.textMuted,
               borderRadius: 6,
-              borderBottom: view === tab.key ? `2px solid ${THEME.secondary}` : "2px solid transparent",
               display: "flex", alignItems: "center", gap: 6, cursor: "pointer"
             }}
           >
@@ -2971,7 +2968,7 @@ const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete }) => {
           </div>
           <div>
             <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4 }}>BRRRR SCORE</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: THEME.secondary }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: THEME.accent }}>
               {metrics.score}/100 <span style={{ fontSize: 14 }}>({metrics.grade})</span>
             </div>
           </div>
@@ -2986,7 +2983,7 @@ const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete }) => {
             style={{
               padding: "10px 16px", fontSize: 13, fontWeight: 600,
               background: section === s.key ? THEME.accent : THEME.bgPanel,
-              color: section === s.key ? "white" : THEME.text,
+              color: section === s.key ? THEME.bg : THEME.text,
               border: `1px solid ${section === s.key ? THEME.accent : THEME.border}`,
               borderRadius: 6,
               display: "flex", alignItems: "center", gap: 6, cursor: "pointer"
@@ -3256,12 +3253,10 @@ const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal }) => {
       }}>
         <div style={{
           width: 72, height: 72, margin: "0 auto 20px",
-          borderRadius: "50%",
-          background: `linear-gradient(135deg, ${THEME.bgRaised} 0%, #FFF7ED 100%)`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          border: `1px solid ${THEME.secondary}33`
+          borderRadius: "50%", background: THEME.bgRaised,
+          display: "flex", alignItems: "center", justifyContent: "center"
         }}>
-          <Building2 size={32} color={THEME.secondary} />
+          <Building2 size={32} color={THEME.accent} />
         </div>
         <h2 className="serif" style={{ fontSize: 28, marginBottom: 8 }}>
           No Deals Yet
@@ -3311,14 +3306,12 @@ const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal }) => {
                 cursor: "pointer", transition: "all 0.15s ease"
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.borderColor = THEME.secondary;
-                e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow = "0 4px 12px rgba(234, 88, 12, 0.12)";
+                e.currentTarget.style.borderColor = THEME.accent;
+                e.currentTarget.style.transform = "translateY(-1px)";
               }}
               onMouseLeave={e => {
                 e.currentTarget.style.borderColor = THEME.border;
                 e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "none";
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
@@ -3333,9 +3326,9 @@ const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal }) => {
                 <div style={{
                   padding: "4px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700,
                   background: metrics.grade === "A" ? THEME.greenDim :
-                             metrics.grade.startsWith("B") ? "#FED7AA" : THEME.redDim,
+                             metrics.grade.startsWith("B") ? "rgba(251, 191, 36, 0.18)" : THEME.redDim,
                   color: metrics.grade === "A" ? THEME.green :
-                         metrics.grade.startsWith("B") ? THEME.secondary : THEME.red
+                         metrics.grade.startsWith("B") ? "#FCD34D" : THEME.red
                 }}>
                   {metrics.grade}
                 </div>
@@ -3671,13 +3664,7 @@ export default function BRRRRTracker() {
         display: "flex", justifyContent: "space-between", alignItems: "center",
         fontSize: 11, color: THEME.textMuted, flexWrap: "wrap", gap: 8
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{
-            width: 6, height: 6, borderRadius: "50%",
-            background: `linear-gradient(135deg, ${THEME.accent} 0%, ${THEME.secondary} 100%)`
-          }} />
-          DealTrack v3.0 Professional
-        </div>
+        <div>DealTrack v3.0 Professional</div>
         <div>© 2026 DealTrack</div>
       </div>
     </div>
