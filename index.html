@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DealTrack - BRRRR Investment Tracker</title>
+  <meta name="description" content="DealTrack professional BRRRR real estate investment tracker for South East Florida. Analyze deals, track properties, find distressed listings, and manage your rental portfolio." />
+  <meta name="keywords" content="DealTrack, BRRRR, real estate investment, Florida properties, deal analyzer, rental property, Airbnb, cash flow calculator" />
+  <meta name="author" content="DealTrack" />
+  
+  <!-- Open Graph / Social Media -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="DealTrack - BRRRR Investment Tracker" />
+  <meta property="og:description" content="DealTrack professional real estate investment tracker for SE Florida BRRRR deals" />
+  <meta property="og:url" content="https://your-domain.com" />
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  
+  <!-- Fonts - Preload for performance -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- Theme color -->
+  <meta name="theme-color" content="#0B0F14" />
+  
+  <!-- PWA manifest -->
+  <link rel="manifest" href="/manifest.json" />
+  
+  <style>
+    /* Prevent flash of unstyled content */
+    body { 
+      margin: 0; 
+      background: #0B0F14; 
+      color: #E8E4D9;
+      font-family: 'DM Sans', sans-serif;
+      overflow-x: hidden;
+    }
+    #loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #8A93A0;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    #root { min-height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="root">
+    <div id="loading">Loading DealTrack...</div>
+  </div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+{
+  "name": "DealTrack - BRRRR Investment Tracker",
+  "short_name": "DealTrack",
+  "description": "DealTrack professional BRRRR real estate investment tracker for South East Florida",
+  "theme_color": "#0D9488",
+  "background_color": "#FFFFFF",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/",
+  "start_url": "/",
+  "id": "dealtrack-brrrr",
+  "categories": ["business", "finance", "productivity"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New Deal",
+      "short_name": "New Deal",
+      "description": "Create a new BRRRR deal analysis",
+      "url": "/?action=new-deal",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Deal Sourcing",
+      "short_name": "Find Properties",
+      "description": "Search for distressed properties",
+      "url": "/?view=sourcing",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
