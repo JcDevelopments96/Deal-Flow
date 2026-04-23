@@ -1,19 +1,75 @@
 /**
  * GET /api/market/listings?city=X&state=Y[&bedrooms=N&bathrooms=N&limit=N]
  *
- * Metered proxy for RentCast for-sale listings. Every successful call counts
- * as one Market Intel click on the authenticated user's plan.
+ * Metered proxy for sale listings. Prefers Realtor.com (realty-in-us
+ * RapidAPI wrapper) when RAPIDAPI_REALTOR_KEY is set — richer photos. Falls
+ * back to RentCast (RENTCAST_API_KEY) if Realtor fails or returns nothing.
+ * User only sees one metered click either way.
+ *
+ * Response shape is identical regardless of which provider served it:
+ *   { listings: [<normalized listing>, ...], usage, provider }
  *
  * Failure modes:
- *   401 — not signed in / invalid token
- *   402 — user out of included clicks, plan disallows overage (free tier)
- *   503 — upstream env not configured yet
- *   502 — RentCast returned an error
+ *   401  not signed in / invalid token
+ *   402  over quota — UI opens the UpgradeModal
+ *   503  no provider configured
+ *   502  both providers failed / not configured
  */
 import { handler, ApiError } from "../_lib/errors.js";
 import { requireUserId } from "../_lib/auth.js";
 import { ensureUser } from "../_lib/db.js";
 import { recordMeteredClick } from "../_lib/metering.js";
+import { normalizeRealtor, normalizeRentCast } from "./_normalize.js";
+
+async function fetchFromRealtor({ city, state, bedrooms, bathrooms, limit, apiKey }) {
+  const body = {
+    limit: Math.max(1, Math.min(100, Number(limit) || 20)),
+    offset: 0,
+    city,
+    state_code: state,
+    status: ["for_sale", "ready_to_build"],
+    sort: { direction: "desc", field: "list_date" }
+  };
+  if (bedrooms) body.beds = { min: Number(bedrooms), max: Number(bedrooms) };
+  if (bathrooms) body.baths = { min: Number(bathrooms), max: Number(bathrooms) };
+
+  const res = await fetch(
+    "https://realty-in-us.p.rapidapi.com/properties/v3/list",
+    {
+      method: "POST",
+      headers: {
+        "X-RapidAPI-Key": apiKey,
+        "X-RapidAPI-Host": "realty-in-us.p.rapidapi.com",
+        "Content-Type": "application/json",
+        accept: "application/json"
+      },
+      body: JSON.stringify(body)
+    }
+  );
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`realtor ${res.status}: ${text.slice(0, 300)}`);
+  }
+  const json = await res.json();
+  const results = json?.data?.home_search?.results || [];
+  return results.map(normalizeRealtor).filter(Boolean);
+}
+
+async function fetchFromRentCast({ city, state, bedrooms, bathrooms, limit, apiKey }) {
+  const qs = new URLSearchParams({ city, state, limit: String(limit || 20) });
+  if (bedrooms) qs.set("bedrooms", bedrooms);
+  if (bathrooms) qs.set("bathrooms", bathrooms);
+  const res = await fetch(`https://api.rentcast.io/v1/listings/sale?${qs}`, {
+    headers: { "X-Api-Key": apiKey, accept: "application/json" }
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`rentcast ${res.status}: ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  const arr = Array.isArray(data) ? data : data.listings || [];
+  return arr.map(normalizeRentCast).filter(Boolean);
+}
 
 export default handler(async (req, res) => {
   if (req.method !== "GET") {
@@ -24,10 +80,11 @@ export default handler(async (req, res) => {
   const { clerkUserId, email } = await requireUserId(req);
   const user = await ensureUser({ clerkUserId, email });
 
-  const apiKey = process.env.RENTCAST_API_KEY;
-  if (!apiKey) {
+  const realtorKey = process.env.RAPIDAPI_REALTOR_KEY;
+  const rentcastKey = process.env.RENTCAST_API_KEY;
+  if (!realtorKey && !rentcastKey) {
     throw new ApiError(503, "provider_not_configured",
-      "Set RENTCAST_API_KEY in the Vercel project env.");
+      "Set RAPIDAPI_REALTOR_KEY or RENTCAST_API_KEY in Vercel env.");
   }
 
   const { city, state, bedrooms, bathrooms, limit = "20" } = req.query || {};
@@ -35,38 +92,44 @@ export default handler(async (req, res) => {
     throw new ApiError(400, "missing_params", "city and state are required");
   }
 
-  // Meter FIRST. If this throws 402, we never hit RentCast, so the user is
-  // only charged for a click when they actually get data back. (On 5xx from
-  // RentCast below we've already spent the click — we deliberately accept
-  // that since the cost-of-goods is already spent upstream.)
+  // Record the click BEFORE calling upstream. One click regardless of which
+  // provider we end up hitting.
   const usage = await recordMeteredClick({
     user,
-    provider: "rentcast",
+    provider: realtorKey ? "realtor" : "rentcast",
     endpoint: "/v1/listings/sale",
     metadata: { city, state, bedrooms, bathrooms }
   });
 
-  const qs = new URLSearchParams({ city, state, limit });
-  if (bedrooms) qs.set("bedrooms", bedrooms);
-  if (bathrooms) qs.set("bathrooms", bathrooms);
+  let listings = [];
+  let provider = null;
+  const errors = [];
 
-  const upstream = await fetch(`https://api.rentcast.io/v1/listings/sale?${qs}`, {
-    headers: {
-      "X-Api-Key": apiKey,
-      accept: "application/json"
+  // 1. Try Realtor.com if configured
+  if (realtorKey) {
+    try {
+      listings = await fetchFromRealtor({ city, state, bedrooms, bathrooms, limit, apiKey: realtorKey });
+      if (listings.length > 0) provider = "realtor";
+    } catch (err) {
+      errors.push(err.message);
+      console.warn("[market/listings] realtor fetch failed:", err.message);
     }
-  });
-
-  if (!upstream.ok) {
-    const text = await upstream.text().catch(() => "");
-    throw new ApiError(502, "upstream_error", {
-      status: upstream.status,
-      body: text.slice(0, 500)
-    });
   }
 
-  const data = await upstream.json();
-  const listings = Array.isArray(data) ? data : data.listings || [];
+  // 2. Fall back to RentCast if Realtor returned empty or failed
+  if (listings.length === 0 && rentcastKey) {
+    try {
+      listings = await fetchFromRentCast({ city, state, bedrooms, bathrooms, limit, apiKey: rentcastKey });
+      if (listings.length > 0) provider = "rentcast";
+    } catch (err) {
+      errors.push(err.message);
+      console.warn("[market/listings] rentcast fetch failed:", err.message);
+    }
+  }
 
-  return res.status(200).json({ listings, usage });
+  if (listings.length === 0 && errors.length > 0) {
+    throw new ApiError(502, "upstream_error", errors.join(" | "));
+  }
+
+  return res.status(200).json({ listings, usage, provider: provider || "none" });
 });

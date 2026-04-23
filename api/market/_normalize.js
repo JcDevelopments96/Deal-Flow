@@ -1,0 +1,118 @@
+/* ============================================================================
+   Listing normalizers — turn upstream API responses into one canonical
+   shape that the frontend ListingCard can render without caring about
+   which provider served the data.
+   ============================================================================ */
+
+const pushUnique = (arr, url) => {
+  if (typeof url === "string" && url && !arr.includes(url)) arr.push(url);
+};
+
+/**
+ * Realtor.com via realty-in-us (apidojo wrapper).
+ * Response shape (for a single home in data.home_search.results):
+ *   {
+ *     listing_id, property_id, status, list_price, list_date, days_on_market,
+ *     description: { beds, baths, sqft, year_built, type },
+ *     location: { address: { line, city, state_code, postal_code, coordinate } },
+ *     primary_photo: { href },
+ *     photos: [{ href }, ...],
+ *     permalink
+ *   }
+ */
+export function normalizeRealtor(r) {
+  if (!r) return null;
+  const photos = [];
+  pushUnique(photos, r.primary_photo?.href);
+  if (Array.isArray(r.photos)) for (const p of r.photos) pushUnique(photos, p?.href);
+
+  const addr = r.location?.address || {};
+  const city = addr.city || null;
+  const state = addr.state_code || addr.state || null;
+  const street = addr.line || null;
+  const zip = addr.postal_code || null;
+
+  const price = r.list_price ?? null;
+  const sqft = r.description?.sqft ?? null;
+
+  const formattedAddress = [street, city, state].filter(Boolean).join(", ");
+  const permalink = r.permalink
+    ? `https://www.realtor.com/realestateandhomes-detail/${r.permalink}`
+    : null;
+
+  return {
+    id: r.listing_id || r.property_id || `realtor-${street}-${zip}`,
+    formattedAddress,
+    addressLine1: street,
+    city, state, zipCode: zip,
+    price,
+    bedrooms: r.description?.beds ?? null,
+    bathrooms: r.description?.baths ?? null,
+    squareFootage: sqft,
+    propertyType: r.description?.type || null,
+    yearBuilt: r.description?.year_built ?? null,
+    listedDate: r.list_date || null,
+    daysOnMarket: r.days_on_market ?? null,
+    status: r.status === "for_sale" ? "Active" : (r.status || "Active"),
+    latitude: addr.coordinate?.lat ?? null,
+    longitude: addr.coordinate?.lon ?? null,
+    pricePerSqft: price && sqft ? Math.round(price / sqft) : null,
+    photos,
+    imageUrl: photos[0] || null,
+    externalUrl: permalink,
+    sourceProvider: "realtor"
+  };
+}
+
+/**
+ * RentCast sale + rental listings.
+ * Their response already has flat-ish fields; we just collect any photo URLs
+ * and compute pricePerSqft so the shape matches Realtor's.
+ */
+export function normalizeRentCast(r) {
+  if (!r) return null;
+
+  const photos = [];
+  const pushFrom = (arr) => {
+    if (!Array.isArray(arr)) return;
+    for (const p of arr) {
+      if (typeof p === "string") pushUnique(photos, p);
+      else if (p && typeof p === "object") pushUnique(photos, p.url || p.href || p.src);
+    }
+  };
+  pushFrom(r.photos);
+  pushFrom(r.images);
+  pushUnique(photos, r.primaryPhoto);
+  pushUnique(photos, r.photoUrl);
+  pushUnique(photos, r.imageUrl);
+
+  const price = r.price ?? null;
+  const sqft = r.squareFootage ?? null;
+  const formattedAddress = r.formattedAddress
+    || [r.addressLine1, r.city, r.state].filter(Boolean).join(", ");
+
+  return {
+    id: r.id || `${r.addressLine1}-${r.zipCode}`,
+    formattedAddress,
+    addressLine1: r.addressLine1 || null,
+    city: r.city || null,
+    state: r.state || null,
+    zipCode: r.zipCode || null,
+    price,
+    bedrooms: r.bedrooms ?? null,
+    bathrooms: r.bathrooms ?? null,
+    squareFootage: sqft,
+    propertyType: r.propertyType || null,
+    yearBuilt: r.yearBuilt ?? null,
+    listedDate: r.listedDate || null,
+    daysOnMarket: r.daysOnMarket ?? null,
+    status: r.status || "Active",
+    latitude: r.latitude ?? null,
+    longitude: r.longitude ?? null,
+    pricePerSqft: price && sqft ? Math.round(price / sqft) : null,
+    photos,
+    imageUrl: photos[0] || null,
+    externalUrl: null,
+    sourceProvider: "rentcast"
+  };
+}

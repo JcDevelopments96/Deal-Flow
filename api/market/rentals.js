@@ -1,14 +1,15 @@
 /**
  * GET /api/market/rentals?city=X&state=Y[&bedrooms=N&bathrooms=N&limit=N]
  *
- * Metered proxy for RentCast long-term rental listings. Same gating /
- * click-counter flow as /api/market/listings — just a different upstream
- * endpoint.
+ * Metered proxy for long-term rental comparables. RentCast-only for now —
+ * Realtor.com's rental data is weaker for investor use cases. Normalized
+ * server-side so the shape matches /api/market/listings.
  */
 import { handler, ApiError } from "../_lib/errors.js";
 import { requireUserId } from "../_lib/auth.js";
 import { ensureUser } from "../_lib/db.js";
 import { recordMeteredClick } from "../_lib/metering.js";
+import { normalizeRentCast } from "./_normalize.js";
 
 export default handler(async (req, res) => {
   if (req.method !== "GET") {
@@ -54,7 +55,8 @@ export default handler(async (req, res) => {
   }
 
   const data = await upstream.json();
-  const rentals = Array.isArray(data) ? data : data.listings || [];
+  const raw = Array.isArray(data) ? data : data.listings || [];
+  const rentals = raw.map(normalizeRentCast).filter(Boolean);
 
-  return res.status(200).json({ rentals, usage });
+  return res.status(200).json({ rentals, usage, provider: "rentcast" });
 });

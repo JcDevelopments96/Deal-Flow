@@ -163,8 +163,10 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
     if (usage) saas.setUsageLocally(usage);
 
     return {
-      listings: (saleRes.listings || []).map(formatRentCastListing),
-      rentals: (rentRes.rentals || []).map(formatRentCastListing)
+      // Server (/api/market/*) already normalizes the upstream response to
+      // our canonical shape, so no client-side formatter needed here.
+      listings: saleRes.listings || [],
+      rentals: rentRes.rentals || []
     };
   };
 
