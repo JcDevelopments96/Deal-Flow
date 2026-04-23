@@ -23,13 +23,16 @@ import { normalizeRealtor, normalizeRentCast } from "./_normalize.js";
 
 async function fetchFromRealtor({ city, state, bedrooms, bathrooms, limit, apiKey }) {
   const body = {
-    limit: Math.max(1, Math.min(100, Number(limit) || 20)),
+    limit: Math.max(1, Math.min(200, Number(limit) || 50)),
     offset: 0,
-    city,
+    // City is optional — state-only query returns listings across the whole
+    // state (tens of thousands for large states, hundreds/thousands for small
+    // states). Drill in by clicking a county on the map.
     state_code: state,
     status: ["for_sale", "ready_to_build"],
     sort: { direction: "desc", field: "list_date" }
   };
+  if (city) body.city = city;
   if (bedrooms) body.beds = { min: Number(bedrooms), max: Number(bedrooms) };
   if (bathrooms) body.baths = { min: Number(bathrooms), max: Number(bathrooms) };
 
@@ -56,7 +59,11 @@ async function fetchFromRealtor({ city, state, bedrooms, bathrooms, limit, apiKe
 }
 
 async function fetchFromRentCast({ city, state, bedrooms, bathrooms, limit, apiKey }) {
-  const qs = new URLSearchParams({ city, state, limit: String(limit || 20) });
+  // RentCast requires city+state together. If only state is supplied (for
+  // state-wide Realtor queries) we'd skip RentCast entirely — the caller
+  // handles that above.
+  const qs = new URLSearchParams({ state, limit: String(limit || 50) });
+  if (city) qs.set("city", city);
   if (bedrooms) qs.set("bedrooms", bedrooms);
   if (bathrooms) qs.set("bathrooms", bathrooms);
   const res = await fetch(`https://api.rentcast.io/v1/listings/sale?${qs}`, {
@@ -87,9 +94,9 @@ export default handler(async (req, res) => {
       "Set RAPIDAPI_REALTOR_KEY or RENTCAST_API_KEY in Vercel env.");
   }
 
-  const { city, state, bedrooms, bathrooms, limit = "20" } = req.query || {};
-  if (!city || !state) {
-    throw new ApiError(400, "missing_params", "city and state are required");
+  const { city, state, bedrooms, bathrooms, limit = "50" } = req.query || {};
+  if (!state) {
+    throw new ApiError(400, "missing_params", "state is required (city is optional — state-only query returns listings across the whole state)");
   }
 
   // Record the click BEFORE calling upstream. One click regardless of which
@@ -116,8 +123,9 @@ export default handler(async (req, res) => {
     }
   }
 
-  // 2. Fall back to RentCast if Realtor returned empty or failed
-  if (listings.length === 0 && rentcastKey) {
+  // 2. Fall back to RentCast if Realtor returned empty or failed.
+  //    RentCast needs a specific city — skip fallback on state-only queries.
+  if (listings.length === 0 && rentcastKey && city) {
     try {
       listings = await fetchFromRentCast({ city, state, bedrooms, bathrooms, limit, apiKey: rentcastKey });
       if (listings.length > 0) provider = "rentcast";

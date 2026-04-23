@@ -68,7 +68,10 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
     return (stateMarkets && stateMarkets[0]) || null;
   }, [selectedState, selectedCity, stateMarkets]);
 
-  const targetCity = selectedCity || (referenceMarket && referenceMarket.city);
+  // `queryCity` is what we send upstream — null means state-wide query (Realtor supports it).
+  // `targetCity` is what we show in the UI + feed to demo builders (falls back so demo still works).
+  const queryCity = selectedCity || null;
+  const targetCity = selectedCity || (referenceMarket && referenceMarket.city) || null;
 
   const bedsRange = useMemo(() => parseFilterRange(bedsFilter), [bedsFilter]);
   const bathsRange = useMemo(() => parseFilterRange(bathsFilter), [bathsFilter]);
@@ -142,7 +145,9 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
   // SaaS path — both sale + rental come through /api/market/* so the RentCast
   // key stays on the server and each call increments the user's usage counter.
   const fetchViaSaas = async () => {
-    const qsBase = { city: targetCity, state: selectedState, limit: 20 };
+    const qsBase = { state: selectedState, limit: 50 };
+    // City is optional for sale listings (state-wide query supported by Realtor).
+    if (queryCity) qsBase.city = queryCity;
     // Only pass exact bedroom/bathroom when the filter is a specific number;
     // RentCast's API doesn't support ranges there.
     if (bedsRange.min !== null && bedsRange.min === bedsRange.max) {
@@ -152,10 +157,14 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
       qsBase.bathrooms = bathsRange.min;
     }
 
+    // Rentals (RentCast) require a city — skip the call entirely on state-only queries.
+    const rentalPromise = queryCity
+      ? fetchRentalListings(saas.getToken, qsBase).catch(() => ({ rentals: [], usage: null }))
+      : Promise.resolve({ rentals: [], usage: null });
+
     const [saleRes, rentRes] = await Promise.all([
       fetchSaleListings(saas.getToken, qsBase).catch(e => { throw e; }),
-      // rentals are secondary — if they 402 separately, don't wipe out sale results
-      fetchRentalListings(saas.getToken, qsBase).catch(() => ({ rentals: [], usage: null }))
+      rentalPromise
     ]);
 
     // Keep the meter fresh using the usage snapshot the proxy returned.
@@ -171,7 +180,10 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
   };
 
   const loadData = useCallback(async () => {
-    if (!selectedState || !targetCity) return;
+    if (!selectedState) return;
+    // Legacy BYOK providers (RentCast/Zillow) require a city. The SaaS path
+    // (Realtor.com-primary) supports state-only queries, so we allow null city there.
+    if (!saasOn && !targetCity) return;
 
     // SaaS mode, signed in → go through the metered proxy
     if (saasOn && saas.user) {
@@ -348,8 +360,9 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
       }
     >
       <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 14, lineHeight: 1.5 }}>
-        Properties currently for sale and rental comparables in <strong>{targetCity}, {selectedState}</strong>
-        {stateName && ` (${stateName})`}. Click any county on the map above to pull listings for that area.
+        {queryCity
+          ? <>Properties currently for sale and rental comparables in <strong>{queryCity}, {selectedState}</strong>{stateName && ` (${stateName})`}. Click any county on the map above to drill in further.</>
+          : <>Showing properties for sale across <strong>{stateName || selectedState}</strong>. Click a county on the map to drill in and see rental comparables.</>}
       </div>
 
       {/* NOTE: the "paid feature" messaging for signed-out and
@@ -532,7 +545,9 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
             <div style={{ padding: 20, textAlign: "center", color: THEME.textMuted, fontSize: 12 }}>
               {rentComps.length > 0
                 ? "No rental comps match the current bed/bath filters — try widening them."
-                : "No rental comparables found for this area."}
+                : !queryCity
+                  ? "Click a county on the map to pull rental comparables for that city."
+                  : "No rental comparables found for this area."}
             </div>
           ) : (
             <div style={{

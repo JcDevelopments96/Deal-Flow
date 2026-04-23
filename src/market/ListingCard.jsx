@@ -19,7 +19,7 @@ import { useAppActions } from "../contexts.jsx";
  * The arrows and count badge only appear when there's more than one photo.
  * Arrow clicks stop propagation so they don't trigger the card's onOpen.
  */
-export const ListingImage = ({ photos, url, demo }) => {
+export const ListingImage = ({ photos, url, demo, photoCount }) => {
   const urls = Array.isArray(photos) && photos.length > 0
     ? photos
     : url
@@ -111,7 +111,12 @@ export const ListingImage = ({ photos, url, demo }) => {
           Demo
         </div>
       )}
-      {count > 1 && (
+      {/* Two cases for the camera badge:
+          - We have multiple URLs → show scroll position "i / n"
+          - We only have the primary photo but the upstream told us more exist
+            (Realtor v3/list returns photo_count but only one photo URL) → show "N photos"
+            so the user knows more are available on the full listing page. */}
+      {count > 1 ? (
         <div style={{
           position: "absolute", bottom: 10, right: 10,
           padding: "3px 9px 3px 8px", fontSize: 11, fontWeight: 700,
@@ -122,7 +127,18 @@ export const ListingImage = ({ photos, url, demo }) => {
           <Camera size={11} />
           {index + 1} / {count}
         </div>
-      )}
+      ) : (showImage && typeof photoCount === "number" && photoCount > 1) ? (
+        <div style={{
+          position: "absolute", bottom: 10, right: 10,
+          padding: "3px 9px 3px 8px", fontSize: 11, fontWeight: 700,
+          background: "rgba(15, 23, 42, 0.78)", color: "#fff",
+          borderRadius: 12,
+          display: "inline-flex", alignItems: "center", gap: 4
+        }}>
+          <Camera size={11} />
+          {photoCount} photos
+        </div>
+      ) : null}
     </div>
   );
 };
@@ -174,7 +190,7 @@ export const ListingCard = ({ listing, type = "sale", onOpen, showWatchToggle = 
     >
       {/* Hero photo area — edge-to-edge */}
       <div style={{ position: "relative" }}>
-        <ListingImage photos={listing.photos} url={listing.imageUrl} demo={listing.demo} />
+        <ListingImage photos={listing.photos} url={listing.imageUrl} demo={listing.demo} photoCount={listing.photoCount} />
         {showWatchToggle && (
           <button
             type="button"

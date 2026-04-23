@@ -1164,20 +1164,14 @@ export const AdvancedMarketIntel = () => {
   );
 
   // City drill-down priority:
-  //   1. User clicked a specific county on the map
-  //   2. User searched and matched exactly one market
-  //   3. State has a curated market in marketData  → first one
-  //   4. State has no curated market              → STATE_DEFAULT_CITIES fallback
-  // #4 is what makes the state dropdown work for states we haven't curated.
+  //   1. User clicked a specific county on the map → that city
+  //   2. User searched and matched exactly one market → that city
+  //   3. Otherwise → null (state-wide query; server returns all listings in state)
   const liveListingsCity = useMemo(() => {
     if (clickedArea && clickedArea.city) return clickedArea.city;
     if (searchResults.length === 1) return searchResults[0].city;
-    if (selectedState) {
-      if (stateMarkets.length > 0) return stateMarkets[0].city;
-      return STATE_DEFAULT_CITIES[selectedState] || null;
-    }
     return null;
-  }, [clickedArea, searchResults, selectedState, stateMarkets]);
+  }, [clickedArea, searchResults]);
 
   const liveListingsStateMarkets = useMemo(() => {
     if (selectedState) return stateMarkets;

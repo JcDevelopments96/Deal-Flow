@@ -22,9 +22,15 @@ const pushUnique = (arr, url) => {
  */
 export function normalizeRealtor(r) {
   if (!r) return null;
+
+  // The v3/list endpoint only returns `primary_photo`. Full multi-photo
+  // arrays require a separate /v3/detail call per property (expensive).
+  // We surface the single primary + `photoCount` so the UI can show
+  // "1 / 23" even when we've only actually loaded one.
   const photos = [];
   pushUnique(photos, r.primary_photo?.href);
   if (Array.isArray(r.photos)) for (const p of r.photos) pushUnique(photos, p?.href);
+  const photoCount = typeof r.photo_count === "number" ? r.photo_count : photos.length;
 
   const addr = r.location?.address || {};
   const city = addr.city || null;
@@ -36,9 +42,10 @@ export function normalizeRealtor(r) {
   const sqft = r.description?.sqft ?? null;
 
   const formattedAddress = [street, city, state].filter(Boolean).join(", ");
-  const permalink = r.permalink
-    ? `https://www.realtor.com/realestateandhomes-detail/${r.permalink}`
-    : null;
+  // `r.href` is the full realtor.com URL ("https://www.realtor.com/realestateandhomes-detail/...").
+  // `r.permalink` is inconsistently populated by v3/list; `r.href` is reliable.
+  const externalUrl = r.href
+    || (r.permalink ? `https://www.realtor.com/realestateandhomes-detail/${r.permalink}` : null);
 
   return {
     id: r.listing_id || r.property_id || `realtor-${street}-${zip}`,
@@ -58,8 +65,10 @@ export function normalizeRealtor(r) {
     longitude: addr.coordinate?.lon ?? null,
     pricePerSqft: price && sqft ? Math.round(price / sqft) : null,
     photos,
+    photoCount,
     imageUrl: photos[0] || null,
-    externalUrl: permalink,
+    externalUrl,
+    virtualTour: Array.isArray(r.virtual_tours) && r.virtual_tours.length > 0 ? r.virtual_tours[0]?.href : null,
     sourceProvider: "realtor"
   };
 }
@@ -111,8 +120,10 @@ export function normalizeRentCast(r) {
     longitude: r.longitude ?? null,
     pricePerSqft: price && sqft ? Math.round(price / sqft) : null,
     photos,
+    photoCount: photos.length,
     imageUrl: photos[0] || null,
     externalUrl: null,
+    virtualTour: null,
     sourceProvider: "rentcast"
   };
 }
