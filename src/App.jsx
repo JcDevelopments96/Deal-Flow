@@ -28,6 +28,7 @@ import { WatchlistView } from "./views/WatchlistView.jsx";
 import { EducationCenter } from "./views/EducationCenter.jsx";
 import { Analyzer } from "./analyzer/Analyzer.jsx";
 import { AdvancedMarketIntel } from "./market/AdvancedMarketIntel.jsx";
+import { ErrorBoundary } from "./ErrorBoundary.jsx";
 import { MarketIntelRibbon } from "./market/MarketIntelRibbon.jsx";
 import { TemplatePicker } from "./modals/TemplatePicker.jsx";
 import { UnsavedChangesModal } from "./modals/UnsavedChangesModal.jsx";
@@ -468,7 +469,7 @@ function BRRRRTrackerInner() {
             Research investment markets across the US
           </div>
         </div>
-        <AdvancedMarketIntel />
+        <ErrorBoundary><AdvancedMarketIntel /></ErrorBoundary>
       </div>}
 
       {view === "watchlist" && <WatchlistView />}

@@ -1098,56 +1098,67 @@ export const AdvancedMarketIntel = () => {
 
   // URL deep-link sync — ?state=FL&county=12086 on the URL seeds the view on
   // load and stays in sync with user actions so links are shareable +
-  // refresh preserves context. Uses history.pushState so back/forward work.
+  // refresh preserves context. Wrapped in try/catch because a broken
+  // URL API on some fringe browser shouldn't take the whole view down.
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const urlState = params.get("state");
-    const urlCounty = params.get("county"); // 5-char state+county FIPS
-    if (urlState && !selectedState) setSelectedState(urlState);
-    if (urlCounty && urlCounty.length === 5 && !clickedArea) {
-      // Seed minimal clickedArea — FIPS is enough for Census/HUD/BLS fetches.
-      // Map click handler will fill in name when the user interacts.
-      setClickedArea({
-        state: urlState || "",
-        stateFips: urlCounty.slice(0, 2),
-        countyFips: urlCounty.slice(2),
-        city: null,
-        county: null
-      });
-    }
-    const handlePop = () => {
-      const p = new URLSearchParams(window.location.search);
-      setSelectedState(p.get("state") || "");
-      const c = p.get("county");
-      if (c && c.length === 5) {
-        setClickedArea(prev => prev ?? ({
-          state: p.get("state") || "",
-          stateFips: c.slice(0, 2),
-          countyFips: c.slice(2),
-          city: null, county: null
-        }));
-      } else {
-        setClickedArea(null);
+    try {
+      if (typeof window === "undefined" || !window.location) return;
+      const params = new URLSearchParams(window.location.search);
+      const urlState = params.get("state");
+      const urlCounty = params.get("county");
+      if (urlState) setSelectedState(urlState);
+      if (urlCounty && urlCounty.length === 5) {
+        setClickedArea({
+          state: urlState || "",
+          stateFips: urlCounty.slice(0, 2),
+          countyFips: urlCounty.slice(2),
+          city: null,
+          county: null
+        });
       }
-    };
-    window.addEventListener("popstate", handlePop);
-    return () => window.removeEventListener("popstate", handlePop);
+      const handlePop = () => {
+        try {
+          const p = new URLSearchParams(window.location.search);
+          setSelectedState(p.get("state") || "");
+          const c = p.get("county");
+          if (c && c.length === 5) {
+            setClickedArea({
+              state: p.get("state") || "",
+              stateFips: c.slice(0, 2),
+              countyFips: c.slice(2),
+              city: null, county: null
+            });
+          } else {
+            setClickedArea(null);
+          }
+        } catch (e) { console.warn("popstate sync failed:", e); }
+      };
+      window.addEventListener("popstate", handlePop);
+      return () => window.removeEventListener("popstate", handlePop);
+    } catch (e) {
+      console.warn("URL seed failed:", e);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // Push URL when state or county selection changes
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (selectedState) params.set("state", selectedState);
-    else params.delete("state");
-    if (clickedArea?.stateFips && clickedArea?.countyFips) {
-      params.set("county", `${clickedArea.stateFips}${clickedArea.countyFips}`);
-    } else {
-      params.delete("county");
-    }
-    const qs = params.toString();
-    const newUrl = `${window.location.pathname}${qs ? "?" + qs : ""}${window.location.hash}`;
-    if (newUrl !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
-      window.history.replaceState(null, "", newUrl);
+    try {
+      if (typeof window === "undefined" || !window.history) return;
+      const params = new URLSearchParams(window.location.search);
+      if (selectedState) params.set("state", selectedState);
+      else params.delete("state");
+      if (clickedArea?.stateFips && clickedArea?.countyFips) {
+        params.set("county", `${clickedArea.stateFips}${clickedArea.countyFips}`);
+      } else {
+        params.delete("county");
+      }
+      const qs = params.toString();
+      const newUrl = `${window.location.pathname}${qs ? "?" + qs : ""}${window.location.hash}`;
+      if (newUrl !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+        window.history.replaceState(null, "", newUrl);
+      }
+    } catch (e) {
+      console.warn("URL push failed:", e);
     }
   }, [selectedState, clickedArea?.stateFips, clickedArea?.countyFips]);
   const [countyCensus, setCountyCensus] = useState(null);
