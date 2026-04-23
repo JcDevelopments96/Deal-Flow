@@ -14,7 +14,7 @@ import { Panel, CalcTooltip } from "../primitives.jsx";
 import { USCountyMap, MAP_METRICS } from "./USCountyMap.jsx";
 import { LiveListingsPanel } from "./LiveListingsPanel.jsx";
 import { STATE_NAMES, STATE_DEFAULT_CITIES } from "./mapUtils.js";
-import { isSaasMode, useSaasUser, fetchCountyCensus, fetchCountyFMR, fetchMarketIndexes, fetchCountyUnemployment } from "../lib/saas.js";
+import { isSaasMode, useSaasUser, fetchCountyCensus, fetchCountyFMR, fetchMarketIndexes, fetchCountyUnemployment, fetchMortgageRate } from "../lib/saas.js";
 
 const RepeatIcon = RotateCcw;
 
@@ -1082,6 +1082,74 @@ export const AdvancedMarketIntel = () => {
   // from our /api/census/county proxy (cached 24h server-side).
   const saas = useSaasUser();
   const saasOn = isSaasMode();
+
+  // Live 30-year mortgage rate — fetched once per session (12h cache server-side)
+  // and passed to the listing cards for quick-cashflow estimates.
+  const [mortgageRate, setMortgageRate] = useState(null);
+  useEffect(() => {
+    if (!saasOn || !saas.user) return;
+    let cancelled = false;
+    fetchMortgageRate(saas.getToken)
+      .then(b => { if (!cancelled && typeof b.rate === "number") setMortgageRate(b.rate); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saasOn, saas.user]);
+
+  // URL deep-link sync — ?state=FL&county=12086 on the URL seeds the view on
+  // load and stays in sync with user actions so links are shareable +
+  // refresh preserves context. Uses history.pushState so back/forward work.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlState = params.get("state");
+    const urlCounty = params.get("county"); // 5-char state+county FIPS
+    if (urlState && !selectedState) setSelectedState(urlState);
+    if (urlCounty && urlCounty.length === 5 && !clickedArea) {
+      // Seed minimal clickedArea — FIPS is enough for Census/HUD/BLS fetches.
+      // Map click handler will fill in name when the user interacts.
+      setClickedArea({
+        state: urlState || "",
+        stateFips: urlCounty.slice(0, 2),
+        countyFips: urlCounty.slice(2),
+        city: null,
+        county: null
+      });
+    }
+    const handlePop = () => {
+      const p = new URLSearchParams(window.location.search);
+      setSelectedState(p.get("state") || "");
+      const c = p.get("county");
+      if (c && c.length === 5) {
+        setClickedArea(prev => prev ?? ({
+          state: p.get("state") || "",
+          stateFips: c.slice(0, 2),
+          countyFips: c.slice(2),
+          city: null, county: null
+        }));
+      } else {
+        setClickedArea(null);
+      }
+    };
+    window.addEventListener("popstate", handlePop);
+    return () => window.removeEventListener("popstate", handlePop);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Push URL when state or county selection changes
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (selectedState) params.set("state", selectedState);
+    else params.delete("state");
+    if (clickedArea?.stateFips && clickedArea?.countyFips) {
+      params.set("county", `${clickedArea.stateFips}${clickedArea.countyFips}`);
+    } else {
+      params.delete("county");
+    }
+    const qs = params.toString();
+    const newUrl = `${window.location.pathname}${qs ? "?" + qs : ""}${window.location.hash}`;
+    if (newUrl !== `${window.location.pathname}${window.location.search}${window.location.hash}`) {
+      window.history.replaceState(null, "", newUrl);
+    }
+  }, [selectedState, clickedArea?.stateFips, clickedArea?.countyFips]);
   const [countyCensus, setCountyCensus] = useState(null);
   const [countyFmr, setCountyFmr] = useState(null);
   const [countyIndexes, setCountyIndexes] = useState(null);
@@ -1728,6 +1796,9 @@ export const AdvancedMarketIntel = () => {
               bathsFilter={bathsFilter}
               onStatsComputed={setLiveCityStats}
               onListingsLoaded={setLiveListings}
+              countyFmr={countyFmr}
+              mortgageRate={mortgageRate}
+              countyStats={liveCityStats?.byCounty || null}
             />
           </div>
         </div>

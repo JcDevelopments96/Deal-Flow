@@ -2,17 +2,55 @@
    LISTING DETAIL MODAL — expanded single-listing view with Analyze /
    Save to Watchlist / Full Listing actions.
    ============================================================================ */
-import React, { useEffect, useState } from "react";
-import { X, Star, Calculator, ExternalLink, AlertTriangle, Building2, Droplets, Footprints } from "lucide-react";
+import React, { useEffect, useState, useMemo } from "react";
+import { X, Star, Calculator, ExternalLink, AlertTriangle, Building2, Droplets, Footprints, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { THEME } from "../theme.js";
 import { fmtUSD } from "../utils.js";
 import { useAppActions } from "../contexts.jsx";
 import { isSaasMode, useSaasUser, fetchFloodZone, fetchWalkScore } from "../lib/saas.js";
+import { estimateCashflow } from "./cashflow.js";
 
-export const ListingDetailModal = ({ listing, type = "sale", onClose }) => {
+export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr, mortgageRate, countyStats }) => {
   const { isWatched, toggleWatch, useListingAsDeal } = useAppActions();
   const watched = isWatched(listing.id);
   const isRental = type === "rental";
+
+  // Find the county stats row for THIS listing's county (not necessarily
+  // the clicked one — e.g. state-wide fetch returns listings from many counties).
+  const listingCountyStats = useMemo(() => {
+    if (!countyStats || !listing.county || typeof listing.county !== "string") return null;
+    const key = listing.county.toLowerCase().replace(/\s+county$/i, "");
+    return countyStats[key] || null;
+  }, [countyStats, listing.county]);
+
+  const cashflow = useMemo(
+    () => (!isRental ? estimateCashflow({
+      price: listing.price,
+      bedrooms: listing.bedrooms,
+      fmr: countyFmr,
+      mortgageRate
+    }) : null),
+    [isRental, listing.price, listing.bedrooms, countyFmr, mortgageRate]
+  );
+
+  // Compare this listing to the county median — tells investors at a glance
+  // whether they're looking at a discount or premium property.
+  const priceComparison = useMemo(() => {
+    if (!listingCountyStats || !listing.price) return null;
+    const median = listingCountyStats.medianPrice;
+    if (!median) return null;
+    const priceDeltaPct = +(((listing.price - median) / median) * 100).toFixed(1);
+    const ppsqftDelta = (listing.pricePerSqft && listingCountyStats.medianPpsqft)
+      ? +(((listing.pricePerSqft - listingCountyStats.medianPpsqft) / listingCountyStats.medianPpsqft) * 100).toFixed(1)
+      : null;
+    return {
+      median,
+      priceDeltaPct,
+      medianPpsqft: listingCountyStats.medianPpsqft,
+      ppsqftDelta,
+      sampleSize: listingCountyStats.listingCount
+    };
+  }, [listingCountyStats, listing.price, listing.pricePerSqft]);
 
   // On-demand enrichment — fired when the modal opens, per-listing, cached
   // server-side so re-opening the same listing is free.
@@ -183,6 +221,107 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose }) => {
               <div style={{ fontSize: 18, fontWeight: 700 }}>{listing.daysOnMarket ?? "—"}</div>
             </div>
           </div>
+
+          {/* County-median comparison — derived from the live listings fetch,
+              lets users instantly see if this property is priced above/below
+              its county. */}
+          {priceComparison && (
+            <div style={{
+              padding: 14, marginBottom: 20,
+              background: THEME.bgPanel, border: `1px solid ${THEME.border}`, borderRadius: 8
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: THEME.textMuted, marginBottom: 10 }}>
+                vs. County Median
+                <span style={{ marginLeft: 8, fontWeight: 500 }}>
+                  ({priceComparison.sampleSize} comparable listing{priceComparison.sampleSize === 1 ? "" : "s"})
+                </span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 10, color: THEME.textMuted }}>Price</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>
+                    {fmtUSD(listing.price)} vs {fmtUSD(priceComparison.median, { short: true })}
+                  </div>
+                  <div style={{
+                    fontSize: 12, fontWeight: 700, marginTop: 4,
+                    color: priceComparison.priceDeltaPct < 0 ? THEME.green
+                         : priceComparison.priceDeltaPct > 5 ? THEME.orange
+                         : THEME.textMuted,
+                    display: "inline-flex", alignItems: "center", gap: 4
+                  }}>
+                    {priceComparison.priceDeltaPct < 0 ? <TrendingDown size={12} /> : priceComparison.priceDeltaPct > 0 ? <TrendingUp size={12} /> : <Minus size={12} />}
+                    {Math.abs(priceComparison.priceDeltaPct)}% {priceComparison.priceDeltaPct <= 0 ? "below" : "above"} median
+                  </div>
+                </div>
+                {priceComparison.ppsqftDelta != null && (
+                  <div>
+                    <div style={{ fontSize: 10, color: THEME.textMuted }}>$/sqft</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>
+                      ${listing.pricePerSqft} vs ${priceComparison.medianPpsqft}
+                    </div>
+                    <div style={{
+                      fontSize: 12, fontWeight: 700, marginTop: 4,
+                      color: priceComparison.ppsqftDelta < 0 ? THEME.green
+                           : priceComparison.ppsqftDelta > 5 ? THEME.orange
+                           : THEME.textMuted,
+                      display: "inline-flex", alignItems: "center", gap: 4
+                    }}>
+                      {priceComparison.ppsqftDelta < 0 ? <TrendingDown size={12} /> : priceComparison.ppsqftDelta > 0 ? <TrendingUp size={12} /> : <Minus size={12} />}
+                      {Math.abs(priceComparison.ppsqftDelta)}% {priceComparison.ppsqftDelta <= 0 ? "below" : "above"} median
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Quick cashflow estimate — only shows when we have FMR for the
+              listing's county AND a live mortgage rate. */}
+          {cashflow && (
+            <div style={{
+              padding: 14, marginBottom: 20,
+              background: cashflow.monthlyCashflow >= 0 ? THEME.greenDim : THEME.bgOrange,
+              border: `1px solid ${cashflow.monthlyCashflow >= 0 ? THEME.green : THEME.orange}`,
+              borderRadius: 8
+            }}>
+              <div style={{
+                fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: cashflow.monthlyCashflow >= 0 ? THEME.green : THEME.orange,
+                marginBottom: 10,
+                display: "flex", alignItems: "center", gap: 6
+              }}>
+                {cashflow.monthlyCashflow >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                Quick Cashflow Estimate
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 10, color: THEME.textMuted }}>Est. Rent</div>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>{fmtUSD(cashflow.monthlyRent)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: THEME.textMuted }}>Mortgage P&amp;I</div>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>{fmtUSD(cashflow.monthlyPI)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: THEME.textMuted }}>Cashflow/mo</div>
+                  <div style={{
+                    fontSize: 14, fontWeight: 700,
+                    color: cashflow.monthlyCashflow >= 0 ? THEME.green : THEME.orange
+                  }}>
+                    {cashflow.monthlyCashflow >= 0 ? "+" : ""}{fmtUSD(cashflow.monthlyCashflow)}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, color: THEME.textMuted }}>Cap Rate</div>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>{cashflow.capRate != null ? `${cashflow.capRate}%` : "—"}</div>
+                </div>
+              </div>
+              <div style={{ fontSize: 10, color: THEME.textMuted, marginTop: 8, lineHeight: 1.4 }}>
+                25% down · {cashflow.assumptions.mortgageRate.toFixed(2)}% (live FRED rate) · HUD FMR {cashflow.assumptions.fmrYear} · 1.2% tax + 0.5% insurance + 20% reserves. Open in the Deal Analyzer to refine.
+              </div>
+            </div>
+          )}
 
           {/* Property intelligence — FEMA flood + Walk Score (all free APIs). */}
           {(flood || walk) && (

@@ -107,7 +107,7 @@ const computeLiveStats = (sales, rentals) => {
   return out;
 };
 
-export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarkets, bedsFilter = "any", bathsFilter = "any", onStatsComputed, onListingsLoaded }) => {
+export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarkets, bedsFilter = "any", bathsFilter = "any", onStatsComputed, onListingsLoaded, countyFmr, mortgageRate, countyStats }) => {
   const saasOn = isSaasMode();
 
   // SaaS hooks (safe to call even when saasOn=false — useSaasUser
@@ -150,6 +150,7 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
 
   const bedsRange = useMemo(() => parseFilterRange(bedsFilter), [bedsFilter]);
   const bathsRange = useMemo(() => parseFilterRange(bathsFilter), [bathsFilter]);
+  const [sortBy, setSortBy] = useState("newest"); // newest | priceAsc | priceDesc | ppsqft | dom
 
   const fetchRentCast = async () => {
     const params = new URLSearchParams({
@@ -361,12 +362,19 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Client-side filter pass — catches demo results and any upstream results that don't
-  // honor the query params. Rental "bedrooms" are not always accurate, so we soft-filter there.
-  const filteredListings = useMemo(
-    () => listings.filter(l => matchesRange(l.bedrooms, bedsRange) && matchesRange(l.bathrooms, bathsRange)),
-    [listings, bedsRange, bathsRange]
-  );
+  // Client-side filter + sort. Rental "bedrooms" are not always accurate, so
+  // we soft-filter there.
+  const filteredListings = useMemo(() => {
+    const out = listings.filter(l => matchesRange(l.bedrooms, bedsRange) && matchesRange(l.bathrooms, bathsRange));
+    const cmp = {
+      newest:    (a, b) => (new Date(b.listedDate || 0).getTime()) - (new Date(a.listedDate || 0).getTime()),
+      priceAsc:  (a, b) => (a.price ?? Infinity) - (b.price ?? Infinity),
+      priceDesc: (a, b) => (b.price ?? 0) - (a.price ?? 0),
+      ppsqft:    (a, b) => (a.pricePerSqft ?? Infinity) - (b.pricePerSqft ?? Infinity),
+      dom:       (a, b) => (a.daysOnMarket ?? Infinity) - (b.daysOnMarket ?? Infinity)
+    };
+    return out.sort(cmp[sortBy] || cmp.newest);
+  }, [listings, bedsRange, bathsRange, sortBy]);
   const filteredComps = useMemo(
     () => rentComps.filter(l => matchesRange(l.bedrooms, bedsRange) && matchesRange(l.bathrooms, bathsRange)),
     [rentComps, bedsRange, bathsRange]
@@ -592,12 +600,34 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
           )}
 
           <div style={{
-            fontSize: 12, fontWeight: 700, color: THEME.accent,
-            textTransform: "uppercase", letterSpacing: "0.1em",
-            marginBottom: 10, display: "flex", alignItems: "center", gap: 8
+            marginBottom: 10,
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            gap: 8, flexWrap: "wrap"
           }}>
-            <Building2 size={13} />
-            Properties For Sale ({filteredListings.length})
+            <div style={{
+              fontSize: 12, fontWeight: 700, color: THEME.accent,
+              textTransform: "uppercase", letterSpacing: "0.1em",
+              display: "flex", alignItems: "center", gap: 8
+            }}>
+              <Building2 size={13} />
+              Properties For Sale ({filteredListings.length})
+            </div>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              aria-label="Sort listings"
+              style={{
+                padding: "4px 8px", fontSize: 11,
+                borderRadius: 4, border: `1px solid ${THEME.border}`,
+                background: THEME.bg, color: THEME.text
+              }}
+            >
+              <option value="newest">Newest first</option>
+              <option value="priceAsc">Price: low → high</option>
+              <option value="priceDesc">Price: high → low</option>
+              <option value="ppsqft">$/sqft: low → high</option>
+              <option value="dom">Days on market</option>
+            </select>
           </div>
           {filteredListings.length === 0 ? (
             <div style={{ padding: 20, textAlign: "center", color: THEME.textMuted, fontSize: 12 }}>
@@ -611,7 +641,16 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
               gridTemplateColumns: isMobile() ? "1fr" : "repeat(auto-fill, minmax(260px, 1fr))",
               gap: 10, marginBottom: 24
             }}>
-              {filteredListings.map(l => <ListingCard key={l.id} listing={l} type="sale" onOpen={openDetail} />)}
+              {filteredListings.map(l => (
+                <ListingCard
+                  key={l.id}
+                  listing={l}
+                  type="sale"
+                  onOpen={openDetail}
+                  countyFmr={countyFmr}
+                  mortgageRate={mortgageRate}
+                />
+              ))}
             </div>
           )}
 
@@ -648,6 +687,9 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
           listing={detail.listing}
           type={detail.type}
           onClose={closeDetail}
+          countyFmr={countyFmr}
+          mortgageRate={mortgageRate}
+          countyStats={countyStats}
         />
       )}
 

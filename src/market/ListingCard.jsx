@@ -3,11 +3,12 @@
    overlays (watchlist star, photo count, demo badge), then price + inline
    stats + address + actions below.
    ============================================================================ */
-import React, { useState } from "react";
-import { Building2, Camera, ChevronLeft, ChevronRight, ExternalLink, Star, Plus } from "lucide-react";
+import React, { useState, useMemo } from "react";
+import { Building2, Camera, ChevronLeft, ChevronRight, ExternalLink, Star, Plus, TrendingUp, TrendingDown } from "lucide-react";
 import { THEME } from "../theme.js";
 import { fmtUSD } from "../utils.js";
 import { useAppActions } from "../contexts.jsx";
+import { estimateCashflow } from "./cashflow.js";
 
 /**
  * ListingImage — Zillow/Redfin-style hero photo with a simple carousel.
@@ -143,7 +144,7 @@ export const ListingImage = ({ photos, url, demo, photoCount }) => {
   );
 };
 
-export const ListingCard = ({ listing, type = "sale", onOpen, showWatchToggle = true }) => {
+export const ListingCard = ({ listing, type = "sale", onOpen, showWatchToggle = true, countyFmr, mortgageRate }) => {
   const isRental = type === "rental";
   const { isWatched, toggleWatch, useListingAsDeal } = useAppActions();
   const watched = isWatched(listing.id);
@@ -153,6 +154,21 @@ export const ListingCard = ({ listing, type = "sale", onOpen, showWatchToggle = 
   const baths = formatStat(listing.bathrooms, " ba");
   const sqft = formatStat(listing.squareFootage, " sqft");
   const inlineStats = [beds, baths, sqft].filter(Boolean).join("  ·  ");
+
+  // Quick-cashflow estimate using HUD FMR + live mortgage rate. Only
+  // shown for sale listings when all inputs are present — skipped for
+  // rentals and when the user hasn't clicked a county yet.
+  const cashflow = useMemo(
+    () => (!isRental
+      ? estimateCashflow({
+          price: listing.price,
+          bedrooms: listing.bedrooms,
+          fmr: countyFmr,
+          mortgageRate
+        })
+      : null),
+    [isRental, listing.price, listing.bedrooms, countyFmr, mortgageRate]
+  );
 
   return (
     <div
@@ -250,6 +266,29 @@ export const ListingCard = ({ listing, type = "sale", onOpen, showWatchToggle = 
         }}>
           {listing.formattedAddress}
         </div>
+
+        {/* Quick cashflow estimate — shows only when we have FMR + rate for
+            this listing's county. Green for positive, orange for negative. */}
+        {cashflow && (
+          <div
+            title={`HUD ${cashflow.assumptions.fmrYear} FMR for ${listing.bedrooms}BR × 25% down at ${cashflow.assumptions.mortgageRate.toFixed(2)}%. Includes 1.2% tax, 0.5% insurance, 20% reserves. Actual cashflow varies.`}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "5px 10px",
+              background: cashflow.monthlyCashflow >= 0 ? THEME.greenDim : THEME.bgOrange,
+              color:      cashflow.monthlyCashflow >= 0 ? THEME.green    : THEME.orange,
+              borderRadius: 6, fontSize: 11, fontWeight: 700
+            }}
+          >
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              {cashflow.monthlyCashflow >= 0 ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+              Est. {cashflow.monthlyCashflow >= 0 ? "+" : ""}{fmtUSD(cashflow.monthlyCashflow)}/mo
+            </span>
+            <span style={{ fontSize: 10, fontWeight: 600, opacity: 0.85 }}>
+              {cashflow.capRate != null ? `${cashflow.capRate}% cap` : ""}
+            </span>
+          </div>
+        )}
 
         {/* Meta line */}
         <div style={{
