@@ -192,10 +192,14 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
           setListings([]);
           setRentComps([]);
           setLiveMode(false);
-          setError("You've used all your Market Intel clicks for this period.");
-          setUpgradeReason("You've hit the free-tier limit. Pick a plan to keep searching.");
+          const onFree = saas.usage?.plan === "free";
+          setError(onFree
+            ? "Market Intel is a paid feature — subscribe to load live listings."
+            : "You've used all your Market Intel clicks for this period.");
+          setUpgradeReason(onFree
+            ? "Pick a plan to unlock Market Intel. Cancel anytime."
+            : "You've hit your monthly click limit. Upgrade for more.");
           setShowUpgrade(true);
-          // Refresh the meter so it reflects reality.
           saas.refetch();
         } else {
           console.warn("SaaS market fetch failed:", err);
@@ -358,13 +362,45 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
         }}>
           <div style={{ flex: 1, minWidth: 240 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: THEME.teal, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
-              <LogIn size={14} /> Sign in to load live listings
+              <LogIn size={14} /> Sign in to continue
             </div>
             <div style={{ fontSize: 11, color: THEME.textMuted, lineHeight: 1.5 }}>
-              Free plan includes 10 Market Intel clicks per month. Use the
-              Sign in / Sign up buttons at the top of the page.
+              Market Intel is a paid feature. Sign up for a DealTrack account
+              via the header and choose a plan to access real listings and
+              comparables.
             </div>
           </div>
+        </div>
+      )}
+
+      {/* SaaS mode + signed-in-free → paywall. Show the map + demo data
+          underneath but gate real listings behind an upgrade. */}
+      {saasOn && saas.user && saas.usage?.plan === "free" && (
+        <div style={{
+          padding: 16, marginBottom: 16,
+          background: THEME.bgOrange,
+          border: `1px solid ${THEME.orange}`,
+          borderRadius: 8,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          flexWrap: "wrap", gap: 12
+        }}>
+          <div style={{ flex: 1, minWidth: 260 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: THEME.orange, marginBottom: 4 }}>
+              Market Intel is a paid feature
+            </div>
+            <div style={{ fontSize: 12, color: THEME.textMuted, lineHeight: 1.5 }}>
+              Subscribe to load live listings and rental comparables. Starter
+              plan starts at $19 / month for 250 Market Intel clicks. Cancel
+              anytime.
+            </div>
+          </div>
+          <button
+            onClick={() => { setUpgradeReason(null); setShowUpgrade(true); }}
+            className="btn-accent-orange"
+            style={{ padding: "9px 16px", fontSize: 13 }}
+          >
+            See plans
+          </button>
         </div>
       )}
 

@@ -11,8 +11,11 @@ export const PLANS = {
     key: "free",
     name: "Free",
     priceMonthly: 0,
-    includedClicks: 10,
-    overageCostCents: null,   // overage not allowed on free — hard gate
+    // Market Intel is a paid feature. Free accounts can sign up + explore the
+    // rest of the app, but any call to /api/market/* returns 402 immediately
+    // and the UI routes them to the upgrade flow.
+    includedClicks: 0,
+    overageCostCents: null,
     priceIdEnv: null
   },
   starter: {

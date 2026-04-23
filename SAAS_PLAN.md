@@ -9,10 +9,14 @@ data providers (RentCast / Zillow).
 
 | Plan | Price | Market Intel clicks/mo | Overage | Notes |
 |---|---|---|---|---|
-| **Free** | $0 | 10 | blocked | lets people try it |
+| **Free** | $0 | 0 (paid feature) | blocked | signup only — no Market Intel access |
 | **Starter** | $19 / mo | 250 | $0.15 / click | small-scale investors |
 | **Pro** | $49 / mo | 1,000 | $0.10 / click | typical BRRRR operator |
 | **Scale** | $149 / mo | 5,000 | $0.05 / click | wholesalers, teams |
+
+Market Intel is gated behind a paid plan. Free accounts can still use the
+rest of the app (Dashboard, Analyzer, Calculator, Watchlist, Education);
+Market Intel surfaces a paywall banner instead of live listings.
 
 "Click" = one request that actually hits RentCast/Zillow's paid API.
 Pan/zoom, state filters, and cached results do **not** consume credit.
