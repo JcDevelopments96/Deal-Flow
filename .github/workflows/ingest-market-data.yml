@@ -1,0 +1,55 @@
+name: Ingest Market Data (Zillow + Redfin)
+
+# Runs scripts/ingest-market-data.js on a schedule so the `market_indexes`
+# Supabase table stays fresh without any per-user API cost. Pulls:
+#   - Zillow ZHVI (home value index) per county
+#   - Zillow ZORI (rent index) per county
+#   - Redfin county market tracker
+#
+# Both sources publish monthly (typically the 15th-22nd), so we run weekly
+# to catch each refresh within 7 days. Upserts are idempotent — running
+# against unchanged upstream data is a no-op, just overwrites rows.
+
+on:
+  # Every Tuesday at 06:00 UTC (~01:00 ET). Weekly is plenty; upstream data
+  # changes monthly. Manual trigger also supported below.
+  schedule:
+    - cron: '0 6 * * 2'
+  # Lets you trigger a fresh ingest anytime from the GitHub Actions tab
+  workflow_dispatch:
+
+# Auto-cancel duplicate runs so a manual trigger doesn't collide with the cron
+concurrency:
+  group: ingest-market-data
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    # Plenty of headroom — the job typically finishes in 3 min; biggest chunk
+    # is the 700MB Redfin download.
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install deps (only what the ingest script needs)
+        # `npm ci --omit=dev` skips Vite/React tooling — we just need
+        # @supabase/supabase-js at runtime. Much faster than full install.
+        run: npm ci --omit=dev
+
+      - name: Run ingestion
+        env:
+          # Supabase credentials — add these in GitHub → Settings → Secrets
+          # and variables → Actions. Same values you set in Vercel env.
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npm run ingest-market-data
