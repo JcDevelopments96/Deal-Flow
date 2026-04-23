@@ -138,26 +138,40 @@ async function parseRedfinTsv(filePath) {
   const iter = readCsvLines(filePath, { sep: "\t" });
   const first = await iter.next();
   const headers = parseCsvRow(first.value, "\t");
+  // Case-insensitive header lookup — Redfin uses UPPERCASE in this file.
+  const headerIndex = (name) => headers.findIndex(h => h && h.toUpperCase() === name.toUpperCase());
   const idx = {
-    period_end: headers.indexOf("period_end"),
-    region: headers.indexOf("region"),
-    stateFips: headers.indexOf("state_code"), // 2-letter state
-    region_type: headers.indexOf("region_type"),
-    median_sale_price: headers.indexOf("median_sale_price"),
-    median_dom: headers.indexOf("median_dom"),
-    inventory: headers.indexOf("inventory")
+    period_end: headerIndex("PERIOD_END"),
+    region: headerIndex("REGION"),
+    stateCode: headerIndex("STATE_CODE"),
+    region_type: headerIndex("REGION_TYPE"),
+    median_sale_price: headerIndex("MEDIAN_SALE_PRICE"),
+    median_dom: headerIndex("MEDIAN_DOM"),
+    inventory: headerIndex("INVENTORY"),
+    property_type: headerIndex("PROPERTY_TYPE")
   };
-  const byCounty = new Map(); // key: "stateCode:countyNameLower" -> { latest period_end, row cells }
+  for (const [k, v] of Object.entries(idx)) {
+    if (v === -1) console.warn(`  (warn) Redfin column not found: ${k}`);
+  }
+  const byCounty = new Map(); // key: "stateCode:countyNameLower" -> row data
+  let countyRowsSeen = 0;
   for await (const line of iter) {
     if (!line.trim()) continue;
     const cells = parseCsvRow(line, "\t");
     if (cells[idx.region_type] !== "county") continue;
-    const regionRaw = cells[idx.region] || ""; // e.g. "Miami-Dade County, FL"
-    // Some rows have period_end like "2024-03-31"; pick latest per region
+    // Redfin publishes one row per (county, property_type). We only want the
+    // "All Residential" rollup so we don't double-count condos/SFR/etc.
+    if (idx.property_type !== -1 && cells[idx.property_type] !== "All Residential") continue;
+    countyRowsSeen++;
+    const regionRaw = cells[idx.region] || "";
     const period = cells[idx.period_end];
     if (!period) continue;
-    const stateCode = cells[idx.stateFips];
-    const countyName = regionRaw.split(",")[0].replace(/\s+County$/i, "").trim().toLowerCase();
+    const stateCode = cells[idx.stateCode];
+    const countyName = regionRaw.split(",")[0]
+      .replace(/\s+County$/i, "")
+      .replace(/\s+Parish$/i, "")
+      .trim()
+      .toLowerCase();
     const key = `${stateCode}:${countyName}`;
     const existing = byCounty.get(key);
     if (!existing || existing.period < period) {
@@ -172,6 +186,7 @@ async function parseRedfinTsv(filePath) {
       });
     }
   }
+  console.log(`    matched ${byCounty.size} counties from ${countyRowsSeen} rows`);
   return byCounty;
 }
 
