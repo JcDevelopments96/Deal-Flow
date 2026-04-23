@@ -11,7 +11,7 @@ import {
 import { THEME } from "../theme.js";
 import { fmtUSD, isMobile } from "../utils.js";
 import { Panel, CalcTooltip } from "../primitives.jsx";
-import { USCountyMap } from "./USCountyMap.jsx";
+import { USCountyMap, MAP_METRICS } from "./USCountyMap.jsx";
 import { LiveListingsPanel } from "./LiveListingsPanel.jsx";
 import { STATE_NAMES, STATE_DEFAULT_CITIES } from "./mapUtils.js";
 import { isSaasMode, useSaasUser, fetchCountyCensus, fetchCountyFMR, fetchMarketIndexes, fetchCountyUnemployment } from "../lib/saas.js";
@@ -993,6 +993,18 @@ export const AdvancedMarketIntel = () => {
     setShowSearchResults(false);
   };
 
+  // Reset the map back to the national view: clear state, search, clicked
+  // county, and any cached live results (so the map re-reads to grey).
+  const handleResetView = () => {
+    setSelectedState("");
+    setShowStateResults(false);
+    setSearchQuery("");
+    setShowSearchResults(false);
+    setClickedArea(null);
+    setLiveCityStats(null);
+    setLiveListings([]);
+  };
+
   const handleSearchChange = (value) => {
     setSearchQuery(value);
     setShowSearchResults(!!value.trim());
@@ -1043,6 +1055,10 @@ export const AdvancedMarketIntel = () => {
   // Live stats pushed up from LiveListingsPanel after each successful fetch.
   // Shape: { [cityKey]: {...}, byCounty: { [countyKey]: {...} }, __state__: {...} }
   const [liveCityStats, setLiveCityStats] = useState(null);
+  // Full listings array so the map can drop a pin for each one.
+  const [liveListings, setLiveListings] = useState([]);
+  // Which metric colors the map (price | yield | rent | listings).
+  const [mapMetric, setMapMetric] = useState("price");
 
   // Sorted, de-duplicated city + county lists for the filter dropdowns.
   const liveCityList = useMemo(() => {
@@ -1492,9 +1508,29 @@ export const AdvancedMarketIntel = () => {
           marginBottom: 24
         }}>
           <div style={{ position: isMobile() ? "static" : "sticky", top: 16 }}>
-            <Panel title="Market Map — US Counties" icon={<MapPin size={16} />} accent>
+            <Panel
+              title="Market Map — US Counties"
+              icon={<MapPin size={16} />}
+              accent
+              action={
+                <select
+                  value={mapMetric}
+                  onChange={(e) => setMapMetric(e.target.value)}
+                  aria-label="Metric shown on map"
+                  style={{
+                    padding: "4px 8px", fontSize: 11,
+                    borderRadius: 4, border: `1px solid ${THEME.border}`,
+                    background: THEME.bg, color: THEME.text
+                  }}
+                >
+                  {Object.values(MAP_METRICS).map(m => (
+                    <option key={m.key} value={m.key}>{m.label}</option>
+                  ))}
+                </select>
+              }
+            >
               <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 14 }}>
-                Click any county to load listings for that area on the right.
+                Color-coded by <strong>{MAP_METRICS[mapMetric].label}</strong> from live data · red pins mark each loaded listing · click any county to drill in.
               </div>
               <USCountyMap
                 allMarkets={allMarkets}
@@ -1502,6 +1538,9 @@ export const AdvancedMarketIntel = () => {
                 highlightedMarket={mapHighlight}
                 onCountyClick={handleMapCountyClick}
                 liveCountyStats={liveCityStats?.byCounty || null}
+                metric={mapMetric}
+                listings={liveListings}
+                onResetView={handleResetView}
               />
             </Panel>
           </div>
@@ -1688,13 +1727,35 @@ export const AdvancedMarketIntel = () => {
               bedsFilter={bedsFilter}
               bathsFilter={bathsFilter}
               onStatsComputed={setLiveCityStats}
+              onListingsLoaded={setLiveListings}
             />
           </div>
         </div>
       ) : (
-        <Panel title="Market Map — US Counties" icon={<MapPin size={16} />} accent style={{ marginBottom: 24 }}>
+        <Panel
+          title="Market Map — US Counties"
+          icon={<MapPin size={16} />}
+          accent
+          style={{ marginBottom: 24 }}
+          action={
+            <select
+              value={mapMetric}
+              onChange={(e) => setMapMetric(e.target.value)}
+              aria-label="Metric shown on map"
+              style={{
+                padding: "4px 8px", fontSize: 11,
+                borderRadius: 4, border: `1px solid ${THEME.border}`,
+                background: THEME.bg, color: THEME.text
+              }}
+            >
+              {Object.values(MAP_METRICS).map(m => (
+                <option key={m.key} value={m.key}>{m.label}</option>
+              ))}
+            </select>
+          }
+        >
           <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 14 }}>
-            Counties color-coded by live median sale price from Realtor.com — greener = more affordable, redder = pricier. Click any county to drill in and load listings + rental comps for that area.
+            Pick a state above or click any county to load live listings. Choose a metric on the right to switch the heat layer.
           </div>
           <USCountyMap
             allMarkets={allMarkets}
@@ -1702,6 +1763,9 @@ export const AdvancedMarketIntel = () => {
             highlightedMarket={mapHighlight}
             onCountyClick={handleMapCountyClick}
             liveCountyStats={liveCityStats?.byCounty || null}
+            metric={mapMetric}
+            listings={liveListings}
+            onResetView={handleResetView}
           />
         </Panel>
       )}

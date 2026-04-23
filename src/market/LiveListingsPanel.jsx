@@ -107,7 +107,7 @@ const computeLiveStats = (sales, rentals) => {
   return out;
 };
 
-export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarkets, bedsFilter = "any", bathsFilter = "any", onStatsComputed }) => {
+export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarkets, bedsFilter = "any", bathsFilter = "any", onStatsComputed, onListingsLoaded }) => {
   const saasOn = isSaasMode();
 
   // SaaS hooks (safe to call even when saasOn=false — useSaasUser
@@ -275,11 +275,13 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
           setLiveMode(false);
           setError("No live results for this area — showing demo data.");
           if (onStatsComputed) onStatsComputed(null);
+          if (onListingsLoaded) onListingsLoaded([]);
         } else {
           setListings(result.listings);
           setRentComps(result.rentals);
           setLiveMode(true);
           if (onStatsComputed) onStatsComputed(computeLiveStats(result.listings, result.rentals));
+          if (onListingsLoaded) onListingsLoaded(result.listings);
         }
       } catch (err) {
         if (err instanceof QuotaExceededError) {
