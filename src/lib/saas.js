@@ -144,6 +144,33 @@ export async function removeWatchlistItem(getToken, listingId) {
   return fetchMetered(getToken, `/api/watchlist?${qs.toString()}`, { method: "DELETE" });
 }
 
+/* ── Team / local pros CRUD (per-user contacts for each market) ──────── */
+
+export async function fetchTeam(getToken) {
+  const body = await fetchMetered(getToken, "/api/team");
+  return body.contacts || [];
+}
+
+export async function saveTeamContact(getToken, contact) {
+  return fetchMetered(getToken, "/api/team", {
+    method: "POST",
+    body: JSON.stringify({ contact })
+  });
+}
+
+export async function updateTeamContact(getToken, id, updates) {
+  const qs = new URLSearchParams({ id: String(id) });
+  return fetchMetered(getToken, `/api/team?${qs.toString()}`, {
+    method: "PATCH",
+    body: JSON.stringify({ updates })
+  });
+}
+
+export async function removeTeamContact(getToken, id) {
+  const qs = new URLSearchParams({ id: String(id) });
+  return fetchMetered(getToken, `/api/team?${qs.toString()}`, { method: "DELETE" });
+}
+
 // Used once per sign-in to migrate local-only items into the server.
 export async function bulkUploadWatchlist(getToken, listings) {
   if (!listings || listings.length === 0) return { count: 0 };

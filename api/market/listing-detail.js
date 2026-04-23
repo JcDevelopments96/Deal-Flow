@@ -54,17 +54,18 @@ export default handler(async (req, res) => {
   const apiKey = process.env.RAPIDAPI_REALTOR_KEY;
   if (!apiKey) throw new ApiError(503, "provider_not_configured", "Set RAPIDAPI_REALTOR_KEY");
 
+  // v3/detail is a GET endpoint that returns the full home record with
+  // the complete photo array. (An earlier POST version of this call
+  // silently 404'd, which is why the modal was stuck on the primary photo.)
   const upstream = await fetch(
-    "https://realty-in-us.p.rapidapi.com/properties/v3/detail",
+    `https://realty-in-us.p.rapidapi.com/properties/v3/detail?property_id=${encodeURIComponent(id)}`,
     {
-      method: "POST",
+      method: "GET",
       headers: {
         "X-RapidAPI-Key": apiKey,
         "X-RapidAPI-Host": "realty-in-us.p.rapidapi.com",
-        "Content-Type": "application/json",
         accept: "application/json"
-      },
-      body: JSON.stringify({ property_id: id })
+      }
     }
   );
   if (!upstream.ok) {

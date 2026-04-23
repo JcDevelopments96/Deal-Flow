@@ -160,6 +160,42 @@ create policy watchlist_items_self_read on public.watchlist_items
 
 
 -- ────────────────────────────────────────────────────────────────────────
+-- team_contacts (real-estate team per user — agents, lenders, PMs, etc.)
+-- ────────────────────────────────────────────────────────────────────────
+create table if not exists public.team_contacts (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references public.users(id) on delete cascade,
+  role        text not null check (role in (
+                'agent','lender','property_manager','contractor',
+                'inspector','title','insurance','attorney','cpa',
+                'wholesaler','other')),
+  name        text not null,
+  company     text,
+  phone       text,
+  email       text,
+  website     text,
+  city        text,
+  state       text,
+  notes       text,
+  rating      integer check (rating is null or (rating >= 1 and rating <= 5)),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create index if not exists team_contacts_user_idx
+  on public.team_contacts(user_id, role);
+
+alter table public.team_contacts enable row level security;
+
+drop policy if exists team_contacts_self_read on public.team_contacts;
+create policy team_contacts_self_read on public.team_contacts
+  for select
+  using (
+    user_id in (select id from public.users where clerk_user_id = auth.jwt() ->> 'sub')
+  );
+
+
+-- ────────────────────────────────────────────────────────────────────────
 -- market_indexes (snapshot of public research data — Zillow + Redfin)
 --
 -- Populated by scripts/ingest-market-data.js (monthly cron / manual run).

@@ -1,0 +1,434 @@
+/* ============================================================================
+   TEAM VIEW — investor's local real-estate team. Build a roster of
+   agents, lenders, property managers, contractors, inspectors, etc.
+   per market so the right contact is one click away.
+   ============================================================================ */
+import React, { useEffect, useState, useMemo, useCallback } from "react";
+import {
+  Plus, Users, Search, Filter, Phone, Mail, Globe, Edit3, Trash2,
+  Star, Building2, X, UserPlus
+} from "lucide-react";
+import { THEME } from "../theme.js";
+import { isMobile } from "../utils.js";
+import { Panel } from "../primitives.jsx";
+import { useToast } from "../contexts.jsx";
+import {
+  isSaasMode, useSaasUser,
+  fetchTeam, saveTeamContact, updateTeamContact, removeTeamContact
+} from "../lib/saas.js";
+
+const ROLES = [
+  { key: "agent",            label: "Agent",             icon: "🏠", hint: "Investor-friendly realtor" },
+  { key: "lender",           label: "Lender",            icon: "💰", hint: "DSCR / conventional / private" },
+  { key: "property_manager", label: "Property Manager",  icon: "🔑", hint: "Handles your rental" },
+  { key: "contractor",       label: "Contractor",        icon: "🔨", hint: "Rehab / repairs" },
+  { key: "inspector",        label: "Inspector",         icon: "🔍", hint: "Home / termite / HVAC" },
+  { key: "title",            label: "Title / Escrow",    icon: "📜", hint: "Closing & escrow" },
+  { key: "insurance",        label: "Insurance",         icon: "🛡️",  hint: "Property / landlord policy" },
+  { key: "attorney",         label: "Attorney",          icon: "⚖️",  hint: "Real estate / eviction" },
+  { key: "cpa",              label: "Accountant / CPA",  icon: "📊", hint: "Real estate tax" },
+  { key: "wholesaler",       label: "Wholesaler",        icon: "📈", hint: "Off-market deal source" },
+  { key: "other",            label: "Other",             icon: "👥", hint: "Anyone else" }
+];
+const ROLE_BY_KEY = Object.fromEntries(ROLES.map(r => [r.key, r]));
+
+const EMPTY = {
+  role: "agent", name: "", company: "", phone: "", email: "",
+  website: "", city: "", state: "", notes: "", rating: null
+};
+
+function ContactFormModal({ initial, onSave, onClose, onDelete }) {
+  const [draft, setDraft] = useState(initial || EMPTY);
+  const [busy, setBusy] = useState(false);
+  const update = (k, v) => setDraft(d => ({ ...d, [k]: v }));
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!draft.name || !draft.role) return;
+    setBusy(true);
+    try { await onSave(draft); onClose(); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div
+      role="dialog" aria-modal="true"
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, background: "rgba(15,23,42,0.6)",
+        display: "flex", alignItems: "flex-start", justifyContent: "center",
+        zIndex: 150, padding: 16, overflowY: "auto"
+      }}
+    >
+      <form onSubmit={submit} onClick={(e) => e.stopPropagation()} style={{
+        background: THEME.bg, borderRadius: 12, maxWidth: 560, width: "100%",
+        marginTop: 40, marginBottom: 40, padding: 24,
+        boxShadow: "0 20px 60px rgba(15,23,42,0.22)"
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h2 className="serif" style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>
+            {initial?.id ? "Edit Contact" : "Add Contact"}
+          </h2>
+          <button type="button" onClick={onClose} style={{
+            border: "none", background: "transparent", cursor: "pointer", color: THEME.textMuted
+          }} aria-label="Close"><X size={18} /></button>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr", gap: 10 }}>
+          <label style={{ gridColumn: "1 / -1" }}>
+            <div className="label-xs" style={{ marginBottom: 4 }}>Role *</div>
+            <select value={draft.role} onChange={(e) => update("role", e.target.value)}
+              style={{ width: "100%", padding: "8px 10px", fontSize: 13 }} required>
+              {ROLES.map(r => <option key={r.key} value={r.key}>{r.icon}  {r.label} — {r.hint}</option>)}
+            </select>
+          </label>
+          <label>
+            <div className="label-xs" style={{ marginBottom: 4 }}>Name *</div>
+            <input required value={draft.name} onChange={(e) => update("name", e.target.value)}
+              style={{ width: "100%", padding: "8px 10px", fontSize: 13 }} />
+          </label>
+          <label>
+            <div className="label-xs" style={{ marginBottom: 4 }}>Company</div>
+            <input value={draft.company || ""} onChange={(e) => update("company", e.target.value)}
+              style={{ width: "100%", padding: "8px 10px", fontSize: 13 }} />
+          </label>
+          <label>
+            <div className="label-xs" style={{ marginBottom: 4 }}>Phone</div>
+            <input type="tel" value={draft.phone || ""} onChange={(e) => update("phone", e.target.value)}
+              placeholder="(555) 123-4567"
+              style={{ width: "100%", padding: "8px 10px", fontSize: 13 }} />
+          </label>
+          <label>
+            <div className="label-xs" style={{ marginBottom: 4 }}>Email</div>
+            <input type="email" value={draft.email || ""} onChange={(e) => update("email", e.target.value)}
+              style={{ width: "100%", padding: "8px 10px", fontSize: 13 }} />
+          </label>
+          <label>
+            <div className="label-xs" style={{ marginBottom: 4 }}>Website</div>
+            <input type="url" value={draft.website || ""} onChange={(e) => update("website", e.target.value)}
+              placeholder="https://…"
+              style={{ width: "100%", padding: "8px 10px", fontSize: 13 }} />
+          </label>
+          <label>
+            <div className="label-xs" style={{ marginBottom: 4 }}>Rating (optional)</div>
+            <select value={draft.rating ?? ""} onChange={(e) => update("rating", e.target.value === "" ? null : Number(e.target.value))}
+              style={{ width: "100%", padding: "8px 10px", fontSize: 13 }}>
+              <option value="">—</option>
+              <option value="5">★★★★★</option>
+              <option value="4">★★★★</option>
+              <option value="3">★★★</option>
+              <option value="2">★★</option>
+              <option value="1">★</option>
+            </select>
+          </label>
+          <label>
+            <div className="label-xs" style={{ marginBottom: 4 }}>City</div>
+            <input value={draft.city || ""} onChange={(e) => update("city", e.target.value)}
+              style={{ width: "100%", padding: "8px 10px", fontSize: 13 }} />
+          </label>
+          <label>
+            <div className="label-xs" style={{ marginBottom: 4 }}>State</div>
+            <input value={draft.state || ""} onChange={(e) => update("state", e.target.value.toUpperCase())}
+              maxLength={2} placeholder="FL"
+              style={{ width: "100%", padding: "8px 10px", fontSize: 13, textTransform: "uppercase" }} />
+          </label>
+          <label style={{ gridColumn: "1 / -1" }}>
+            <div className="label-xs" style={{ marginBottom: 4 }}>Notes</div>
+            <textarea rows={3} value={draft.notes || ""} onChange={(e) => update("notes", e.target.value)}
+              placeholder="Specialty, best time to reach, referral fee arrangement, anything you want to remember"
+              style={{ width: "100%", padding: "8px 10px", fontSize: 13, resize: "vertical" }} />
+          </label>
+        </div>
+
+        <div style={{ display: "flex", gap: 10, marginTop: 16, justifyContent: "space-between" }}>
+          <div>
+            {initial?.id && (
+              <button type="button" onClick={onDelete}
+                className="btn-danger" style={{ padding: "8px 14px", fontSize: 12 }}>
+                <Trash2 size={12} /> Delete
+              </button>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" onClick={onClose} className="btn-secondary" style={{ padding: "8px 14px", fontSize: 12 }}>
+              Cancel
+            </button>
+            <button type="submit" disabled={busy} className="btn-primary" style={{ padding: "8px 14px", fontSize: 12 }}>
+              {busy ? "Saving…" : (initial?.id ? "Save changes" : "Add Contact")}
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+const ContactCard = ({ contact, onEdit }) => {
+  const role = ROLE_BY_KEY[contact.role] || ROLE_BY_KEY.other;
+  return (
+    <div
+      onClick={() => onEdit(contact)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEdit(contact); } }}
+      style={{
+        border: `1px solid ${THEME.border}`,
+        borderRadius: 8,
+        padding: 14,
+        background: THEME.bg,
+        cursor: "pointer",
+        transition: "border-color 0.15s, box-shadow 0.15s"
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.borderColor = THEME.accent;
+        e.currentTarget.style.boxShadow = "0 2px 8px rgba(15,23,42,0.06)";
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.borderColor = THEME.border;
+        e.currentTarget.style.boxShadow = "none";
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 6 }}>
+        <div>
+          <div style={{
+            display: "inline-block", padding: "2px 7px", fontSize: 10, fontWeight: 700,
+            background: THEME.bgTeal, color: THEME.teal,
+            borderRadius: 4, letterSpacing: "0.06em", textTransform: "uppercase"
+          }}>
+            {role.icon} {role.label}
+          </div>
+        </div>
+        <Edit3 size={14} color={THEME.textDim} />
+      </div>
+      <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 2 }}>{contact.name}</div>
+      {contact.company && <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 8 }}>{contact.company}</div>}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        {contact.phone && (
+          <a href={`tel:${contact.phone}`} onClick={(e) => e.stopPropagation()}
+            style={{ fontSize: 12, color: THEME.accent, display: "inline-flex", alignItems: "center", gap: 5, textDecoration: "none" }}>
+            <Phone size={11} /> {contact.phone}
+          </a>
+        )}
+        {contact.email && (
+          <a href={`mailto:${contact.email}`} onClick={(e) => e.stopPropagation()}
+            style={{ fontSize: 12, color: THEME.accent, display: "inline-flex", alignItems: "center", gap: 5, textDecoration: "none", wordBreak: "break-all" }}>
+            <Mail size={11} /> {contact.email}
+          </a>
+        )}
+        {contact.website && (
+          <a href={contact.website} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+            style={{ fontSize: 12, color: THEME.accent, display: "inline-flex", alignItems: "center", gap: 5, textDecoration: "none" }}>
+            <Globe size={11} /> {contact.website.replace(/^https?:\/\//, "").slice(0, 30)}
+          </a>
+        )}
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10, paddingTop: 8, borderTop: `1px solid ${THEME.borderLight}` }}>
+        <span style={{ fontSize: 11, color: THEME.textMuted }}>
+          {(contact.city || contact.state) ? [contact.city, contact.state].filter(Boolean).join(", ") : "—"}
+        </span>
+        {contact.rating ? (
+          <span style={{ fontSize: 11, color: "#F59E0B", fontWeight: 700 }}>{"★".repeat(contact.rating)}</span>
+        ) : null}
+      </div>
+      {contact.notes && (
+        <div style={{ fontSize: 11, color: THEME.textMuted, marginTop: 8, lineHeight: 1.4,
+          display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          {contact.notes}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const TeamView = () => {
+  const saas = useSaasUser();
+  const saasOn = isSaasMode();
+  const toast = useToast();
+  const [contacts, setContacts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [stateFilter, setStateFilter] = useState("all");
+  const [query, setQuery] = useState("");
+  const [editing, setEditing] = useState(null); // null = closed, {} = new, contact = edit
+
+  const load = useCallback(async () => {
+    if (!saasOn || !saas.user) { setContacts([]); setLoading(false); return; }
+    try {
+      setLoading(true);
+      const list = await fetchTeam(saas.getToken);
+      setContacts(list);
+    } catch (e) {
+      console.warn("team load failed:", e);
+    } finally { setLoading(false); }
+  }, [saasOn, saas.user, saas.getToken]);
+  useEffect(() => { load(); }, [load]);
+
+  const handleSave = async (draft) => {
+    try {
+      if (draft.id) {
+        const { id, created_at, updated_at, user_id, ...updates } = draft;
+        const { contact } = await updateTeamContact(saas.getToken, id, updates);
+        setContacts(prev => prev.map(c => c.id === id ? contact : c));
+        toast.push("Contact updated", "success");
+      } else {
+        const { contact } = await saveTeamContact(saas.getToken, draft);
+        setContacts(prev => [...prev, contact]);
+        toast.push("Contact added", "success");
+      }
+    } catch (e) {
+      toast.push(e.message || "Save failed", "error");
+      throw e;
+    }
+  };
+  const handleDelete = async () => {
+    if (!editing?.id) return;
+    if (!confirm(`Delete ${editing.name}?`)) return;
+    try {
+      await removeTeamContact(saas.getToken, editing.id);
+      setContacts(prev => prev.filter(c => c.id !== editing.id));
+      toast.push("Contact removed", "info");
+      setEditing(null);
+    } catch (e) {
+      toast.push(e.message || "Delete failed", "error");
+    }
+  };
+
+  const states = useMemo(() => {
+    const s = new Set(contacts.map(c => c.state).filter(Boolean));
+    return [...s].sort();
+  }, [contacts]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return contacts.filter(c => {
+      if (roleFilter !== "all" && c.role !== roleFilter) return false;
+      if (stateFilter !== "all" && c.state !== stateFilter) return false;
+      if (!q) return true;
+      const hay = [c.name, c.company, c.city, c.notes].filter(Boolean).join(" ").toLowerCase();
+      return hay.includes(q);
+    });
+  }, [contacts, roleFilter, stateFilter, query]);
+
+  const grouped = useMemo(() => {
+    const out = {};
+    for (const c of filtered) {
+      const role = c.role || "other";
+      if (!out[role]) out[role] = [];
+      out[role].push(c);
+    }
+    return out;
+  }, [filtered]);
+
+  if (!saasOn || !saas.user) {
+    return (
+      <div style={{ maxWidth: 560, margin: "60px auto", padding: 24, textAlign: "center" }}>
+        <Users size={32} color={THEME.textDim} style={{ marginBottom: 12 }} />
+        <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Sign in to build your team</h2>
+        <p style={{ fontSize: 13, color: THEME.textMuted }}>
+          Store agents, lenders, PMs, contractors, and more — synced across devices.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ maxWidth: 1400, margin: "0 auto", padding: isMobile() ? "16px" : "24px 28px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <h1 className="serif" style={{ fontSize: 26, fontWeight: 700, margin: 0 }}>Your Real Estate Team</h1>
+          <p style={{ fontSize: 13, color: THEME.textMuted, margin: "4px 0 0" }}>
+            The local pros you trust — one click away for every deal.
+          </p>
+        </div>
+        <button onClick={() => setEditing({})} className="btn-primary" style={{ padding: "10px 16px", fontSize: 13 }}>
+          <UserPlus size={14} /> Add Contact
+        </button>
+      </div>
+
+      <Panel title="Filters" icon={<Filter size={16} />} accent style={{ marginBottom: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "2fr 1fr 1fr", gap: 10 }}>
+          <div style={{ position: "relative" }}>
+            <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: THEME.textMuted }} />
+            <input value={query} onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search name, company, city, notes…"
+              style={{ width: "100%", padding: "9px 10px 9px 32px", fontSize: 13 }} />
+          </div>
+          <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}
+            style={{ padding: "9px 10px", fontSize: 13 }}>
+            <option value="all">All roles</option>
+            {ROLES.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+          </select>
+          <select value={stateFilter} onChange={(e) => setStateFilter(e.target.value)}
+            style={{ padding: "9px 10px", fontSize: 13 }} disabled={states.length === 0}>
+            <option value="all">All states</option>
+            {states.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+      </Panel>
+
+      {loading ? (
+        <div style={{ padding: 40, textAlign: "center", color: THEME.textMuted, fontSize: 13 }}>
+          Loading your team…
+        </div>
+      ) : contacts.length === 0 ? (
+        <div style={{ padding: "40px 20px", textAlign: "center", background: THEME.bgPanel, border: `1px dashed ${THEME.border}`, borderRadius: 10 }}>
+          <Building2 size={32} color={THEME.textDim} style={{ marginBottom: 10 }} />
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>No contacts yet</div>
+          <p style={{ fontSize: 12, color: THEME.textMuted, maxWidth: 380, margin: "0 auto 16px" }}>
+            Real-estate investing is a team sport. Start adding the agents, lenders, PMs, and contractors you lean on for each market.
+          </p>
+          <button onClick={() => setEditing({})} className="btn-primary" style={{ padding: "9px 14px", fontSize: 13 }}>
+            <Plus size={13} /> Add your first contact
+          </button>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div style={{ padding: 24, textAlign: "center", color: THEME.textMuted, fontSize: 13 }}>
+          No contacts match the current filters.
+        </div>
+      ) : (
+        ROLES.filter(r => grouped[r.key]?.length > 0).map(role => (
+          <div key={role.key} style={{ marginBottom: 24 }}>
+            <div style={{
+              fontSize: 11, fontWeight: 700, color: THEME.accent,
+              textTransform: "uppercase", letterSpacing: "0.1em",
+              marginBottom: 10, display: "flex", alignItems: "center", gap: 6
+            }}>
+              {role.icon} {role.label} ({grouped[role.key].length})
+            </div>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: isMobile() ? "1fr" : "repeat(auto-fill, minmax(280px, 1fr))",
+              gap: 12
+            }}>
+              {grouped[role.key].map(c => (
+                <ContactCard key={c.id} contact={c} onEdit={setEditing} />
+              ))}
+            </div>
+          </div>
+        ))
+      )}
+
+      {editing !== null && (
+        <ContactFormModal
+          initial={editing.id ? editing : null}
+          onSave={handleSave}
+          onClose={() => setEditing(null)}
+          onDelete={handleDelete}
+        />
+      )}
+
+      <Panel title="Don't have the team yet?" icon={<Users size={16} />} style={{ marginTop: 24 }}>
+        <div style={{ fontSize: 13, color: THEME.textMuted, lineHeight: 1.6 }}>
+          <p style={{ margin: "0 0 10px" }}>Where investor-focused pros tend to hang out:</p>
+          <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.8 }}>
+            <li><strong>BiggerPockets</strong> — forums + referral threads by state → <a href="https://www.biggerpockets.com/forums" target="_blank" rel="noopener noreferrer" style={{ color: THEME.accent }}>biggerpockets.com/forums</a></li>
+            <li><strong>Local REIA</strong> (Real Estate Investors Association) meetups — searchable at <a href="https://nationalreia.org/membership/find-a-reia/" target="_blank" rel="noopener noreferrer" style={{ color: THEME.accent }}>nationalreia.org</a></li>
+            <li><strong>Zillow Premier Agent directory</strong> for agents by zip → <a href="https://www.zillow.com/professionals/real-estate-agent-reviews/" target="_blank" rel="noopener noreferrer" style={{ color: THEME.accent }}>zillow.com/professionals</a></li>
+            <li><strong>DSCR-loan specialists</strong>: Kiavi, Visio, RCN Capital, Lima One — they all have broker programs with lender lists</li>
+            <li><strong>Facebook groups</strong>: "[State] Real Estate Investors" groups are surprisingly active for PM / contractor referrals</li>
+          </ul>
+        </div>
+      </Panel>
+    </div>
+  );
+};
