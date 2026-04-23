@@ -181,6 +181,14 @@ export async function fetchMarketIndexes(getToken, { regionType, regionId }) {
   return fetchMetered(getToken, `/api/market/indexes?${qs.toString()}`);
 }
 
+// Full-gallery + long-description lookup for a single Realtor listing.
+// Unmetered, cached 24h server-side — fired on-demand when the user opens
+// the detail modal.
+export async function fetchListingDetail(getToken, { id }) {
+  const qs = new URLSearchParams({ id: String(id) });
+  return fetchMetered(getToken, `/api/market/listing-detail?${qs.toString()}`);
+}
+
 // Per-property (lat/lng) lookups — flood zone + walk score — route through
 // /api/property?kind=... (also consolidated).
 export async function fetchFloodZone(getToken, { lat, lng }) {

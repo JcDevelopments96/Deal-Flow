@@ -3,11 +3,11 @@
    Save to Watchlist / Full Listing actions.
    ============================================================================ */
 import React, { useEffect, useState, useMemo } from "react";
-import { X, Star, Calculator, ExternalLink, AlertTriangle, Building2, Droplets, Footprints, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { X, Star, Calculator, ExternalLink, AlertTriangle, Building2, Droplets, Footprints, TrendingUp, TrendingDown, Minus, ChevronLeft, ChevronRight, Camera } from "lucide-react";
 import { THEME } from "../theme.js";
 import { fmtUSD } from "../utils.js";
 import { useAppActions } from "../contexts.jsx";
-import { isSaasMode, useSaasUser, fetchFloodZone, fetchWalkScore } from "../lib/saas.js";
+import { isSaasMode, useSaasUser, fetchFloodZone, fetchWalkScore, fetchListingDetail } from "../lib/saas.js";
 import { estimateCashflow } from "./cashflow.js";
 
 export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr, mortgageRate, countyStats }) => {
@@ -58,6 +58,39 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
   const saasOn = isSaasMode();
   const [flood, setFlood] = useState(null);
   const [walk, setWalk] = useState(null);
+  const [detail, setDetail] = useState(null);        // { photos, photoCount, description, ... }
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [photoIdx, setPhotoIdx] = useState(0);
+  const [heroErrored, setHeroErrored] = useState(false);
+
+  // Fetch the full gallery + description for this listing on open. Unmetered
+  // — user already paid a click for the listings fetch that produced this id.
+  useEffect(() => {
+    if (!saasOn || !saas.user || !listing.id || listing.demo) return;
+    let cancelled = false;
+    setDetailLoading(true);
+    fetchListingDetail(saas.getToken, { id: listing.id })
+      .then(d => { if (!cancelled) setDetail(d); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setDetailLoading(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listing.id, saasOn, saas.user]);
+
+  // Unified photo array: prefer detail's full gallery, fall back to the
+  // single primary photo from the listings fetch.
+  const photos = useMemo(() => {
+    const fromDetail = Array.isArray(detail?.photos) ? detail.photos.filter(Boolean) : [];
+    if (fromDetail.length > 0) return fromDetail;
+    const fromListing = Array.isArray(listing.photos) ? listing.photos.filter(Boolean) : [];
+    if (fromListing.length > 0) return fromListing;
+    return listing.imageUrl ? [listing.imageUrl] : [];
+  }, [detail, listing.photos, listing.imageUrl]);
+
+  // Reset carousel + hero error when a different listing opens.
+  useEffect(() => { setPhotoIdx(0); setHeroErrored(false); }, [listing.id]);
+  // Also clamp the index if the photo set shrinks.
+  useEffect(() => { if (photoIdx >= photos.length) setPhotoIdx(0); }, [photoIdx, photos.length]);
   useEffect(() => {
     if (!saasOn || !saas.user) return;
     const lat = Number(listing.latitude);
@@ -111,13 +144,16 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
           overflow: "hidden"
         }}
       >
-        {/* Hero image */}
+        {/* Hero carousel — uses the full Realtor gallery when the detail
+            fetch returns one, falls back to the listing's primary photo. */}
         <div style={{ position: "relative" }}>
-          <div style={{ aspectRatio: "16 / 9", background: THEME.bgPanel, overflow: "hidden" }}>
-            {listing.imageUrl ? (
+          <div style={{ aspectRatio: "16 / 9", background: THEME.bgPanel, overflow: "hidden", position: "relative" }}>
+            {photos.length > 0 && !heroErrored ? (
               <img
-                src={listing.imageUrl}
+                key={photos[photoIdx]}
+                src={photos[photoIdx]}
                 alt=""
+                onError={() => setHeroErrored(true)}
                 style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
               />
             ) : (
@@ -127,6 +163,54 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
                 display: "flex", alignItems: "center", justifyContent: "center"
               }}>
                 <Building2 size={64} color={THEME.textDim} />
+              </div>
+            )}
+
+            {/* Carousel arrows — only when multiple photos */}
+            {photos.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  aria-label="Previous photo"
+                  onClick={() => { setHeroErrored(false); setPhotoIdx(i => (i - 1 + photos.length) % photos.length); }}
+                  style={{
+                    position: "absolute", top: "50%", left: 12, transform: "translateY(-50%)",
+                    width: 40, height: 40, borderRadius: "50%",
+                    background: "rgba(15, 23, 42, 0.55)", color: "#fff", border: "none",
+                    display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer"
+                  }}
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Next photo"
+                  onClick={() => { setHeroErrored(false); setPhotoIdx(i => (i + 1) % photos.length); }}
+                  style={{
+                    position: "absolute", top: "50%", right: 12, transform: "translateY(-50%)",
+                    width: 40, height: 40, borderRadius: "50%",
+                    background: "rgba(15, 23, 42, 0.55)", color: "#fff", border: "none",
+                    display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer"
+                  }}
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </>
+            )}
+
+            {/* Photo count badge bottom-right */}
+            {(photos.length > 1 || detailLoading) && (
+              <div style={{
+                position: "absolute", bottom: 12, right: 12,
+                padding: "4px 10px", fontSize: 11, fontWeight: 700,
+                background: "rgba(15, 23, 42, 0.78)", color: "#fff",
+                borderRadius: 12,
+                display: "inline-flex", alignItems: "center", gap: 5
+              }}>
+                <Camera size={11} />
+                {detailLoading && photos.length <= 1
+                  ? "Loading photos…"
+                  : `${photoIdx + 1} / ${detail?.photoCount || photos.length}`}
               </div>
             )}
           </div>
@@ -221,6 +305,21 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
               <div style={{ fontSize: 18, fontWeight: 700 }}>{listing.daysOnMarket ?? "—"}</div>
             </div>
           </div>
+
+          {/* Long-form description from Realtor's detail endpoint. Shown
+              below the stats grid when present — gives the full listing
+              narrative without leaving the app. */}
+          {detail?.description && (
+            <div style={{
+              padding: 14, marginBottom: 20,
+              background: THEME.bgPanel, border: `1px solid ${THEME.border}`, borderRadius: 8,
+              fontSize: 12, color: THEME.textMuted, lineHeight: 1.6,
+              whiteSpace: "pre-wrap",
+              maxHeight: 180, overflowY: "auto"
+            }}>
+              {detail.description}
+            </div>
+          )}
 
           {/* County-median comparison — derived from the live listings fetch,
               lets users instantly see if this property is priced above/below
