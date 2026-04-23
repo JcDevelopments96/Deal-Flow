@@ -1,10 +1,15 @@
 /* ============================================================================
    LIVE LISTINGS & COMPARABLES PANEL — drives the RentCast / Zillow fetches,
    bed/bath filtering, and listing cards + detail modal.
+
+   Two operating modes:
+   - SaaS mode    : Clerk configured → fetch through /api/market/* so the
+                    user's RentCast key lives server-side + usage is metered
+   - Standalone   : no Clerk → user brings their own provider key (legacy)
    ============================================================================ */
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import {
-  Home, Building2, Filter, Settings, Key, RefreshCw, AlertTriangle
+  Home, Building2, Filter, Settings, Key, RefreshCw, AlertTriangle, LogIn
 } from "lucide-react";
 import { THEME } from "../theme.js";
 import { fmtUSD, isMobile } from "../utils.js";
@@ -17,8 +22,25 @@ import {
 } from "./providers.js";
 import { ListingCard } from "./ListingCard.jsx";
 import { ListingDetailModal } from "./ListingDetailModal.jsx";
+import { UsageMeter } from "./UsageMeter.jsx";
+import { UpgradeModal } from "../modals/UpgradeModal.jsx";
+import {
+  isSaasMode,
+  useSaasUser,
+  fetchSaleListings,
+  fetchRentalListings,
+  QuotaExceededError
+} from "../lib/saas.js";
 
 export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarkets, bedsFilter = "any", bathsFilter = "any" }) => {
+  const saasOn = isSaasMode();
+
+  // SaaS hooks (safe to call even when saasOn=false — useSaasUser
+  // short-circuits when Clerk isn't loaded / user isn't signed in).
+  const saas = useSaasUser();
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState(null);
+
   const initial = useMemo(loadProviderPrefs, []);
   const [provider, setProvider] = useState(initial.provider);
   const [keys, setKeys] = useState(initial.keys);
@@ -26,7 +48,7 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
   const openDetail = useCallback((listing, type) => setDetail({ listing, type }), []);
   const closeDetail = useCallback(() => setDetail(null), []);
   const [keyDrafts, setKeyDrafts] = useState({ rentcast: "", zillow: "" });
-  const [showKeyInput, setShowKeyInput] = useState(!initial.keys[initial.provider]);
+  const [showKeyInput, setShowKeyInput] = useState(!saasOn && !initial.keys[initial.provider]);
   const [listings, setListings] = useState([]);
   const [rentComps, setRentComps] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -117,9 +139,87 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
     };
   };
 
+  // SaaS path — both sale + rental come through /api/market/* so the RentCast
+  // key stays on the server and each call increments the user's usage counter.
+  const fetchViaSaas = async () => {
+    const qsBase = { city: targetCity, state: selectedState, limit: 20 };
+    // Only pass exact bedroom/bathroom when the filter is a specific number;
+    // RentCast's API doesn't support ranges there.
+    if (bedsRange.min !== null && bedsRange.min === bedsRange.max) {
+      qsBase.bedrooms = bedsRange.min;
+    }
+    if (bathsRange.min !== null && bathsRange.min === bathsRange.max) {
+      qsBase.bathrooms = bathsRange.min;
+    }
+
+    const [saleRes, rentRes] = await Promise.all([
+      fetchSaleListings(saas.getToken, qsBase).catch(e => { throw e; }),
+      // rentals are secondary — if they 402 separately, don't wipe out sale results
+      fetchRentalListings(saas.getToken, qsBase).catch(() => ({ rentals: [], usage: null }))
+    ]);
+
+    // Keep the meter fresh using the usage snapshot the proxy returned.
+    const usage = saleRes.usage || rentRes.usage;
+    if (usage) saas.setUsageLocally(usage);
+
+    return {
+      listings: (saleRes.listings || []).map(formatRentCastListing),
+      rentals: (rentRes.rentals || []).map(formatRentCastListing)
+    };
+  };
+
   const loadData = useCallback(async () => {
     if (!selectedState || !targetCity) return;
 
+    // SaaS mode, signed in → go through the metered proxy
+    if (saasOn && saas.user) {
+      setLoading(true);
+      setError("");
+      try {
+        const result = await fetchViaSaas();
+        if (result.listings.length === 0 && result.rentals.length === 0) {
+          setListings(buildDemoListings(selectedState, targetCity, referenceMarket));
+          setRentComps(buildDemoComps(selectedState, targetCity, referenceMarket));
+          setLiveMode(false);
+          setError("No live results for this area — showing demo data.");
+        } else {
+          setListings(result.listings);
+          setRentComps(result.rentals);
+          setLiveMode(true);
+        }
+      } catch (err) {
+        if (err instanceof QuotaExceededError) {
+          setListings([]);
+          setRentComps([]);
+          setLiveMode(false);
+          setError("You've used all your Market Intel clicks for this period.");
+          setUpgradeReason("You've hit the free-tier limit. Pick a plan to keep searching.");
+          setShowUpgrade(true);
+          // Refresh the meter so it reflects reality.
+          saas.refetch();
+        } else {
+          console.warn("SaaS market fetch failed:", err);
+          setListings(buildDemoListings(selectedState, targetCity, referenceMarket));
+          setRentComps(buildDemoComps(selectedState, targetCity, referenceMarket));
+          setLiveMode(false);
+          setError(err.message || "Live data unavailable — showing demo data.");
+        }
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // SaaS mode but user not signed in → show sign-in prompt + demo data
+    if (saasOn && !saas.user) {
+      setListings(buildDemoListings(selectedState, targetCity, referenceMarket));
+      setRentComps(buildDemoComps(selectedState, targetCity, referenceMarket));
+      setLiveMode(false);
+      setError("");
+      return;
+    }
+
+    // Standalone (non-SaaS) path — the legacy BYOK flow.
     if (!apiKey) {
       setListings(buildDemoListings(selectedState, targetCity, referenceMarket));
       setRentComps(buildDemoComps(selectedState, targetCity, referenceMarket));
@@ -152,7 +252,12 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
     } finally {
       setLoading(false);
     }
-  }, [apiKey, provider, selectedState, targetCity, referenceMarket, activeProvider.name, bedsFilter, bathsFilter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    saasOn, saas.user, saas.getToken,
+    apiKey, provider, selectedState, targetCity, referenceMarket,
+    activeProvider.name, bedsFilter, bathsFilter
+  ]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -196,7 +301,16 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
       accent
       style={{ marginBottom: 24 }}
       action={
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {saasOn && saas.usage && (
+            <UsageMeter
+              usage={saas.usage}
+              onUpgradeClick={() => {
+                setUpgradeReason(null);
+                setShowUpgrade(true);
+              }}
+            />
+          )}
           <span style={{
             padding: "3px 9px",
             fontSize: 10, fontWeight: 700,
@@ -205,15 +319,17 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
             background: liveMode ? THEME.greenDim : THEME.bgOrange,
             color: liveMode ? THEME.green : THEME.orange
           }}>
-            {liveMode ? `Live · ${activeProvider.name}` : "Demo"}
+            {liveMode ? `Live · ${saasOn ? "DealTrack" : activeProvider.name}` : "Demo"}
           </span>
-          <button
-            onClick={() => setShowKeyInput(s => !s)}
-            className="btn-ghost"
-            style={{ padding: "4px 10px", fontSize: 11 }}
-          >
-            <Settings size={12} /> {apiKey ? "Keys" : "Connect"}
-          </button>
+          {!saasOn && (
+            <button
+              onClick={() => setShowKeyInput(s => !s)}
+              className="btn-ghost"
+              style={{ padding: "4px 10px", fontSize: 11 }}
+            >
+              <Settings size={12} /> {apiKey ? "Keys" : "Connect"}
+            </button>
+          )}
           <button
             onClick={loadData}
             className="btn-ghost"
@@ -230,8 +346,30 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
         {stateName && ` (${stateName})`}. Click any county on the map above to pull listings for that area.
       </div>
 
-      {/* Prominent "Connect Live Data" banner when no key is set for the active provider */}
-      {!apiKey && !showKeyInput && (
+      {/* SaaS mode + signed out → prompt sign-in (click the header auth slot). */}
+      {saasOn && !saas.user && (
+        <div style={{
+          padding: 14, marginBottom: 16,
+          background: THEME.bgTeal,
+          border: `1px solid ${THEME.teal}`,
+          borderRadius: 8,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          flexWrap: "wrap", gap: 12
+        }}>
+          <div style={{ flex: 1, minWidth: 240 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: THEME.teal, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
+              <LogIn size={14} /> Sign in to load live listings
+            </div>
+            <div style={{ fontSize: 11, color: THEME.textMuted, lineHeight: 1.5 }}>
+              Free plan includes 10 Market Intel clicks per month. Use the
+              Sign in / Sign up buttons at the top of the page.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BYOK prompt — standalone mode only (hidden when SaaS is active). */}
+      {!saasOn && !apiKey && !showKeyInput && (
         <div style={{
           padding: 14, marginBottom: 16,
           background: THEME.bgTeal,
@@ -254,7 +392,7 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
         </div>
       )}
 
-      {showKeyInput && (
+      {!saasOn && showKeyInput && (
         <div style={{
           padding: 16, marginBottom: 16,
           background: THEME.bg, borderRadius: 8, border: `1px solid ${THEME.accent}`
@@ -424,6 +562,16 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
           listing={detail.listing}
           type={detail.type}
           onClose={closeDetail}
+        />
+      )}
+
+      {showUpgrade && saasOn && (
+        <UpgradeModal
+          plans={saas.plans}
+          currentPlan={saas.usage?.plan}
+          getToken={saas.getToken}
+          reason={upgradeReason}
+          onClose={() => { setShowUpgrade(false); setUpgradeReason(null); }}
         />
       )}
     </Panel>
