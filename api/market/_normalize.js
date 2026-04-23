@@ -57,10 +57,17 @@ export function normalizeRealtor(r) {
   const state = addr.state_code || addr.state || null;
   const street = addr.line || null;
   const zip = addr.postal_code || null;
-  // County name is inconsistently populated in v3/list responses — take it
-  // when present so the client can color the map by county-level medians.
-  const county = r.location?.county?.name || r.location?.county || null;
-  const countyFips = r.location?.county?.fips_code || null;
+  // County name is inconsistently populated in v3/list responses. Realtor
+  // sometimes returns an object ({name, fips_code}) and sometimes a bare
+  // string — we coerce to a string (or null) to keep downstream `.toLowerCase()`
+  // calls safe.
+  const rawCounty = r.location?.county;
+  const county = typeof rawCounty === "string"
+    ? rawCounty
+    : (rawCounty && typeof rawCounty.name === "string" ? rawCounty.name : null);
+  const countyFips = rawCounty && typeof rawCounty.fips_code === "string"
+    ? rawCounty.fips_code
+    : null;
 
   const price = r.list_price ?? null;
   const sqft = r.description?.sqft ?? null;

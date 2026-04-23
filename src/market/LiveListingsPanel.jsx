@@ -55,7 +55,7 @@ const computeLiveStats = (sales, rentals) => {
   for (const s of sales || []) {
     if (!s.price) continue;
     const cityKey = (s.city || "").toLowerCase();
-    const countyKey = (s.county || "").toLowerCase().replace(/\s+county$/i, "");
+    const countyKey = (typeof s.county === "string" ? s.county : "").toLowerCase().replace(/\s+county$/i, "");
     if (cityKey) {
       bump(cityBuckets, cityKey, "prices", s.price);
       if (s.pricePerSqft) bump(cityBuckets, cityKey, "ppsqft", s.pricePerSqft);
@@ -71,7 +71,7 @@ const computeLiveStats = (sales, rentals) => {
   for (const r of rentals || []) {
     if (!r.price) continue;
     const cityKey = (r.city || "").toLowerCase();
-    const countyKey = (r.county || "").toLowerCase().replace(/\s+county$/i, "");
+    const countyKey = (typeof r.county === "string" ? r.county : "").toLowerCase().replace(/\s+county$/i, "");
     if (cityKey) bump(cityBuckets, cityKey, "rents", r.price);
     if (countyKey) bump(countyBuckets, countyKey, "rents", r.price);
     state.rents.push(r.price);
