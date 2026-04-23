@@ -4,17 +4,20 @@
    stats + address + actions below.
    ============================================================================ */
 import React, { useState } from "react";
-import { Building2, Camera, ExternalLink, Star, Plus } from "lucide-react";
+import { Building2, Camera, ChevronLeft, ChevronRight, ExternalLink, Star, Plus } from "lucide-react";
 import { THEME } from "../theme.js";
 import { fmtUSD } from "../utils.js";
 import { useAppActions } from "../contexts.jsx";
 
 /**
- * ListingImage — hero photo. Accepts either:
- *   - `photos` array (preferred)  → shows count badge when > 1
- *   - `url` single URL (legacy)    → still works for older callers
+ * ListingImage — Zillow/Redfin-style hero photo with a simple carousel.
  *
- * Falls back to a Building2 icon on a neutral panel when no image or load error.
+ * Accepts either:
+ *   - `photos` array (preferred)  → arrows + count indicator when > 1
+ *   - `url` single URL (legacy)   → still works for older callers
+ *
+ * The arrows and count badge only appear when there's more than one photo.
+ * Arrow clicks stop propagation so they don't trigger the card's onOpen.
  */
 export const ListingImage = ({ photos, url, demo }) => {
   const urls = Array.isArray(photos) && photos.length > 0
@@ -22,10 +25,32 @@ export const ListingImage = ({ photos, url, demo }) => {
     : url
       ? [url]
       : [];
-  const primary = urls[0] || null;
   const count = urls.length;
+  const [index, setIndex] = useState(0);
   const [errored, setErrored] = useState(false);
-  const showImage = primary && !errored;
+  const current = urls[index] || null;
+  const showImage = current && !errored;
+
+  const prev = (e) => {
+    e.stopPropagation();
+    setErrored(false);
+    setIndex(i => (i - 1 + count) % count);
+  };
+  const next = (e) => {
+    e.stopPropagation();
+    setErrored(false);
+    setIndex(i => (i + 1) % count);
+  };
+
+  const arrowStyle = {
+    position: "absolute", top: "50%",
+    transform: "translateY(-50%)",
+    width: 32, height: 32, borderRadius: "50%",
+    background: "rgba(15, 23, 42, 0.55)", color: "#fff",
+    border: "none", cursor: "pointer",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    transition: "background 0.12s ease"
+  };
 
   return (
     <div style={{
@@ -40,7 +65,7 @@ export const ListingImage = ({ photos, url, demo }) => {
     }}>
       {showImage ? (
         <img
-          src={primary}
+          src={current}
           alt=""
           onError={() => setErrored(true)}
           loading="lazy"
@@ -49,6 +74,33 @@ export const ListingImage = ({ photos, url, demo }) => {
       ) : (
         <Building2 size={40} color={THEME.textDim} />
       )}
+
+      {/* Arrows — only when there's actually something to scroll through */}
+      {count > 1 && (
+        <>
+          <button
+            type="button"
+            aria-label="Previous photo"
+            onClick={prev}
+            style={{ ...arrowStyle, left: 8 }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(15, 23, 42, 0.82)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(15, 23, 42, 0.55)"; }}
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <button
+            type="button"
+            aria-label="Next photo"
+            onClick={next}
+            style={{ ...arrowStyle, right: 8 }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(15, 23, 42, 0.82)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(15, 23, 42, 0.55)"; }}
+          >
+            <ChevronRight size={18} />
+          </button>
+        </>
+      )}
+
       {demo && (
         <div style={{
           position: "absolute", top: 10, left: 10,
@@ -68,7 +120,7 @@ export const ListingImage = ({ photos, url, demo }) => {
           display: "inline-flex", alignItems: "center", gap: 4
         }}>
           <Camera size={11} />
-          {count}
+          {index + 1} / {count}
         </div>
       )}
     </div>

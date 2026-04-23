@@ -5,7 +5,7 @@
    ============================================================================ */
 import React, { useState, useMemo, useCallback } from "react";
 import {
-  Search, MapPin, DollarSign, TrendingUp, Gauge, Target, Trophy,
+  Search, MapPin, DollarSign, TrendingUp, Gauge, Target,
   Filter, RotateCcw, X
 } from "lucide-react";
 import { THEME } from "../theme.js";
@@ -23,7 +23,6 @@ const RepeatIcon = RotateCcw;
 const ALL_STATES = Object.keys(STATE_NAMES).sort();
 
 export const AdvancedMarketIntel = () => {
-  const [selectedMetric, setSelectedMetric] = useState("capRate");
   const [investmentGoal, setInvestmentGoal] = useState("cashFlow");
   const [selectedState, setSelectedState] = useState("");
   const [showStateResults, setShowStateResults] = useState(false);
@@ -1019,7 +1018,6 @@ export const AdvancedMarketIntel = () => {
   };
 
   const recommendedMarkets = getRecommendedMarkets(investmentGoal);
-  const topMarkets = getTopMarkets(selectedMetric, 5);
   const stateMarkets = selectedState ? getStateMarkets(selectedState) : [];
   const stateInfo = selectedState ? getStateInfo(selectedState) : null;
 
@@ -1458,37 +1456,6 @@ export const AdvancedMarketIntel = () => {
           <div className="label-xs" style={{ marginBottom: 10 }}>Top Recommended Markets For Your Goal</div>
           {recommendedMarkets.map((market, idx) => renderMarketCard(market, true, idx + 1))}
         </div>
-      </Panel>
-
-      {/* 6. TOP 5 MARKETS */}
-      <Panel title="Top 5 Markets" icon={<Trophy size={16} />}>
-        <div style={{ marginBottom: 16 }}>
-          <div className="label-xs" style={{ marginBottom: 8 }}>Rank by:</div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {[
-              { key: "capRate", label: "Cap Rate" },
-              { key: "rentGrowth", label: "Rent Growth" },
-              { key: "score", label: "Overall Score" },
-              { key: "brrrrScore", label: "Deal Score" }
-            ].map(metric => (
-              <button
-                key={metric.key}
-                onClick={() => setSelectedMetric(metric.key)}
-                style={{
-                  padding: "6px 12px", fontSize: 12,
-                  background: selectedMetric === metric.key ? THEME.accent : THEME.bgPanel,
-                  color: selectedMetric === metric.key ? THEME.bg : THEME.text,
-                  border: `1px solid ${selectedMetric === metric.key ? THEME.accent : THEME.border}`,
-                  borderRadius: 4, fontWeight: 600, cursor: "pointer"
-                }}
-              >
-                {metric.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {topMarkets.map((market, idx) => renderMarketCard(market, true, idx + 1))}
       </Panel>
     </div>
   );
