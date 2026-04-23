@@ -83,15 +83,27 @@ export const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCo
                   const isHighlighted = highlightedFips === stateFips && highlightedCounty === countyNorm;
                   const isInSelectedState = selectedFips === stateFips;
 
-                  // Every county gets a visible base fill + contrast stroke so the full map reads as a populated choropleth.
-                  let fill = THEME.bgRaised;
-                  let stroke = THEME.border;
-                  let strokeWidth = 0.4;
+                  // Every US county is covered by our listings data (Realtor.com is
+                  // nationwide), so every county gets a visible colored fill — the
+                  // map reads as "you can click anywhere" not "only 7 markets".
+                  //
+                  // Priority:
+                  //   1. Highlighted (active pin)  → accent
+                  //   2. Curated "tracked market"  → full heat-scale based on score
+                  //   3. Selected state            → teal tint
+                  //   4. Every other county        → soft mid-scale heat fill (coverage signal)
+                  const t_default = 0.5; // mid-scale neutral for untracked counties
+                  let fill = scoreToHeatFill(t_default);
+                  let stroke = scoreToHeatStroke(t_default);
+                  let strokeWidth = 0.45;
+                  // Dim non-tracked counties slightly so the tracked-market ones pop
+                  let opacity = 0.55;
 
                   if (isInSelectedState) {
                     fill = THEME.bgTeal;
                     stroke = THEME.teal;
                     strokeWidth = 0.55;
+                    opacity = 0.95;
                   }
                   if (isMarket) {
                     const score = getScore(market);
@@ -99,11 +111,13 @@ export const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCo
                     fill = scoreToHeatFill(t);
                     stroke = scoreToHeatStroke(t);
                     strokeWidth = 0.6;
+                    opacity = 1;
                   }
                   if (isHighlighted) {
                     fill = THEME.accent;
                     stroke = THEME.accentDim;
                     strokeWidth = 1.4;
+                    opacity = 1;
                   }
 
                   const hoverFill = isMarket
@@ -121,10 +135,11 @@ export const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCo
                       stroke={stroke}
                       strokeWidth={strokeWidth}
                       style={{
-                        default: { outline: "none", transition: "fill 0.2s" },
+                        default: { outline: "none", transition: "fill 0.2s, opacity 0.2s", opacity },
                         hover: {
                           fill: hoverFill,
                           stroke: hoverFill,
+                          opacity: 1,
                           outline: "none",
                           cursor: "pointer"
                         },
@@ -256,10 +271,11 @@ export const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCo
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{
             width: 14, height: 14, borderRadius: 2,
-            background: THEME.bgRaised,
-            border: `1px solid ${THEME.border}`
+            background: scoreToHeatFill(0.5),
+            border: `1px solid ${scoreToHeatStroke(0.5)}`,
+            opacity: 0.55
           }} />
-          <span>Other Counties (clickable)</span>
+          <span>Coverage (click any county)</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{

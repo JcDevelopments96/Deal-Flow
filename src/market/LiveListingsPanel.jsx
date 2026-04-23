@@ -32,7 +32,72 @@ import {
   QuotaExceededError
 } from "../lib/saas.js";
 
-export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarkets, bedsFilter = "any", bathsFilter = "any" }) => {
+// Median of an array of numbers, skipping non-numeric entries.
+const medianOf = (arr) => {
+  const nums = arr.filter(n => typeof n === "number" && Number.isFinite(n) && n > 0).sort((a, b) => a - b);
+  if (nums.length === 0) return null;
+  const mid = Math.floor(nums.length / 2);
+  return nums.length % 2 ? nums[mid] : Math.round((nums[mid - 1] + nums[mid]) / 2);
+};
+
+// Build per-city live stats from the fetched listings so the market cards
+// above can show live Realtor numbers instead of the hardcoded demo ones.
+// Keyed by city name lower-cased. Also includes a "__state__" rollup.
+const computeLiveStats = (sales, rentals) => {
+  const buckets = new Map(); // cityKey -> { prices: [], rents: [], ppsqft: [] }
+  const state = { prices: [], rents: [], ppsqft: [] };
+  const bump = (key, field, value) => {
+    if (!buckets.has(key)) buckets.set(key, { prices: [], rents: [], ppsqft: [] });
+    buckets.get(key)[field].push(value);
+  };
+  for (const s of sales || []) {
+    if (!s.price) continue;
+    const key = (s.city || "").toLowerCase();
+    if (key) {
+      bump(key, "prices", s.price);
+      if (s.pricePerSqft) bump(key, "ppsqft", s.pricePerSqft);
+    }
+    state.prices.push(s.price);
+    if (s.pricePerSqft) state.ppsqft.push(s.pricePerSqft);
+  }
+  for (const r of rentals || []) {
+    if (!r.price) continue;
+    const key = (r.city || "").toLowerCase();
+    if (key) bump(key, "rents", r.price);
+    state.rents.push(r.price);
+  }
+  const out = {};
+  for (const [key, { prices, rents, ppsqft }] of buckets) {
+    const medianPrice = medianOf(prices);
+    const medianRent = medianOf(rents);
+    out[key] = {
+      medianPrice,
+      medianRent,
+      medianPpsqft: medianOf(ppsqft),
+      // Gross yield = annual rent / price * 100. Not a true cap rate (no expense
+      // data), but close enough for a live freshness indicator.
+      grossYield: medianPrice && medianRent ? +((medianRent * 12 / medianPrice) * 100).toFixed(1) : null,
+      listingCount: prices.length,
+      rentalCount: rents.length,
+      isLive: true
+    };
+  }
+  out.__state__ = {
+    medianPrice: medianOf(state.prices),
+    medianRent: medianOf(state.rents),
+    medianPpsqft: medianOf(state.ppsqft),
+    grossYield: (() => {
+      const p = medianOf(state.prices), r = medianOf(state.rents);
+      return p && r ? +((r * 12 / p) * 100).toFixed(1) : null;
+    })(),
+    listingCount: state.prices.length,
+    rentalCount: state.rents.length,
+    isLive: true
+  };
+  return out;
+};
+
+export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarkets, bedsFilter = "any", bathsFilter = "any", onStatsComputed }) => {
   const saasOn = isSaasMode();
 
   // SaaS hooks (safe to call even when saasOn=false — useSaasUser
@@ -145,7 +210,10 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
   // SaaS path — both sale + rental come through /api/market/* so the RentCast
   // key stays on the server and each call increments the user's usage counter.
   const fetchViaSaas = async () => {
-    const qsBase = { state: selectedState, limit: 50 };
+    // Max page-size: Realtor.com tops out at 200 per call. Using the full page
+    // matters on state-only queries — at 50 the results cluster into the 7-ish
+    // highest-volume metros. 200 spreads across ~30-40 cities in large states.
+    const qsBase = { state: selectedState, limit: 200 };
     // City is optional for sale listings (state-wide query supported by Realtor).
     if (queryCity) qsBase.city = queryCity;
     // Only pass exact bedroom/bathroom when the filter is a specific number;
@@ -196,10 +264,12 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
           setRentComps(buildDemoComps(selectedState, targetCity, referenceMarket));
           setLiveMode(false);
           setError("No live results for this area — showing demo data.");
+          if (onStatsComputed) onStatsComputed(null);
         } else {
           setListings(result.listings);
           setRentComps(result.rentals);
           setLiveMode(true);
+          if (onStatsComputed) onStatsComputed(computeLiveStats(result.listings, result.rentals));
         }
       } catch (err) {
         if (err instanceof QuotaExceededError) {

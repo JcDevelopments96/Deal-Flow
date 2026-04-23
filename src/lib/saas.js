@@ -116,7 +116,8 @@ export function useSaasUser() {
  * into `useSaasUser().setUsageLocally(usage)` to keep the meter in sync.
  */
 export async function fetchSaleListings(getToken, { city, state, bedrooms, bathrooms, limit }) {
-  const qs = new URLSearchParams({ city, state });
+  const qs = new URLSearchParams({ state });
+  if (city) qs.set("city", city); // omit entirely for state-wide query — server supports it
   if (bedrooms) qs.set("bedrooms", bedrooms);
   if (bathrooms) qs.set("bathrooms", bathrooms);
   if (limit) qs.set("limit", String(limit));
@@ -124,9 +125,38 @@ export async function fetchSaleListings(getToken, { city, state, bedrooms, bathr
 }
 
 export async function fetchRentalListings(getToken, { city, state, bedrooms, bathrooms, limit }) {
-  const qs = new URLSearchParams({ city, state });
+  const qs = new URLSearchParams({ state });
+  if (city) qs.set("city", city);
   if (bedrooms) qs.set("bedrooms", bedrooms);
   if (bathrooms) qs.set("bathrooms", bathrooms);
   if (limit) qs.set("limit", String(limit));
   return fetchMetered(getToken, `/api/market/rentals?${qs.toString()}`);
+}
+
+/* ── Watchlist (per-user, survives sign-out) ─────────────────────────── */
+
+export async function fetchWatchlist(getToken) {
+  const body = await fetchMetered(getToken, "/api/watchlist");
+  return body.items || [];
+}
+
+export async function saveWatchlistItem(getToken, listing) {
+  return fetchMetered(getToken, "/api/watchlist", {
+    method: "POST",
+    body: JSON.stringify({ listing })
+  });
+}
+
+export async function removeWatchlistItem(getToken, listingId) {
+  const qs = new URLSearchParams({ listingId: String(listingId) });
+  return fetchMetered(getToken, `/api/watchlist?${qs.toString()}`, { method: "DELETE" });
+}
+
+// Used once per sign-in to migrate local-only items into the server.
+export async function bulkUploadWatchlist(getToken, listings) {
+  if (!listings || listings.length === 0) return { count: 0 };
+  return fetchMetered(getToken, "/api/watchlist?bulk=1", {
+    method: "POST",
+    body: JSON.stringify({ listings })
+  });
 }

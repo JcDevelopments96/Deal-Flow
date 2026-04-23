@@ -1039,6 +1039,11 @@ export const AdvancedMarketIntel = () => {
   // to the state selection so the LiveListingsPanel can query that county directly.
   const [clickedArea, setClickedArea] = useState(null);
 
+  // Live stats pushed up from LiveListingsPanel after each successful fetch.
+  // Keyed by city name lower-cased; includes a "__state__" rollup for state-wide queries.
+  // Shape: { [city]: { medianPrice, medianRent, grossYield, listingCount, ... } }
+  const [liveCityStats, setLiveCityStats] = useState(null);
+
   const handleMapCountyClick = useCallback((payload) => {
     if (!payload) return;
     if (payload.synthetic) {
@@ -1057,12 +1062,21 @@ export const AdvancedMarketIntel = () => {
     }
   }, []);
 
-  const renderMarketCard = (market, showRank = false, rank = 0) => (
+  const renderMarketCard = (market, showRank = false, rank = 0) => {
+    // Merge in live Realtor/RentCast stats for this city when we have them.
+    // Falls back to the curated hardcoded numbers when no live fetch has landed.
+    const cityKey = (market.city || "").toLowerCase();
+    const live = liveCityStats && liveCityStats[cityKey];
+    const medianPrice = live?.medianPrice ?? market.medianPrice;
+    const medianRent = live?.medianRent ?? market.medianRent;
+    const yieldVal = live?.grossYield ?? market.capRate;
+    const yieldLabel = live ? "YIELD" : "CAP RATE";
+    return (
     <div
       key={`${market.city}-${market.state}`}
       style={{
         padding: 16,
-        border: `1px solid ${THEME.border}`,
+        border: `1px solid ${live ? THEME.accent : THEME.border}`,
         borderRadius: 8,
         background: THEME.bgPanel,
         marginBottom: 12
@@ -1084,6 +1098,16 @@ export const AdvancedMarketIntel = () => {
             <div style={{ fontSize: 16, fontWeight: 700 }}>
               {market.city}, {market.state}
             </div>
+            {live && (
+              <span style={{
+                padding: "2px 7px", fontSize: 9, fontWeight: 700,
+                letterSpacing: "0.08em", textTransform: "uppercase",
+                borderRadius: 4,
+                background: THEME.greenDim, color: THEME.green
+              }}>
+                Live · {live.listingCount} homes
+              </span>
+            )}
           </div>
           {market.county && (
             <div style={{ fontSize: 11, color: THEME.textMuted, marginTop: 2 }}>
@@ -1108,15 +1132,15 @@ export const AdvancedMarketIntel = () => {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 12 }}>
         <div>
           <div style={{ fontSize: 10, color: THEME.textMuted }}>MEDIAN</div>
-          <div style={{ fontSize: 13, fontWeight: 600 }}>{fmtUSD(market.medianPrice, { short: true })}</div>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>{fmtUSD(medianPrice, { short: true })}</div>
         </div>
         <div>
           <div style={{ fontSize: 10, color: THEME.textMuted }}>RENT</div>
-          <div style={{ fontSize: 13, fontWeight: 600 }}>${market.medianRent}</div>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>{medianRent ? `$${Math.round(medianRent).toLocaleString()}` : "—"}</div>
         </div>
         <div>
-          <div style={{ fontSize: 10, color: THEME.textMuted }}>CAP RATE</div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: THEME.green }}>{market.capRate}%</div>
+          <div style={{ fontSize: 10, color: THEME.textMuted }}>{yieldLabel}</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: THEME.green }}>{yieldVal ? `${yieldVal}%` : "—"}</div>
         </div>
         <div>
           <div style={{ fontSize: 10, color: THEME.textMuted }}>GROWTH</div>
@@ -1161,7 +1185,8 @@ export const AdvancedMarketIntel = () => {
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   // City drill-down priority:
   //   1. User clicked a specific county on the map → that city
@@ -1376,6 +1401,7 @@ export const AdvancedMarketIntel = () => {
               stateMarkets={liveListingsStateMarkets}
               bedsFilter={bedsFilter}
               bathsFilter={bathsFilter}
+              onStatsComputed={setLiveCityStats}
             />
           </div>
         </div>

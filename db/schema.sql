@@ -133,6 +133,33 @@ create policy usage_summaries_self_read on public.usage_summaries
 
 
 -- ────────────────────────────────────────────────────────────────────────
+-- watchlist_items (saved listings per user — survives device / sign-out)
+-- ────────────────────────────────────────────────────────────────────────
+create table if not exists public.watchlist_items (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null references public.users(id) on delete cascade,
+  listing_id    text not null,       -- stable id from the provider (realtor property_id etc)
+  listing_data  jsonb not null,      -- full listing snapshot at save time
+  created_at    timestamptz not null default now(),
+  unique (user_id, listing_id)
+);
+
+create index if not exists watchlist_items_user_created_idx
+  on public.watchlist_items(user_id, created_at desc);
+
+alter table public.watchlist_items enable row level security;
+
+drop policy if exists watchlist_items_self_read on public.watchlist_items;
+create policy watchlist_items_self_read on public.watchlist_items
+  for select
+  using (
+    user_id in (
+      select id from public.users where clerk_user_id = auth.jwt() ->> 'sub'
+    )
+  );
+
+
+-- ────────────────────────────────────────────────────────────────────────
 -- helper function: atomic click-increment.
 -- Called from the metering middleware. Returns the new running total
 -- so the API can also return remaining-quota to the client.

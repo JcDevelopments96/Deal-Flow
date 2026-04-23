@@ -14,6 +14,10 @@ import { THEME, STYLE_TAG } from "./theme.js";
 import { n, isMobile } from "./utils.js";
 import { AppActionsContext, useToast, ToastHost } from "./contexts.jsx";
 import {
+  isSaasMode, useSaasUser,
+  fetchWatchlist, saveWatchlistItem, removeWatchlistItem, bulkUploadWatchlist
+} from "./lib/saas.js";
+import {
   createBlankDeal,
   STORAGE_KEY, WATCHLIST_STORAGE_KEY, RECENT_STORAGE_KEY, RECENT_MAX
 } from "./deals.jsx";
@@ -76,7 +80,18 @@ function BRRRRTrackerInner() {
     }
   }, [deals, loaded]);
 
-  // Load watchlist from localStorage once on mount
+  // Watchlist lives in two places:
+  //   - localStorage: always, so standalone/signed-out mode works
+  //   - /api/watchlist (Supabase): only when SaaS + signed in, so the list
+  //     follows the user across devices / reinstalls / sign-outs.
+  //
+  // The useSaasUser hook short-circuits (returns user=null) when Clerk isn't
+  // configured, so this is safe in standalone mode too.
+  const saas = useSaasUser();
+  const saasOn = isSaasMode();
+  const saasUserId = saas.user?.id || null;
+
+  // Load watchlist from localStorage once on mount (standalone/initial render).
   useEffect(() => {
     try {
       const raw = typeof window !== "undefined" && window.localStorage
@@ -91,7 +106,8 @@ function BRRRRTrackerInner() {
     }
   }, []);
 
-  // Persist watchlist
+  // Persist watchlist to localStorage — always keep a local cache so the list
+  // renders instantly on page load, even before the server round-trip.
   useEffect(() => {
     if (!loaded) return;
     try {
@@ -102,6 +118,36 @@ function BRRRRTrackerInner() {
       console.warn("Could not save watchlist:", err);
     }
   }, [watchlist, loaded]);
+
+  // When a SaaS user signs in, sync: upload any local-only items, then
+  // replace with the authoritative server list. Runs once per sign-in.
+  useEffect(() => {
+    if (!saasOn || !saasUserId || !loaded) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        // 1. Fetch what the server has (authoritative).
+        const serverItems = await fetchWatchlist(saas.getToken);
+        const serverIds = new Set(serverItems.map(i => String(i.id)));
+        // 2. Any purely-local items? Upload them so the user doesn't lose
+        //    saves made while signed out. Server-side upsert dedupes.
+        const localOnly = watchlist.filter(w => !serverIds.has(String(w.id)));
+        if (localOnly.length > 0) {
+          await bulkUploadWatchlist(saas.getToken, localOnly);
+        }
+        if (cancelled) return;
+        // 3. Merge (server items + any local-only we just uploaded) so the
+        //    UI shows everything — localOnly items aren't in serverItems yet.
+        const byId = new Map();
+        [...serverItems, ...localOnly].forEach(i => byId.set(String(i.id), i));
+        setWatchlist([...byId.values()]);
+      } catch (err) {
+        console.warn("Watchlist sync failed:", err);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saasOn, saasUserId, loaded]);
 
   // Load recently-viewed deal IDs
   useEffect(() => {
@@ -264,21 +310,35 @@ function BRRRRTrackerInner() {
   );
 
   const toggleWatch = useCallback((listing) => {
+    if (!listing || !listing.id) return;
+    // Optimistic update — show the toggle instantly; server sync happens
+    // in the background. If the server call fails the local change stays
+    // (the user can re-toggle); the next sign-in will reconcile.
+    let willAdd = true;
     setWatchlist(prev => {
       const already = prev.some(w => w.id === listing.id);
-      if (already) {
-        toast.push("Removed from Watchlist", "info");
-        return prev.filter(w => w.id !== listing.id);
-      }
-      toast.push("Saved to Watchlist", "success");
+      willAdd = !already;
+      if (already) return prev.filter(w => w.id !== listing.id);
       return [...prev, { ...listing, addedAt: new Date().toISOString() }];
     });
-  }, [toast]);
+    toast.push(willAdd ? "Saved to Watchlist" : "Removed from Watchlist", willAdd ? "success" : "info");
+
+    if (saasOn && saasUserId) {
+      (willAdd
+        ? saveWatchlistItem(saas.getToken, { ...listing, addedAt: new Date().toISOString() })
+        : removeWatchlistItem(saas.getToken, listing.id)
+      ).catch(err => console.warn("Watchlist sync failed:", err));
+    }
+  }, [toast, saasOn, saasUserId, saas.getToken]);
 
   const removeWatch = useCallback((id) => {
     setWatchlist(prev => prev.filter(w => w.id !== id));
     toast.push("Removed from Watchlist", "info");
-  }, [toast]);
+    if (saasOn && saasUserId) {
+      removeWatchlistItem(saas.getToken, id)
+        .catch(err => console.warn("Watchlist remove failed:", err));
+    }
+  }, [toast, saasOn, saasUserId, saas.getToken]);
 
   const useListingAsDeal = useCallback((listing) => {
     const parseAddress = (formatted) => {
