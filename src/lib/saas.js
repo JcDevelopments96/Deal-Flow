@@ -161,52 +161,42 @@ export async function bulkUploadWatchlist(getToken, listings) {
   });
 }
 
-/* ── Live economic data (free, unmetered — FRED + Census) ────────────── */
+/* ── Live free-data lookups (consolidated behind /api/lookup) ────────── */
 
-// Live 30-year mortgage rate from the Federal Reserve. Cached server-side for
-// 12h, so this is safe to call on every page mount.
-export async function fetchMortgageRate(getToken) {
-  return fetchMetered(getToken, "/api/rates/mortgage");
-}
-
-// Census ACS county demographics (population, median income, owner/renter
-// share). Cached server-side for 24h per (stateFips, countyFips) pair.
+// All county-level free-data lookups (Census, HUD, BLS, FRED mortgage rate)
+// now route through /api/lookup?source=... — consolidated into one serverless
+// function so we stay under the Vercel Hobby 12-function limit.
 export async function fetchCountyCensus(getToken, { stateFips, countyFips }) {
-  const qs = new URLSearchParams({ stateFips, countyFips });
-  return fetchMetered(getToken, `/api/census/county?${qs.toString()}`);
+  const qs = new URLSearchParams({ source: "census", stateFips, countyFips });
+  return fetchMetered(getToken, `/api/lookup?${qs.toString()}`);
 }
-
-// HUD Fair Market Rents — free, government rental baselines per county.
-// Cached server-side for 30d (HUD publishes annually).
 export async function fetchCountyFMR(getToken, { stateFips, countyFips }) {
-  const qs = new URLSearchParams({ stateFips, countyFips });
-  return fetchMetered(getToken, `/api/hud/fmr?${qs.toString()}`);
+  const qs = new URLSearchParams({ source: "fmr", stateFips, countyFips });
+  return fetchMetered(getToken, `/api/lookup?${qs.toString()}`);
+}
+export async function fetchCountyUnemployment(getToken, { stateFips, countyFips }) {
+  const qs = new URLSearchParams({ source: "unemployment", stateFips, countyFips });
+  return fetchMetered(getToken, `/api/lookup?${qs.toString()}`);
+}
+export async function fetchMortgageRate(getToken) {
+  return fetchMetered(getToken, "/api/lookup?source=mortgage");
 }
 
-// Monthly market indexes (Zillow ZHVI home-value + ZORI rent + Redfin median
-// price/DOM/inventory). Free, ingested from public research CSVs. No per-call
-// cost — queries a cached Supabase snapshot.
+// Monthly market indexes — cached Supabase snapshot populated by the
+// GitHub Actions cron. Stays on its own endpoint because it's DB-backed.
 export async function fetchMarketIndexes(getToken, { regionType, regionId }) {
   const qs = new URLSearchParams({ regionType, regionId });
   return fetchMetered(getToken, `/api/market/indexes?${qs.toString()}`);
 }
 
-// BLS Local Area Unemployment — county-level unemployment rate + YoY delta.
-// Free, cached 12h server-side.
-export async function fetchCountyUnemployment(getToken, { stateFips, countyFips }) {
-  const qs = new URLSearchParams({ stateFips, countyFips });
-  return fetchMetered(getToken, `/api/economy/unemployment?${qs.toString()}`);
-}
-
-// FEMA flood zone + insurance guidance for a specific lat/lng. Free, no key.
+// Per-property (lat/lng) lookups — flood zone + walk score — route through
+// /api/property?kind=... (also consolidated).
 export async function fetchFloodZone(getToken, { lat, lng }) {
-  const qs = new URLSearchParams({ lat: String(lat), lng: String(lng) });
-  return fetchMetered(getToken, `/api/environment/flood?${qs.toString()}`);
+  const qs = new URLSearchParams({ kind: "flood", lat: String(lat), lng: String(lng) });
+  return fetchMetered(getToken, `/api/property?${qs.toString()}`);
 }
-
-// Walk Score / Bike Score / Transit Score per address. Requires WALKSCORE_API_KEY.
 export async function fetchWalkScore(getToken, { lat, lng, address }) {
-  const qs = new URLSearchParams({ lat: String(lat), lng: String(lng) });
+  const qs = new URLSearchParams({ kind: "walkscore", lat: String(lat), lng: String(lng) });
   if (address) qs.set("address", address);
-  return fetchMetered(getToken, `/api/amenities/walkscore?${qs.toString()}`);
+  return fetchMetered(getToken, `/api/property?${qs.toString()}`);
 }
