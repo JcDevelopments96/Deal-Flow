@@ -264,7 +264,11 @@ async function main() {
       redfin_median_price: rf ? rf.median_sale_price : null,
       redfin_median_dom: rf ? rf.median_dom : null,
       redfin_inventory: rf ? rf.inventory : null,
-      as_of: z.as_of
+      as_of: z.as_of,
+      // Postgres DEFAULT now() only fires on INSERT. We include it explicitly
+      // so each upsert refreshes the timestamp — otherwise after the first
+      // run, updated_at stays frozen and it looks like nothing's ingesting.
+      updated_at: new Date().toISOString()
     };
   });
   await upsertChunks(merged);
