@@ -23,6 +23,7 @@ import { WatchlistView } from "./views/WatchlistView.jsx";
 import { EducationCenter } from "./views/EducationCenter.jsx";
 import { Analyzer } from "./analyzer/Analyzer.jsx";
 import { AdvancedMarketIntel } from "./market/AdvancedMarketIntel.jsx";
+import { MarketIntelRibbon } from "./market/MarketIntelRibbon.jsx";
 import { TemplatePicker } from "./modals/TemplatePicker.jsx";
 import { UnsavedChangesModal } from "./modals/UnsavedChangesModal.jsx";
 import { MortgageCalculatorModal } from "./modals/MortgageCalculatorModal.jsx";
@@ -372,6 +373,7 @@ function BRRRRTrackerInner() {
       )}
 
       {view === "market" && <div style={{ maxWidth: 1400, margin: "0 auto", padding: isMobile() ? "16px" : "24px 28px" }}>
+        <MarketIntelRibbon />
         <div style={{ marginBottom: 24 }}>
           <h1 className="serif" style={{ fontSize: 28, fontWeight: 700, margin: 0 }}>
             Market Intelligence

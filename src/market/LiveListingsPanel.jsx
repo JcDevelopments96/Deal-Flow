@@ -9,7 +9,7 @@
    ============================================================================ */
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import {
-  Home, Building2, Filter, Settings, Key, RefreshCw, AlertTriangle, LogIn
+  Home, Building2, Filter, Settings, Key, RefreshCw, AlertTriangle
 } from "lucide-react";
 import { THEME } from "../theme.js";
 import { fmtUSD, isMobile } from "../utils.js";
@@ -350,59 +350,10 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
         {stateName && ` (${stateName})`}. Click any county on the map above to pull listings for that area.
       </div>
 
-      {/* SaaS mode + signed out → prompt sign-in (click the header auth slot). */}
-      {saasOn && !saas.user && (
-        <div style={{
-          padding: 14, marginBottom: 16,
-          background: THEME.bgTeal,
-          border: `1px solid ${THEME.teal}`,
-          borderRadius: 8,
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          flexWrap: "wrap", gap: 12
-        }}>
-          <div style={{ flex: 1, minWidth: 240 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: THEME.teal, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
-              <LogIn size={14} /> Sign in to continue
-            </div>
-            <div style={{ fontSize: 11, color: THEME.textMuted, lineHeight: 1.5 }}>
-              Market Intel is a paid feature. Sign up for a DealTrack account
-              via the header and choose a plan to access real listings and
-              comparables.
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* SaaS mode + signed-in-free → paywall. Show the map + demo data
-          underneath but gate real listings behind an upgrade. */}
-      {saasOn && saas.user && saas.usage?.plan === "free" && (
-        <div style={{
-          padding: 16, marginBottom: 16,
-          background: THEME.bgOrange,
-          border: `1px solid ${THEME.orange}`,
-          borderRadius: 8,
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          flexWrap: "wrap", gap: 12
-        }}>
-          <div style={{ flex: 1, minWidth: 260 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: THEME.orange, marginBottom: 4 }}>
-              Market Intel is a paid feature
-            </div>
-            <div style={{ fontSize: 12, color: THEME.textMuted, lineHeight: 1.5 }}>
-              Subscribe to load live listings and rental comparables. Starter
-              plan starts at $19 / month for 250 Market Intel clicks. Cancel
-              anytime.
-            </div>
-          </div>
-          <button
-            onClick={() => { setUpgradeReason(null); setShowUpgrade(true); }}
-            className="btn-accent-orange"
-            style={{ padding: "9px 16px", fontSize: 13 }}
-          >
-            See plans
-          </button>
-        </div>
-      )}
+      {/* NOTE: the "paid feature" messaging for signed-out and
+          signed-in-free users now lives in the MarketIntelRibbon above this
+          panel. This panel just shows demo data + renders the UpgradeModal
+          on 402 errors from actual click attempts. */}
 
       {/* BYOK prompt — standalone mode only (hidden when SaaS is active). */}
       {!saasOn && !apiKey && !showKeyInput && (
