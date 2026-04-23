@@ -190,3 +190,23 @@ export async function fetchMarketIndexes(getToken, { regionType, regionId }) {
   const qs = new URLSearchParams({ regionType, regionId });
   return fetchMetered(getToken, `/api/market/indexes?${qs.toString()}`);
 }
+
+// BLS Local Area Unemployment — county-level unemployment rate + YoY delta.
+// Free, cached 12h server-side.
+export async function fetchCountyUnemployment(getToken, { stateFips, countyFips }) {
+  const qs = new URLSearchParams({ stateFips, countyFips });
+  return fetchMetered(getToken, `/api/economy/unemployment?${qs.toString()}`);
+}
+
+// FEMA flood zone + insurance guidance for a specific lat/lng. Free, no key.
+export async function fetchFloodZone(getToken, { lat, lng }) {
+  const qs = new URLSearchParams({ lat: String(lat), lng: String(lng) });
+  return fetchMetered(getToken, `/api/environment/flood?${qs.toString()}`);
+}
+
+// Walk Score / Bike Score / Transit Score per address. Requires WALKSCORE_API_KEY.
+export async function fetchWalkScore(getToken, { lat, lng, address }) {
+  const qs = new URLSearchParams({ lat: String(lat), lng: String(lng) });
+  if (address) qs.set("address", address);
+  return fetchMetered(getToken, `/api/amenities/walkscore?${qs.toString()}`);
+}

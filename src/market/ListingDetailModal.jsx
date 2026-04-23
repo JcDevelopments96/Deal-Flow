@@ -2,16 +2,41 @@
    LISTING DETAIL MODAL — expanded single-listing view with Analyze /
    Save to Watchlist / Full Listing actions.
    ============================================================================ */
-import React, { useEffect } from "react";
-import { X, Star, Calculator, ExternalLink, AlertTriangle, Building2 } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { X, Star, Calculator, ExternalLink, AlertTriangle, Building2, Droplets, Footprints } from "lucide-react";
 import { THEME } from "../theme.js";
 import { fmtUSD } from "../utils.js";
 import { useAppActions } from "../contexts.jsx";
+import { isSaasMode, useSaasUser, fetchFloodZone, fetchWalkScore } from "../lib/saas.js";
 
 export const ListingDetailModal = ({ listing, type = "sale", onClose }) => {
   const { isWatched, toggleWatch, useListingAsDeal } = useAppActions();
   const watched = isWatched(listing.id);
   const isRental = type === "rental";
+
+  // On-demand enrichment — fired when the modal opens, per-listing, cached
+  // server-side so re-opening the same listing is free.
+  const saas = useSaasUser();
+  const saasOn = isSaasMode();
+  const [flood, setFlood] = useState(null);
+  const [walk, setWalk] = useState(null);
+  useEffect(() => {
+    if (!saasOn || !saas.user) return;
+    const lat = Number(listing.latitude);
+    const lng = Number(listing.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    let cancelled = false;
+    Promise.allSettled([
+      fetchFloodZone(saas.getToken, { lat, lng }),
+      fetchWalkScore(saas.getToken, { lat, lng, address: listing.formattedAddress })
+    ]).then(([floodRes, walkRes]) => {
+      if (cancelled) return;
+      if (floodRes.status === "fulfilled") setFlood(floodRes.value);
+      if (walkRes.status === "fulfilled") setWalk(walkRes.value);
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saasOn, saas.user, listing.id, listing.latitude, listing.longitude]);
 
   useEffect(() => {
     const handler = (e) => { if (e.key === "Escape") onClose(); };
@@ -158,6 +183,79 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose }) => {
               <div style={{ fontSize: 18, fontWeight: 700 }}>{listing.daysOnMarket ?? "—"}</div>
             </div>
           </div>
+
+          {/* Property intelligence — FEMA flood + Walk Score (all free APIs). */}
+          {(flood || walk) && (
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: (flood && walk) ? "1fr 1fr" : "1fr",
+              gap: 12, marginBottom: 20
+            }}>
+              {flood && (
+                <div style={{
+                  padding: 14,
+                  background: flood.riskLevel === "high" ? THEME.bgOrange
+                    : flood.riskLevel === "moderate" ? THEME.bgRaised
+                    : THEME.bgPanel,
+                  border: `1px solid ${flood.riskLevel === "high" ? THEME.orange : THEME.border}`,
+                  borderRadius: 8
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    <Droplets size={14} color={flood.riskLevel === "high" ? THEME.orange : THEME.accent} />
+                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: THEME.textMuted }}>
+                      FEMA Flood Zone
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4,
+                    color: flood.riskLevel === "high" ? THEME.orange : THEME.text }}>
+                    {flood.zone || "Not in mapped zone"}
+                    {flood.sfha && <span style={{ fontSize: 11, marginLeft: 8, fontWeight: 600 }}>· SFHA</span>}
+                  </div>
+                  <div style={{ fontSize: 11, color: THEME.textMuted, lineHeight: 1.4 }}>
+                    {flood.insuranceGuidance}
+                  </div>
+                </div>
+              )}
+              {walk && walk.walkScore != null && (
+                <div style={{
+                  padding: 14,
+                  background: THEME.bgPanel,
+                  border: `1px solid ${THEME.border}`,
+                  borderRadius: 8
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    <Footprints size={14} color={THEME.accent} />
+                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: THEME.textMuted }}>
+                      Walk / Bike / Transit
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 14 }}>
+                    <div>
+                      <div style={{ fontSize: 18, fontWeight: 700 }}>{walk.walkScore}</div>
+                      <div style={{ fontSize: 10, color: THEME.textMuted }}>Walk</div>
+                    </div>
+                    {walk.bikeScore != null && (
+                      <div>
+                        <div style={{ fontSize: 18, fontWeight: 700 }}>{walk.bikeScore}</div>
+                        <div style={{ fontSize: 10, color: THEME.textMuted }}>Bike</div>
+                      </div>
+                    )}
+                    {walk.transitScore != null && (
+                      <div>
+                        <div style={{ fontSize: 18, fontWeight: 700 }}>{walk.transitScore}</div>
+                        <div style={{ fontSize: 10, color: THEME.textMuted }}>Transit</div>
+                      </div>
+                    )}
+                  </div>
+                  {walk.walkDescription && (
+                    <div style={{ fontSize: 11, color: THEME.textMuted, marginTop: 4 }}>
+                      {walk.walkDescription}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Actions */}
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>

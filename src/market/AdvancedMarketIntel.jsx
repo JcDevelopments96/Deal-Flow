@@ -14,7 +14,7 @@ import { Panel, CalcTooltip } from "../primitives.jsx";
 import { USCountyMap } from "./USCountyMap.jsx";
 import { LiveListingsPanel } from "./LiveListingsPanel.jsx";
 import { STATE_NAMES, STATE_DEFAULT_CITIES } from "./mapUtils.js";
-import { isSaasMode, useSaasUser, fetchCountyCensus, fetchCountyFMR, fetchMarketIndexes } from "../lib/saas.js";
+import { isSaasMode, useSaasUser, fetchCountyCensus, fetchCountyFMR, fetchMarketIndexes, fetchCountyUnemployment } from "../lib/saas.js";
 
 const RepeatIcon = RotateCcw;
 
@@ -1069,30 +1069,31 @@ export const AdvancedMarketIntel = () => {
   const [countyCensus, setCountyCensus] = useState(null);
   const [countyFmr, setCountyFmr] = useState(null);
   const [countyIndexes, setCountyIndexes] = useState(null);
+  const [countyUnemp, setCountyUnemp] = useState(null);
   const [dataLoading, setDataLoading] = useState(false);
   useEffect(() => {
-    if (!saasOn || !saas.user) {
-      setCountyCensus(null); setCountyFmr(null); setCountyIndexes(null);
-      return;
-    }
-    if (!clickedArea || !clickedArea.stateFips || !clickedArea.countyFips) {
-      setCountyCensus(null); setCountyFmr(null); setCountyIndexes(null);
-      return;
-    }
+    const reset = () => {
+      setCountyCensus(null); setCountyFmr(null);
+      setCountyIndexes(null); setCountyUnemp(null);
+    };
+    if (!saasOn || !saas.user) { reset(); return; }
+    if (!clickedArea || !clickedArea.stateFips || !clickedArea.countyFips) { reset(); return; }
     let cancelled = false;
     setDataLoading(true);
     const { stateFips, countyFips } = clickedArea;
-    // Fire all three free data sources in parallel — they're independent and
-    // failure of one shouldn't block the others.
+    // All four free data sources fire in parallel — independent, failure of
+    // one shouldn't block the others.
     Promise.allSettled([
       fetchCountyCensus(saas.getToken, { stateFips, countyFips }),
       fetchCountyFMR(saas.getToken, { stateFips, countyFips }),
-      fetchMarketIndexes(saas.getToken, { regionType: "county", regionId: `${stateFips}${countyFips}` })
+      fetchMarketIndexes(saas.getToken, { regionType: "county", regionId: `${stateFips}${countyFips}` }),
+      fetchCountyUnemployment(saas.getToken, { stateFips, countyFips })
     ]).then(results => {
       if (cancelled) return;
       setCountyCensus(results[0].status === "fulfilled" ? results[0].value : null);
       setCountyFmr(results[1].status === "fulfilled" ? results[1].value : null);
       setCountyIndexes(results[2].status === "fulfilled" ? results[2].value : null);
+      setCountyUnemp(results[3].status === "fulfilled" ? results[3].value : null);
     }).finally(() => { if (!cancelled) setDataLoading(false); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1508,7 +1509,7 @@ export const AdvancedMarketIntel = () => {
             {/* County free-data panel: Census demographics + HUD FMR + Zillow/Redfin
                 indexes. All three are free government/research sources so we
                 call them together on every county click. */}
-            {clickedArea && (countyCensus || countyFmr || countyIndexes) && (
+            {clickedArea && (countyCensus || countyFmr || countyIndexes || countyUnemp) && (
               <Panel
                 title={`${clickedArea.county || clickedArea.city} County — Free Data Sources`}
                 icon={<Users size={16} />}
@@ -1520,7 +1521,12 @@ export const AdvancedMarketIntel = () => {
                     borderRadius: 4,
                     background: THEME.greenDim, color: THEME.green
                   }}>
-                    Free · {[countyCensus && "Census", countyFmr && "HUD", countyIndexes && "Zillow/Redfin"].filter(Boolean).join(" + ")}
+                    Free · {[
+                      countyCensus && "Census",
+                      countyFmr && "HUD",
+                      countyUnemp && "BLS",
+                      countyIndexes && "Zillow/Redfin"
+                    ].filter(Boolean).join(" + ")}
                   </span>
                 }
               >
@@ -1552,6 +1558,41 @@ export const AdvancedMarketIntel = () => {
                         <div style={{ fontSize: 10, color: THEME.textMuted }}>Census Median Rent</div>
                         <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>
                           {countyCensus.medianGrossRent ? `$${countyCensus.medianGrossRent.toLocaleString()}` : "—"}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {countyUnemp && countyUnemp.rate != null && (
+                  <>
+                    <div style={{ fontSize: 10, color: THEME.textMuted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                      BLS Unemployment · {countyUnemp.periodLabel}
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 16 }}>
+                      <div>
+                        <div style={{ fontSize: 10, color: THEME.textMuted }}>Current Rate</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>
+                          {countyUnemp.rate.toFixed(1)}%
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: THEME.textMuted }}>Year Ago</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2, color: THEME.textMuted }}>
+                          {countyUnemp.yearAgoRate != null ? `${countyUnemp.yearAgoRate.toFixed(1)}%` : "—"}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: THEME.textMuted }}>YoY Change</div>
+                        <div style={{
+                          fontSize: 14, fontWeight: 700, marginTop: 2,
+                          color: countyUnemp.deltaPct == null
+                            ? THEME.textMuted
+                            : countyUnemp.deltaPct <= 0 ? THEME.green : THEME.red
+                        }}>
+                          {countyUnemp.deltaPct != null
+                            ? `${countyUnemp.deltaPct >= 0 ? "+" : ""}${countyUnemp.deltaPct.toFixed(1)} pp`
+                            : "—"}
                         </div>
                       </div>
                     </div>
