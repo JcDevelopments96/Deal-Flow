@@ -91,6 +91,7 @@ export const buildDemoListings = (state, city, marketRef) => {
       pricePerSqft: Math.round(price / sqft),
       daysOnMarket: 7 + i * 9,
       status: "Active",
+      photos: [DEMO_HOUSE_IMAGES[i % DEMO_HOUSE_IMAGES.length]],
       imageUrl: DEMO_HOUSE_IMAGES[i % DEMO_HOUSE_IMAGES.length],
       demo: true
     };
@@ -120,57 +121,82 @@ export const buildDemoComps = (state, city, marketRef) => {
       pricePerSqft: +(rent / sqft).toFixed(2),
       daysOnMarket: 5 + i * 7,
       status: "Active",
+      photos: [DEMO_RENTAL_IMAGES[i % DEMO_RENTAL_IMAGES.length]],
       imageUrl: DEMO_RENTAL_IMAGES[i % DEMO_RENTAL_IMAGES.length],
       demo: true
     };
   });
 };
 
-// Pick the first usable photo URL from a variety of shapes the RentCast responses use.
-export const extractRentCastImage = (raw) => {
-  if (!raw) return null;
-  if (Array.isArray(raw.photos) && raw.photos.length > 0) {
-    const first = raw.photos[0];
-    if (typeof first === "string") return first;
-    if (first && typeof first === "object") return first.url || first.href || first.src || null;
-  }
-  if (Array.isArray(raw.images) && raw.images.length > 0) {
-    const first = raw.images[0];
-    if (typeof first === "string") return first;
-    if (first && typeof first === "object") return first.url || first.href || first.src || null;
-  }
-  return raw.primaryPhoto || raw.photoUrl || raw.imageUrl || null;
+// Pull every photo URL RentCast returned, not just the first. Returns an
+// array (possibly empty) so the UI can show count badges / carousels later.
+export const extractRentCastPhotos = (raw) => {
+  if (!raw) return [];
+  const out = [];
+  const seen = new Set();
+  const push = (v) => {
+    if (typeof v === "string" && v && !seen.has(v)) { seen.add(v); out.push(v); }
+  };
+
+  const pushFrom = (arr) => {
+    if (!Array.isArray(arr)) return;
+    for (const p of arr) {
+      if (typeof p === "string") push(p);
+      else if (p && typeof p === "object") push(p.url || p.href || p.src);
+    }
+  };
+
+  pushFrom(raw.photos);
+  pushFrom(raw.images);
+  push(raw.primaryPhoto);
+  push(raw.photoUrl);
+  push(raw.imageUrl);
+  return out;
 };
 
-export const formatRentCastListing = (raw) => ({
-  id: raw.id || `${raw.addressLine1}-${raw.zipCode}`,
-  formattedAddress: raw.formattedAddress || `${raw.addressLine1 || ""}, ${raw.city || ""}, ${raw.state || ""}`,
-  addressLine1: raw.addressLine1,
-  city: raw.city,
-  state: raw.state,
-  price: raw.price,
-  bedrooms: raw.bedrooms,
-  bathrooms: raw.bathrooms,
-  squareFootage: raw.squareFootage,
-  propertyType: raw.propertyType,
-  yearBuilt: raw.yearBuilt,
-  listedDate: raw.listedDate,
-  pricePerSqft: raw.price && raw.squareFootage ? Math.round(raw.price / raw.squareFootage) : null,
-  daysOnMarket: raw.daysOnMarket,
-  status: raw.status || "Active",
-  latitude: raw.latitude,
-  longitude: raw.longitude,
-  imageUrl: extractRentCastImage(raw)
-});
+// Back-compat helper: first photo URL or null.
+export const extractRentCastImage = (raw) => extractRentCastPhotos(raw)[0] || null;
+
+export const formatRentCastListing = (raw) => {
+  const photos = extractRentCastPhotos(raw);
+  return {
+    id: raw.id || `${raw.addressLine1}-${raw.zipCode}`,
+    formattedAddress: raw.formattedAddress || `${raw.addressLine1 || ""}, ${raw.city || ""}, ${raw.state || ""}`,
+    addressLine1: raw.addressLine1,
+    city: raw.city,
+    state: raw.state,
+    price: raw.price,
+    bedrooms: raw.bedrooms,
+    bathrooms: raw.bathrooms,
+    squareFootage: raw.squareFootage,
+    propertyType: raw.propertyType,
+    yearBuilt: raw.yearBuilt,
+    listedDate: raw.listedDate,
+    pricePerSqft: raw.price && raw.squareFootage ? Math.round(raw.price / raw.squareFootage) : null,
+    daysOnMarket: raw.daysOnMarket,
+    status: raw.status || "Active",
+    latitude: raw.latitude,
+    longitude: raw.longitude,
+    photos,
+    imageUrl: photos[0] || null
+  };
+};
 
 export const formatZillowListing = (raw) => {
   const address = raw.address && typeof raw.address === "object"
     ? `${raw.address.streetAddress || ""}, ${raw.address.city || ""}, ${raw.address.state || ""}`.trim()
     : (raw.address || raw.streetAddress || "");
-  const image = raw.imgSrc
-    || (Array.isArray(raw.carouselPhotos) && raw.carouselPhotos[0] && (raw.carouselPhotos[0].url || raw.carouselPhotos[0]))
-    || raw.hiResImageLink
-    || null;
+
+  // Photo array: prefer carouselPhotos if the wrapper provides it, else single imgSrc.
+  const photos = [];
+  const seen = new Set();
+  const push = (v) => { if (typeof v === "string" && v && !seen.has(v)) { seen.add(v); photos.push(v); } };
+  if (Array.isArray(raw.carouselPhotos)) {
+    for (const p of raw.carouselPhotos) push(typeof p === "string" ? p : (p && (p.url || p.src)));
+  }
+  push(raw.imgSrc);
+  push(raw.hiResImageLink);
+  const image = photos[0] || null;
   return {
     id: raw.zpid || raw.id || `${address}`,
     formattedAddress: address,
@@ -189,6 +215,7 @@ export const formatZillowListing = (raw) => {
     status: raw.listingStatus || "Active",
     latitude: raw.latitude,
     longitude: raw.longitude,
+    photos,
     imageUrl: image,
     externalUrl: raw.detailUrl
       ? (raw.detailUrl.startsWith("http") ? raw.detailUrl : `https://www.zillow.com${raw.detailUrl}`)

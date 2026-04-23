@@ -13,8 +13,14 @@ import { fmtUSD, isMobile } from "../utils.js";
 import { Panel, CalcTooltip } from "../primitives.jsx";
 import { USCountyMap } from "./USCountyMap.jsx";
 import { LiveListingsPanel } from "./LiveListingsPanel.jsx";
+import { STATE_NAMES, STATE_DEFAULT_CITIES } from "./mapUtils.js";
 
 const RepeatIcon = RotateCcw;
+
+// All 50 US states + DC, sorted alphabetically by code — used by the state
+// dropdown so users can pull listings for any state, not just the ~15 we
+// have curated market data for.
+const ALL_STATES = Object.keys(STATE_NAMES).sort();
 
 export const AdvancedMarketIntel = () => {
   const [selectedMetric, setSelectedMetric] = useState("capRate");
@@ -1159,11 +1165,19 @@ export const AdvancedMarketIntel = () => {
     </div>
   );
 
-  // City drill-down: clicked area wins over search / state defaults
+  // City drill-down priority:
+  //   1. User clicked a specific county on the map
+  //   2. User searched and matched exactly one market
+  //   3. State has a curated market in marketData  → first one
+  //   4. State has no curated market              → STATE_DEFAULT_CITIES fallback
+  // #4 is what makes the state dropdown work for states we haven't curated.
   const liveListingsCity = useMemo(() => {
     if (clickedArea && clickedArea.city) return clickedArea.city;
     if (searchResults.length === 1) return searchResults[0].city;
-    if (selectedState && stateMarkets.length > 0) return stateMarkets[0].city;
+    if (selectedState) {
+      if (stateMarkets.length > 0) return stateMarkets[0].city;
+      return STATE_DEFAULT_CITIES[selectedState] || null;
+    }
     return null;
   }, [clickedArea, searchResults, selectedState, stateMarkets]);
 
@@ -1197,12 +1211,16 @@ export const AdvancedMarketIntel = () => {
                 style={{ flex: 1, padding: "10px 12px", fontSize: 14 }}
               >
                 <option value="">Select a state...</option>
-                {availableStates.map(state => {
+                {ALL_STATES.map(state => {
                   const info = getStateInfo(state);
+                  const defaultCity = STATE_DEFAULT_CITIES[state];
+                  const label = info.cityCount > 0
+                    ? `${info.name} (${info.cityCount} ${info.cityCount === 1 ? "tracked city" : "tracked cities"})`
+                    : defaultCity
+                      ? `${info.name} — ${defaultCity}`
+                      : info.name;
                   return (
-                    <option key={state} value={state}>
-                      {info.name} ({info.cityCount} {info.cityCount === 1 ? "city" : "cities"})
-                    </option>
+                    <option key={state} value={state}>{label}</option>
                   );
                 })}
               </select>

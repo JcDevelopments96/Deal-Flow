@@ -33,6 +33,29 @@ export const STATE_NAMES = {
   WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming"
 };
 
+/**
+ * Representative city per state — largest/most-active metro for real-estate
+ * data. Used as the default when the user picks a state we don't have
+ * curated market data for, so the RentCast fetch still has a concrete city
+ * to anchor against. Users can still click any county on the map to change
+ * the target city.
+ */
+export const STATE_DEFAULT_CITIES = {
+  AL: "Birmingham",   AK: "Anchorage",    AZ: "Phoenix",      AR: "Little Rock",
+  CA: "Los Angeles",  CO: "Denver",       CT: "Bridgeport",   DE: "Wilmington",
+  DC: "Washington",   FL: "Jacksonville", GA: "Atlanta",      HI: "Honolulu",
+  ID: "Boise",        IL: "Chicago",      IN: "Indianapolis", IA: "Des Moines",
+  KS: "Wichita",      KY: "Louisville",   LA: "New Orleans",  ME: "Portland",
+  MD: "Baltimore",    MA: "Boston",       MI: "Detroit",      MN: "Minneapolis",
+  MS: "Jackson",      MO: "Kansas City",  MT: "Billings",     NE: "Omaha",
+  NV: "Las Vegas",    NH: "Manchester",   NJ: "Newark",       NM: "Albuquerque",
+  NY: "New York",     NC: "Charlotte",    ND: "Fargo",        OH: "Columbus",
+  OK: "Oklahoma City",OR: "Portland",     PA: "Philadelphia", RI: "Providence",
+  SC: "Charleston",   SD: "Sioux Falls",  TN: "Nashville",    TX: "Houston",
+  UT: "Salt Lake City",VT: "Burlington",  VA: "Virginia Beach",WA: "Seattle",
+  WV: "Charleston",   WI: "Milwaukee",    WY: "Cheyenne"
+};
+
 export const STATE_MAP_VIEW = {
   FL: { center: [-82, 28], zoom: 4 },
   NY: { center: [-75.5, 43], zoom: 3.5 },

@@ -1,48 +1,74 @@
 /* ============================================================================
-   LISTING CARD — card used by LiveListingsPanel, WatchlistView, and the
-   Market Intel search results. ListingImage hero + metrics + actions.
+   LISTING CARD — Zillow/Redfin-style card: edge-to-edge 4:3 photo with
+   overlays (watchlist star, photo count, demo badge), then price + inline
+   stats + address + actions below.
    ============================================================================ */
 import React, { useState } from "react";
-import { Building2, ExternalLink, Star, Plus } from "lucide-react";
+import { Building2, Camera, ExternalLink, Star, Plus } from "lucide-react";
 import { THEME } from "../theme.js";
 import { fmtUSD } from "../utils.js";
 import { useAppActions } from "../contexts.jsx";
 
-export const ListingImage = ({ url, demo }) => {
+/**
+ * ListingImage — hero photo. Accepts either:
+ *   - `photos` array (preferred)  → shows count badge when > 1
+ *   - `url` single URL (legacy)    → still works for older callers
+ *
+ * Falls back to a Building2 icon on a neutral panel when no image or load error.
+ */
+export const ListingImage = ({ photos, url, demo }) => {
+  const urls = Array.isArray(photos) && photos.length > 0
+    ? photos
+    : url
+      ? [url]
+      : [];
+  const primary = urls[0] || null;
+  const count = urls.length;
   const [errored, setErrored] = useState(false);
-  const showImage = url && !errored;
+  const showImage = primary && !errored;
+
   return (
     <div style={{
       position: "relative",
       width: "100%",
-      aspectRatio: "16 / 10",
-      borderRadius: 6,
-      overflow: "hidden",
+      aspectRatio: "4 / 3",
       background: THEME.bgPanel,
-      marginBottom: 10,
       display: "flex",
       alignItems: "center",
-      justifyContent: "center"
+      justifyContent: "center",
+      overflow: "hidden"
     }}>
       {showImage ? (
         <img
-          src={url}
+          src={primary}
           alt=""
           onError={() => setErrored(true)}
           loading="lazy"
           style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
         />
       ) : (
-        <Building2 size={32} color={THEME.textDim} />
+        <Building2 size={40} color={THEME.textDim} />
       )}
       {demo && (
         <div style={{
-          position: "absolute", top: 8, right: 8,
-          padding: "2px 7px", fontSize: 9, fontWeight: 700,
-          background: "rgba(15, 23, 42, 0.72)", color: "#fff",
-          borderRadius: 4, letterSpacing: "0.06em", textTransform: "uppercase"
+          position: "absolute", top: 10, left: 10,
+          padding: "3px 9px", fontSize: 9, fontWeight: 700,
+          background: "rgba(15, 23, 42, 0.82)", color: "#fff",
+          borderRadius: 4, letterSpacing: "0.08em", textTransform: "uppercase"
         }}>
           Demo
+        </div>
+      )}
+      {count > 1 && (
+        <div style={{
+          position: "absolute", bottom: 10, right: 10,
+          padding: "3px 9px 3px 8px", fontSize: 11, fontWeight: 700,
+          background: "rgba(15, 23, 42, 0.78)", color: "#fff",
+          borderRadius: 12,
+          display: "inline-flex", alignItems: "center", gap: 4
+        }}>
+          <Camera size={11} />
+          {count}
         </div>
       )}
     </div>
@@ -53,6 +79,12 @@ export const ListingCard = ({ listing, type = "sale", onOpen, showWatchToggle = 
   const isRental = type === "rental";
   const { isWatched, toggleWatch, useListingAsDeal } = useAppActions();
   const watched = isWatched(listing.id);
+
+  const formatStat = (v, suffix) => (v || v === 0 ? `${typeof v === "number" ? v.toLocaleString() : v}${suffix}` : null);
+  const beds = formatStat(listing.bedrooms, " bd");
+  const baths = formatStat(listing.bathrooms, " ba");
+  const sqft = formatStat(listing.squareFootage, " sqft");
+  const inlineStats = [beds, baths, sqft].filter(Boolean).join("  ·  ");
 
   return (
     <div
@@ -66,25 +98,31 @@ export const ListingCard = ({ listing, type = "sale", onOpen, showWatchToggle = 
         }
       }}
       style={{
-        padding: 12,
         border: `1px solid ${THEME.border}`,
-        borderRadius: 8,
+        borderRadius: 10,
         background: THEME.bg,
-        position: "relative",
+        overflow: "hidden",
         display: "flex",
         flexDirection: "column",
         cursor: onOpen ? "pointer" : "default",
-        transition: "border-color 0.15s ease, transform 0.15s ease"
+        transition: "border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease"
       }}
       onMouseEnter={e => {
-        if (onOpen) e.currentTarget.style.borderColor = THEME.accent;
+        if (onOpen) {
+          e.currentTarget.style.borderColor = THEME.accent;
+          e.currentTarget.style.boxShadow = "0 4px 14px rgba(15, 23, 42, 0.08)";
+          e.currentTarget.style.transform = "translateY(-1px)";
+        }
       }}
       onMouseLeave={e => {
         e.currentTarget.style.borderColor = THEME.border;
+        e.currentTarget.style.boxShadow = "none";
+        e.currentTarget.style.transform = "translateY(0)";
       }}
     >
+      {/* Hero photo area — edge-to-edge */}
       <div style={{ position: "relative" }}>
-        <ListingImage url={listing.imageUrl} demo={listing.demo} />
+        <ListingImage photos={listing.photos} url={listing.imageUrl} demo={listing.demo} />
         {showWatchToggle && (
           <button
             type="button"
@@ -92,83 +130,98 @@ export const ListingCard = ({ listing, type = "sale", onOpen, showWatchToggle = 
             title={watched ? "Remove from watchlist" : "Save to watchlist"}
             onClick={(e) => { e.stopPropagation(); toggleWatch(listing); }}
             style={{
-              position: "absolute", top: 8, left: 8,
-              width: 30, height: 30, borderRadius: "50%",
-              background: watched ? THEME.accent : "rgba(255,255,255,0.92)",
+              position: "absolute", top: 10, right: 10,
+              width: 34, height: 34, borderRadius: "50%",
+              background: watched ? THEME.accent : "rgba(255,255,255,0.95)",
               color: watched ? "#fff" : THEME.textMuted,
               border: `1px solid ${watched ? THEME.accent : THEME.border}`,
               display: "flex", alignItems: "center", justifyContent: "center",
               cursor: "pointer",
-              boxShadow: "0 2px 6px rgba(15,23,42,0.12)"
+              boxShadow: "0 2px 8px rgba(15,23,42,0.15)"
             }}
           >
-            <Star size={14} fill={watched ? "#fff" : "none"} />
+            <Star size={16} fill={watched ? "#fff" : "none"} />
           </button>
         )}
       </div>
 
-      <div style={{ fontSize: 13, fontWeight: 700, color: THEME.text, marginBottom: 4 }}>
-        {listing.formattedAddress}
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-        <div className="mono" style={{ fontSize: 18, fontWeight: 700, color: isRental ? THEME.teal : THEME.accent }}>
-          {fmtUSD(listing.price)}{isRental ? <span style={{ fontSize: 11, fontWeight: 500, color: THEME.textMuted }}> /mo</span> : null}
+      {/* Info block */}
+      <div style={{ padding: "12px 14px 14px", display: "flex", flexDirection: "column", gap: 6 }}>
+        {/* Price — big and bold, Zillow-style */}
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+          <div className="mono" style={{
+            fontSize: 22, fontWeight: 700,
+            color: isRental ? THEME.teal : THEME.accent,
+            lineHeight: 1.1
+          }}>
+            {fmtUSD(listing.price)}
+            {isRental && (
+              <span style={{ fontSize: 12, fontWeight: 500, color: THEME.textMuted, marginLeft: 4 }}>
+                /mo
+              </span>
+            )}
+          </div>
+          {listing.pricePerSqft && (
+            <div style={{ fontSize: 10, color: THEME.textDim, whiteSpace: "nowrap" }}>
+              {isRental ? `$${listing.pricePerSqft}` : fmtUSD(listing.pricePerSqft)} /sqft
+            </div>
+          )}
         </div>
-        {listing.pricePerSqft && (
-          <div style={{ fontSize: 11, color: THEME.textMuted }}>
-            {isRental ? `$${listing.pricePerSqft}/sqft` : `${fmtUSD(listing.pricePerSqft)}/sqft`}
+
+        {/* Beds · Baths · Sqft — inline divider */}
+        {inlineStats && (
+          <div style={{ fontSize: 13, fontWeight: 600, color: THEME.text }}>
+            {inlineStats}
           </div>
         )}
+
+        {/* Address (secondary) */}
+        <div style={{
+          fontSize: 12, color: THEME.textMuted,
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
+        }}>
+          {listing.formattedAddress}
+        </div>
+
+        {/* Meta line */}
+        <div style={{
+          fontSize: 10, color: THEME.textDim,
+          paddingTop: 6, borderTop: `1px solid ${THEME.borderLight}`,
+          display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap"
+        }}>
+          <span>{listing.propertyType || "—"}</span>
+          <span>
+            {listing.yearBuilt ? `Built ${listing.yearBuilt}` : ""}
+            {listing.yearBuilt && listing.daysOnMarket != null ? " · " : ""}
+            {listing.daysOnMarket != null ? `${listing.daysOnMarket} days on market` : ""}
+          </span>
+        </div>
+
+        {/* External link + primary action */}
+        {listing.externalUrl && (
+          <a
+            href={listing.externalUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              fontSize: 11, color: THEME.accent,
+              textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4
+            }}
+          >
+            <ExternalLink size={11} /> View full listing
+          </a>
+        )}
+        {!isRental && (
+          <button
+            onClick={(e) => { e.stopPropagation(); useListingAsDeal(listing); }}
+            className="btn-secondary"
+            style={{ width: "100%", marginTop: 4, padding: "7px 10px", fontSize: 11, justifyContent: "center" }}
+          >
+            <Plus size={12} /> Use in Deal Analyzer
+          </button>
+        )}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, fontSize: 11, marginBottom: 10 }}>
-        <div>
-          <div style={{ color: THEME.textDim }}>BEDS</div>
-          <div style={{ fontWeight: 600 }}>{listing.bedrooms || "—"}</div>
-        </div>
-        <div>
-          <div style={{ color: THEME.textDim }}>BATHS</div>
-          <div style={{ fontWeight: 600 }}>{listing.bathrooms || "—"}</div>
-        </div>
-        <div>
-          <div style={{ color: THEME.textDim }}>SQFT</div>
-          <div style={{ fontWeight: 600 }}>{listing.squareFootage ? listing.squareFootage.toLocaleString() : "—"}</div>
-        </div>
-        <div>
-          <div style={{ color: THEME.textDim }}>DOM</div>
-          <div style={{ fontWeight: 600 }}>{listing.daysOnMarket ?? "—"}</div>
-        </div>
-      </div>
-      <div style={{
-        fontSize: 10, color: THEME.textMuted,
-        paddingTop: 8, borderTop: `1px solid ${THEME.borderLight}`,
-        display: "flex", justifyContent: "space-between"
-      }}>
-        <span>{listing.propertyType || "—"}</span>
-        {listing.yearBuilt && <span>Built {listing.yearBuilt}</span>}
-      </div>
-      {listing.externalUrl && (
-        <a
-          href={listing.externalUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            marginTop: 8, fontSize: 11, color: THEME.accent,
-            textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4
-          }}
-        >
-          <ExternalLink size={11} /> View full listing
-        </a>
-      )}
-      {!isRental && (
-        <button
-          onClick={(e) => { e.stopPropagation(); useListingAsDeal(listing); }}
-          className="btn-secondary"
-          style={{ width: "100%", marginTop: 10, padding: "6px 10px", fontSize: 11 }}
-        >
-          <Plus size={12} /> Use in Deal Analyzer
-        </button>
-      )}
     </div>
   );
 };
