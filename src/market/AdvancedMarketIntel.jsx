@@ -14,7 +14,7 @@ import { Panel, CalcTooltip } from "../primitives.jsx";
 import { USCountyMap } from "./USCountyMap.jsx";
 import { LiveListingsPanel } from "./LiveListingsPanel.jsx";
 import { STATE_NAMES, STATE_DEFAULT_CITIES } from "./mapUtils.js";
-import { isSaasMode, useSaasUser, fetchCountyCensus } from "../lib/saas.js";
+import { isSaasMode, useSaasUser, fetchCountyCensus, fetchCountyFMR, fetchMarketIndexes } from "../lib/saas.js";
 
 const RepeatIcon = RotateCcw;
 
@@ -1066,23 +1066,34 @@ export const AdvancedMarketIntel = () => {
   // from our /api/census/county proxy (cached 24h server-side).
   const saas = useSaasUser();
   const saasOn = isSaasMode();
-  const [countyCensus, setCountyCensus] = useState(null); // { population, medianIncome, ... }
-  const [censusLoading, setCensusLoading] = useState(false);
+  const [countyCensus, setCountyCensus] = useState(null);
+  const [countyFmr, setCountyFmr] = useState(null);
+  const [countyIndexes, setCountyIndexes] = useState(null);
+  const [dataLoading, setDataLoading] = useState(false);
   useEffect(() => {
-    if (!saasOn || !saas.user) { setCountyCensus(null); return; }
+    if (!saasOn || !saas.user) {
+      setCountyCensus(null); setCountyFmr(null); setCountyIndexes(null);
+      return;
+    }
     if (!clickedArea || !clickedArea.stateFips || !clickedArea.countyFips) {
-      setCountyCensus(null);
+      setCountyCensus(null); setCountyFmr(null); setCountyIndexes(null);
       return;
     }
     let cancelled = false;
-    setCensusLoading(true);
-    fetchCountyCensus(saas.getToken, {
-      stateFips: clickedArea.stateFips,
-      countyFips: clickedArea.countyFips
-    })
-      .then(data => { if (!cancelled) setCountyCensus(data); })
-      .catch(err => { if (!cancelled) { console.warn("Census fetch failed:", err); setCountyCensus(null); }})
-      .finally(() => { if (!cancelled) setCensusLoading(false); });
+    setDataLoading(true);
+    const { stateFips, countyFips } = clickedArea;
+    // Fire all three free data sources in parallel — they're independent and
+    // failure of one shouldn't block the others.
+    Promise.allSettled([
+      fetchCountyCensus(saas.getToken, { stateFips, countyFips }),
+      fetchCountyFMR(saas.getToken, { stateFips, countyFips }),
+      fetchMarketIndexes(saas.getToken, { regionType: "county", regionId: `${stateFips}${countyFips}` })
+    ]).then(results => {
+      if (cancelled) return;
+      setCountyCensus(results[0].status === "fulfilled" ? results[0].value : null);
+      setCountyFmr(results[1].status === "fulfilled" ? results[1].value : null);
+      setCountyIndexes(results[2].status === "fulfilled" ? results[2].value : null);
+    }).finally(() => { if (!cancelled) setDataLoading(false); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saasOn, saas.user, clickedArea?.stateFips, clickedArea?.countyFips]);
@@ -1494,11 +1505,12 @@ export const AdvancedMarketIntel = () => {
             </Panel>
           </div>
           <div>
-            {/* County demographics (US Census ACS 5-year) — only shows when the
-                user has drilled into a specific county on the map. */}
-            {clickedArea && countyCensus && (
+            {/* County free-data panel: Census demographics + HUD FMR + Zillow/Redfin
+                indexes. All three are free government/research sources so we
+                call them together on every county click. */}
+            {clickedArea && (countyCensus || countyFmr || countyIndexes) && (
               <Panel
-                title={`${clickedArea.county || clickedArea.city} County Demographics`}
+                title={`${clickedArea.county || clickedArea.city} County — Free Data Sources`}
                 icon={<Users size={16} />}
                 style={{ marginBottom: 20 }}
                 action={
@@ -1508,44 +1520,123 @@ export const AdvancedMarketIntel = () => {
                     borderRadius: 4,
                     background: THEME.greenDim, color: THEME.green
                   }}>
-                    Live · US Census ({countyCensus.asOf})
+                    Free · {[countyCensus && "Census", countyFmr && "HUD", countyIndexes && "Zillow/Redfin"].filter(Boolean).join(" + ")}
                   </span>
                 }
               >
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
-                  <div>
-                    <div style={{ fontSize: 10, color: THEME.textMuted, letterSpacing: "0.06em", textTransform: "uppercase" }}>Population</div>
-                    <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>
-                      {countyCensus.population ? countyCensus.population.toLocaleString() : "—"}
+                {countyCensus && (
+                  <>
+                    <div style={{ fontSize: 10, color: THEME.textMuted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                      US Census · {countyCensus.asOf}
                     </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 10, color: THEME.textMuted, letterSpacing: "0.06em", textTransform: "uppercase" }}>Median Income</div>
-                    <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>
-                      {countyCensus.medianIncome ? fmtUSD(countyCensus.medianIncome, { short: true }) : "—"}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 16 }}>
+                      <div>
+                        <div style={{ fontSize: 10, color: THEME.textMuted }}>Population</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>
+                          {countyCensus.population ? countyCensus.population.toLocaleString() : "—"}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: THEME.textMuted }}>Median Income</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>
+                          {countyCensus.medianIncome ? fmtUSD(countyCensus.medianIncome, { short: true }) : "—"}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: THEME.textMuted }}>Renter Share</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2, color: THEME.teal }}>
+                          {countyCensus.renterSharePct != null ? `${countyCensus.renterSharePct}%` : "—"}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: THEME.textMuted }}>Census Median Rent</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>
+                          {countyCensus.medianGrossRent ? `$${countyCensus.medianGrossRent.toLocaleString()}` : "—"}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 10, color: THEME.textMuted, letterSpacing: "0.06em", textTransform: "uppercase" }}>Renter Share</div>
-                    <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2, color: THEME.teal }}>
-                      {countyCensus.renterSharePct != null ? `${countyCensus.renterSharePct}%` : "—"}
+                  </>
+                )}
+
+                {countyFmr && countyFmr.fmr && (
+                  <>
+                    <div style={{ fontSize: 10, color: THEME.textMuted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                      HUD Fair Market Rents · {countyFmr.year}{countyFmr.smallAreaFmr ? " · Small Area" : ""}
                     </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 10, color: THEME.textMuted, letterSpacing: "0.06em", textTransform: "uppercase" }}>Median Rent</div>
-                    <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>
-                      {countyCensus.medianGrossRent ? `$${countyCensus.medianGrossRent.toLocaleString()}` : "—"}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8, marginBottom: 16 }}>
+                      {[
+                        ["Studio", countyFmr.fmr.studio],
+                        ["1BR", countyFmr.fmr.one],
+                        ["2BR", countyFmr.fmr.two],
+                        ["3BR", countyFmr.fmr.three],
+                        ["4BR", countyFmr.fmr.four]
+                      ].map(([label, val]) => (
+                        <div key={label} style={{
+                          padding: "8px 6px",
+                          background: THEME.bgRaised,
+                          borderRadius: 6,
+                          textAlign: "center"
+                        }}>
+                          <div style={{ fontSize: 10, color: THEME.textMuted }}>{label}</div>
+                          <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2, color: THEME.accent }}>
+                            {val ? `$${val.toLocaleString()}` : "—"}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                </div>
+                  </>
+                )}
+
+                {countyIndexes && (countyIndexes.zhvi_latest || countyIndexes.zori_latest || countyIndexes.redfin_median_price) && (
+                  <>
+                    <div style={{ fontSize: 10, color: THEME.textMuted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                      Zillow + Redfin · {countyIndexes.asOf || "latest"}
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+                      <div>
+                        <div style={{ fontSize: 10, color: THEME.textMuted }}>ZHVI (Home Value)</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>
+                          {countyIndexes.zhvi_latest ? fmtUSD(countyIndexes.zhvi_latest, { short: true }) : "—"}
+                        </div>
+                        {countyIndexes.zhvi_yoy_pct != null && (
+                          <div style={{ fontSize: 10, color: countyIndexes.zhvi_yoy_pct >= 0 ? THEME.green : THEME.red, marginTop: 2 }}>
+                            {countyIndexes.zhvi_yoy_pct >= 0 ? "+" : ""}{countyIndexes.zhvi_yoy_pct}% YoY
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: THEME.textMuted }}>ZORI (Rent)</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2, color: THEME.teal }}>
+                          {countyIndexes.zori_latest ? `$${Math.round(countyIndexes.zori_latest).toLocaleString()}` : "—"}
+                        </div>
+                        {countyIndexes.zori_yoy_pct != null && (
+                          <div style={{ fontSize: 10, color: countyIndexes.zori_yoy_pct >= 0 ? THEME.green : THEME.red, marginTop: 2 }}>
+                            {countyIndexes.zori_yoy_pct >= 0 ? "+" : ""}{countyIndexes.zori_yoy_pct}% YoY
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: THEME.textMuted }}>Redfin Median · DOM</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>
+                          {countyIndexes.redfin_median_price ? fmtUSD(countyIndexes.redfin_median_price, { short: true }) : "—"}
+                          {countyIndexes.redfin_median_dom != null && (
+                            <span style={{ fontSize: 11, color: THEME.textMuted, fontWeight: 500 }}>
+                              {" · "}{countyIndexes.redfin_median_dom}d
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
               </Panel>
             )}
-            {clickedArea && censusLoading && !countyCensus && (
+            {clickedArea && dataLoading && !countyCensus && !countyFmr && !countyIndexes && (
               <div style={{
                 padding: 10, marginBottom: 14, fontSize: 12, color: THEME.textMuted,
                 background: THEME.bgRaised, borderRadius: 6
               }}>
-                Loading demographics…
+                Loading free county data…
               </div>
             )}
             <LiveListingsPanel

@@ -175,3 +175,18 @@ export async function fetchCountyCensus(getToken, { stateFips, countyFips }) {
   const qs = new URLSearchParams({ stateFips, countyFips });
   return fetchMetered(getToken, `/api/census/county?${qs.toString()}`);
 }
+
+// HUD Fair Market Rents — free, government rental baselines per county.
+// Cached server-side for 30d (HUD publishes annually).
+export async function fetchCountyFMR(getToken, { stateFips, countyFips }) {
+  const qs = new URLSearchParams({ stateFips, countyFips });
+  return fetchMetered(getToken, `/api/hud/fmr?${qs.toString()}`);
+}
+
+// Monthly market indexes (Zillow ZHVI home-value + ZORI rent + Redfin median
+// price/DOM/inventory). Free, ingested from public research CSVs. No per-call
+// cost — queries a cached Supabase snapshot.
+export async function fetchMarketIndexes(getToken, { regionType, regionId }) {
+  const qs = new URLSearchParams({ regionType, regionId });
+  return fetchMetered(getToken, `/api/market/indexes?${qs.toString()}`);
+}

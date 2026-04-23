@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "npm run build && npx vercel --prod"
+    "deploy": "npm run build && npx vercel --prod",
+    "ingest-market-data": "node scripts/ingest-market-data.js"
   },
   "dependencies": {
     "@clerk/backend": "^3.3.0",

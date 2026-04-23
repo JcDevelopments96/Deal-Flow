@@ -44,8 +44,11 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
 
   return (
   <div style={{
-    borderBottom: `1px solid ${THEME.border}`,
-    background: THEME.bg,
+    // Navy header with light text so content panels below (on white canvas)
+    // stand out sharply. Subtle bottom glow adds separation without a hard line.
+    borderBottom: `1px solid ${THEME.navyDim}`,
+    background: THEME.navy,
+    boxShadow: "0 2px 10px rgba(15, 23, 42, 0.12)",
     position: "sticky", top: 0, zIndex: 10
   }}>
     <div style={{
@@ -57,16 +60,16 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <div style={{
           width: 36, height: 36, borderRadius: 8,
-          background: THEME.navy,
+          background: "#FFFFFF",
           display: "flex", alignItems: "center", justifyContent: "center"
         }}>
-          <Building2 size={20} color="white" />
+          <Building2 size={20} color={THEME.navy} />
         </div>
         <div>
-          <div className="serif" style={{ fontSize: 20, fontWeight: 700, lineHeight: 1 }}>
+          <div className="serif" style={{ fontSize: 20, fontWeight: 700, lineHeight: 1, color: "#FFFFFF" }}>
             DealTrack
           </div>
-          <div style={{ fontSize: 10, color: THEME.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 2 }}>
+          <div style={{ fontSize: 10, color: "rgba(255, 255, 255, 0.65)", letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 2 }}>
             Real Estate Investment Platform
           </div>
         </div>
@@ -86,8 +89,9 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
             aria-label={tab.label}
             style={{
               padding: "8px 14px", fontSize: 13, fontWeight: 600,
-              background: view === tab.key ? THEME.bgRaised : "transparent",
-              color: view === tab.key ? THEME.accent : THEME.textMuted,
+              background: view === tab.key ? "rgba(255, 255, 255, 0.15)" : "transparent",
+              color: view === tab.key ? "#FFFFFF" : "rgba(255, 255, 255, 0.75)",
+              border: "none",
               borderRadius: 6,
               display: "flex", alignItems: "center", gap: 6, cursor: "pointer",
               position: "relative"

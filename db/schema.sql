@@ -160,6 +160,40 @@ create policy watchlist_items_self_read on public.watchlist_items
 
 
 -- ────────────────────────────────────────────────────────────────────────
+-- market_indexes (snapshot of public research data — Zillow + Redfin)
+--
+-- Populated by scripts/ingest-market-data.js (monthly cron / manual run).
+-- Queried by /api/market/indexes so the county panel can show ZHVI + ZORI
+-- + Redfin numbers alongside the metered Realtor data — at zero per-call cost.
+-- ────────────────────────────────────────────────────────────────────────
+create table if not exists public.market_indexes (
+  region_type          text not null check (region_type in ('zip', 'county')),
+  region_id            text not null,    -- ZIP code or 5-char state+county FIPS
+  region_name          text,
+  state_code           text,
+  zhvi_latest          numeric,
+  zhvi_yoy_pct         numeric,
+  zori_latest          numeric,
+  zori_yoy_pct         numeric,
+  redfin_median_price  numeric,
+  redfin_median_dom    integer,
+  redfin_inventory     integer,
+  as_of                date,
+  updated_at           timestamptz not null default now(),
+  primary key (region_type, region_id)
+);
+
+create index if not exists market_indexes_state_idx on public.market_indexes(state_code);
+
+alter table public.market_indexes enable row level security;
+
+-- Readable by anyone authenticated — this is purely aggregated public data
+drop policy if exists market_indexes_read on public.market_indexes;
+create policy market_indexes_read on public.market_indexes
+  for select using (auth.role() = 'authenticated');
+
+
+-- ────────────────────────────────────────────────────────────────────────
 -- helper function: atomic click-increment.
 -- Called from the metering middleware. Returns the new running total
 -- so the API can also return remaining-quota to the client.
