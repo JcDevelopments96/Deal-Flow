@@ -1,35 +1,19 @@
 /* ============================================================================
-   DATA PROVIDERS — RentCast + Zillow (via RapidAPI zillow-com1) integration.
-   Also includes demo data builders + image normalization + filter helpers.
+   DATA PROVIDERS — Zillow (via RapidAPI zillow-com1) BYOK for standalone mode.
+   SaaS mode goes through /api/market/listings (Realtor.com, server-side key).
 
-   Docs:
-     RentCast: https://developers.rentcast.io   (free tier 50 req/mo)
-     Zillow:   via RapidAPI zillow-com1 community wrapper
-               (Zillow retired their official API in 2014)
-
-   Build-time env fallback: VITE_RENTCAST_API_KEY, VITE_RAPIDAPI_ZILLOW_KEY
+   RentCast was removed: rental baselines now come from the free stack
+   (HUD Fair Market Rents + Zillow ZORI + Census median gross rent), all
+   surfaced in the "Free Data Sources" panel on the Market Intel view.
    ============================================================================ */
 
 export const PROVIDER_STORAGE_KEY = "dealtrack-data-provider";
-export const RENTCAST_STORAGE_KEY = "dealtrack-rentcast-key";
 export const RAPIDAPI_STORAGE_KEY = "dealtrack-rapidapi-zillow-key";
 
-// eslint-disable-next-line no-undef
-export const ENV_RENTCAST_KEY = (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_RENTCAST_API_KEY) || "";
 // eslint-disable-next-line no-undef
 export const ENV_RAPIDAPI_KEY = (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_RAPIDAPI_ZILLOW_KEY) || "";
 
 export const PROVIDERS = {
-  rentcast: {
-    id: "rentcast",
-    name: "RentCast",
-    subtitle: "MLS sale + rental listings",
-    signupUrl: "https://app.rentcast.io/app/api",
-    docsUrl: "https://developers.rentcast.io",
-    freeTier: "Free tier: 50 requests/month",
-    storageKey: RENTCAST_STORAGE_KEY,
-    envKey: ENV_RENTCAST_KEY
-  },
   zillow: {
     id: "zillow",
     name: "Zillow (via RapidAPI)",
@@ -56,15 +40,6 @@ export const DEMO_HOUSE_IMAGES = [
   `${PICSUM_BASE}/dealtrack-house-6/640/400`,
   `${PICSUM_BASE}/dealtrack-house-7/640/400`,
   `${PICSUM_BASE}/dealtrack-house-8/640/400`
-];
-
-export const DEMO_RENTAL_IMAGES = [
-  `${PICSUM_BASE}/dealtrack-rent-1/640/400`,
-  `${PICSUM_BASE}/dealtrack-rent-2/640/400`,
-  `${PICSUM_BASE}/dealtrack-rent-3/640/400`,
-  `${PICSUM_BASE}/dealtrack-rent-4/640/400`,
-  `${PICSUM_BASE}/dealtrack-rent-5/640/400`,
-  `${PICSUM_BASE}/dealtrack-rent-6/640/400`
 ];
 
 export const buildDemoListings = (state, city, marketRef) => {
@@ -96,90 +71,6 @@ export const buildDemoListings = (state, city, marketRef) => {
       demo: true
     };
   });
-};
-
-export const buildDemoComps = (state, city, marketRef) => {
-  if (!marketRef) return [];
-  const baseRent = marketRef.medianRent || 1800;
-  const streets = ["Cypress Rd", "Mariner Way", "Lakeshore Dr", "Coral Ave", "Orchid Ln", "Heron Ct"];
-  return Array.from({ length: 6 }).map((_, i) => {
-    const variation = 0.85 + (i * 0.06);
-    const rent = Math.round(baseRent * variation / 25) * 25;
-    const sqft = 950 + i * 180;
-    return {
-      id: `demo-rent-${state}-${city}-${i}`,
-      formattedAddress: `${800 + i * 44} ${streets[i % streets.length]}, ${city}, ${state}`,
-      addressLine1: `${800 + i * 44} ${streets[i % streets.length]}`,
-      city,
-      state,
-      price: rent,
-      bedrooms: 2 + (i % 3),
-      bathrooms: 1 + (i % 2) * 0.5 + 1,
-      squareFootage: sqft,
-      propertyType: i % 3 === 2 ? "Condo" : "Single Family",
-      listedDate: new Date(Date.now() - i * 86400000 * 6).toISOString(),
-      pricePerSqft: +(rent / sqft).toFixed(2),
-      daysOnMarket: 5 + i * 7,
-      status: "Active",
-      photos: [DEMO_RENTAL_IMAGES[i % DEMO_RENTAL_IMAGES.length]],
-      imageUrl: DEMO_RENTAL_IMAGES[i % DEMO_RENTAL_IMAGES.length],
-      demo: true
-    };
-  });
-};
-
-// Pull every photo URL RentCast returned, not just the first. Returns an
-// array (possibly empty) so the UI can show count badges / carousels later.
-export const extractRentCastPhotos = (raw) => {
-  if (!raw) return [];
-  const out = [];
-  const seen = new Set();
-  const push = (v) => {
-    if (typeof v === "string" && v && !seen.has(v)) { seen.add(v); out.push(v); }
-  };
-
-  const pushFrom = (arr) => {
-    if (!Array.isArray(arr)) return;
-    for (const p of arr) {
-      if (typeof p === "string") push(p);
-      else if (p && typeof p === "object") push(p.url || p.href || p.src);
-    }
-  };
-
-  pushFrom(raw.photos);
-  pushFrom(raw.images);
-  push(raw.primaryPhoto);
-  push(raw.photoUrl);
-  push(raw.imageUrl);
-  return out;
-};
-
-// Back-compat helper: first photo URL or null.
-export const extractRentCastImage = (raw) => extractRentCastPhotos(raw)[0] || null;
-
-export const formatRentCastListing = (raw) => {
-  const photos = extractRentCastPhotos(raw);
-  return {
-    id: raw.id || `${raw.addressLine1}-${raw.zipCode}`,
-    formattedAddress: raw.formattedAddress || `${raw.addressLine1 || ""}, ${raw.city || ""}, ${raw.state || ""}`,
-    addressLine1: raw.addressLine1,
-    city: raw.city,
-    state: raw.state,
-    price: raw.price,
-    bedrooms: raw.bedrooms,
-    bathrooms: raw.bathrooms,
-    squareFootage: raw.squareFootage,
-    propertyType: raw.propertyType,
-    yearBuilt: raw.yearBuilt,
-    listedDate: raw.listedDate,
-    pricePerSqft: raw.price && raw.squareFootage ? Math.round(raw.price / raw.squareFootage) : null,
-    daysOnMarket: raw.daysOnMarket,
-    status: raw.status || "Active",
-    latitude: raw.latitude,
-    longitude: raw.longitude,
-    photos,
-    imageUrl: photos[0] || null
-  };
 };
 
 export const formatZillowListing = (raw) => {

@@ -124,14 +124,6 @@ export async function fetchSaleListings(getToken, { city, state, bedrooms, bathr
   return fetchMetered(getToken, `/api/market/listings?${qs.toString()}`);
 }
 
-export async function fetchRentalListings(getToken, { city, state, bedrooms, bathrooms, limit }) {
-  const qs = new URLSearchParams({ state });
-  if (city) qs.set("city", city);
-  if (bedrooms) qs.set("bedrooms", bedrooms);
-  if (bathrooms) qs.set("bathrooms", bathrooms);
-  if (limit) qs.set("limit", String(limit));
-  return fetchMetered(getToken, `/api/market/rentals?${qs.toString()}`);
-}
 
 /* ── Watchlist (per-user, survives sign-out) ─────────────────────────── */
 

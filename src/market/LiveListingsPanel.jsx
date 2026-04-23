@@ -16,8 +16,8 @@ import { fmtUSD, isMobile } from "../utils.js";
 import { Panel } from "../primitives.jsx";
 import {
   PROVIDERS,
-  buildDemoListings, buildDemoComps,
-  formatRentCastListing, formatZillowListing,
+  buildDemoListings,
+  formatZillowListing,
   loadProviderPrefs, parseFilterRange, matchesRange
 } from "./providers.js";
 import { ListingCard } from "./ListingCard.jsx";
@@ -28,7 +28,6 @@ import {
   isSaasMode,
   useSaasUser,
   fetchSaleListings,
-  fetchRentalListings,
   QuotaExceededError
 } from "../lib/saas.js";
 
@@ -40,16 +39,17 @@ const medianOf = (arr) => {
   return nums.length % 2 ? nums[mid] : Math.round((nums[mid - 1] + nums[mid]) / 2);
 };
 
-// Build per-city + per-county live stats from the fetched listings so the
-// market cards can show live Realtor numbers and the map can color counties
-// by live median price. Keyed by city name / county name lower-cased. Also
-// includes a "__state__" rollup.
-const computeLiveStats = (sales, rentals) => {
-  const cityBuckets = new Map();   // cityKey -> { prices, rents, ppsqft }
-  const countyBuckets = new Map(); // countyKey -> { prices, rents, ppsqft, cities:Set }
-  const state = { prices: [], rents: [], ppsqft: [] };
+// Build per-city + per-county live stats from the Realtor sale listings so
+// the map can color counties by live median price. Keyed by city name /
+// county name lower-cased; plus a "__state__" rollup. Rent/yield comes from
+// HUD FMR + Zillow ZORI at the county level (see AdvancedMarketIntel's
+// countyFmr / countyIndexes) — we no longer bucket per-city rent data.
+const computeLiveStats = (sales) => {
+  const cityBuckets = new Map();
+  const countyBuckets = new Map();
+  const state = { prices: [], ppsqft: [] };
   const bump = (map, key, field, value) => {
-    if (!map.has(key)) map.set(key, { prices: [], rents: [], ppsqft: [], cities: new Set() });
+    if (!map.has(key)) map.set(key, { prices: [], ppsqft: [], cities: new Set() });
     map.get(key)[field].push(value);
   };
   for (const s of sales || []) {
@@ -68,40 +68,19 @@ const computeLiveStats = (sales, rentals) => {
     state.prices.push(s.price);
     if (s.pricePerSqft) state.ppsqft.push(s.pricePerSqft);
   }
-  for (const r of rentals || []) {
-    if (!r.price) continue;
-    const cityKey = (r.city || "").toLowerCase();
-    const countyKey = (typeof r.county === "string" ? r.county : "").toLowerCase().replace(/\s+county$/i, "");
-    if (cityKey) bump(cityBuckets, cityKey, "rents", r.price);
-    if (countyKey) bump(countyBuckets, countyKey, "rents", r.price);
-    state.rents.push(r.price);
-  }
-  const finish = (bucket) => {
-    const medianPrice = medianOf(bucket.prices);
-    const medianRent = medianOf(bucket.rents);
-    return {
-      medianPrice,
-      medianRent,
-      medianPpsqft: medianOf(bucket.ppsqft),
-      grossYield: medianPrice && medianRent ? +((medianRent * 12 / medianPrice) * 100).toFixed(1) : null,
-      listingCount: bucket.prices.length,
-      rentalCount: bucket.rents.length,
-      isLive: true
-    };
-  };
+  const finish = (bucket) => ({
+    medianPrice: medianOf(bucket.prices),
+    medianPpsqft: medianOf(bucket.ppsqft),
+    listingCount: bucket.prices.length,
+    isLive: true
+  });
   const out = { byCounty: {} };
   for (const [key, bucket] of cityBuckets) out[key] = finish(bucket);
   for (const [key, bucket] of countyBuckets) out.byCounty[key] = finish(bucket);
   out.__state__ = {
     medianPrice: medianOf(state.prices),
-    medianRent: medianOf(state.rents),
     medianPpsqft: medianOf(state.ppsqft),
-    grossYield: (() => {
-      const p = medianOf(state.prices), r = medianOf(state.rents);
-      return p && r ? +((r * 12 / p) * 100).toFixed(1) : null;
-    })(),
     listingCount: state.prices.length,
-    rentalCount: state.rents.length,
     isLive: true
   };
   return out;
@@ -122,15 +101,14 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
   const [detail, setDetail] = useState(null); // { listing, type } — opens the listing detail modal
   const openDetail = useCallback((listing, type) => setDetail({ listing, type }), []);
   const closeDetail = useCallback(() => setDetail(null), []);
-  const [keyDrafts, setKeyDrafts] = useState({ rentcast: "", zillow: "" });
+  const [keyDrafts, setKeyDrafts] = useState({ zillow: "" });
   const [showKeyInput, setShowKeyInput] = useState(!saasOn && !initial.keys[initial.provider]);
   const [listings, setListings] = useState([]);
-  const [rentComps, setRentComps] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [liveMode, setLiveMode] = useState(false);
 
-  const activeProvider = PROVIDERS[provider] || PROVIDERS.rentcast;
+  const activeProvider = PROVIDERS[provider] || PROVIDERS.zillow;
   const apiKey = keys[provider] || "";
 
   // Primary reference market for demo defaults
@@ -152,38 +130,6 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
   const bathsRange = useMemo(() => parseFilterRange(bathsFilter), [bathsFilter]);
   const [sortBy, setSortBy] = useState("newest"); // newest | priceAsc | priceDesc | ppsqft | dom
 
-  const fetchRentCast = async () => {
-    const params = new URLSearchParams({
-      city: targetCity,
-      state: selectedState,
-      limit: "20"
-    });
-    // RentCast supports `bedrooms` / `bathrooms` for exact match — only set when user picked a specific count.
-    if (bedsRange.min !== null && bedsRange.min === bedsRange.max) {
-      params.set("bedrooms", String(bedsRange.min));
-    }
-    if (bathsRange.min !== null && bathsRange.min === bathsRange.max) {
-      params.set("bathrooms", String(bathsRange.min));
-    }
-    const [saleRes, rentRes] = await Promise.all([
-      fetch(`https://api.rentcast.io/v1/listings/sale?${params.toString()}`, {
-        headers: { "X-Api-Key": apiKey, "accept": "application/json" }
-      }),
-      fetch(`https://api.rentcast.io/v1/listings/rental/long-term?${params.toString()}`, {
-        headers: { "X-Api-Key": apiKey, "accept": "application/json" }
-      })
-    ]);
-    if (!saleRes.ok) throw new Error(`RentCast request failed (${saleRes.status}). Check your API key.`);
-    const saleJson = await saleRes.json();
-    const rentJson = rentRes.ok ? await rentRes.json() : [];
-    const saleList = Array.isArray(saleJson) ? saleJson : (saleJson.listings || []);
-    const rentList = Array.isArray(rentJson) ? rentJson : (rentJson.listings || []);
-    return {
-      listings: saleList.map(formatRentCastListing),
-      rentals: rentList.map(formatRentCastListing)
-    };
-  };
-
   const fetchZillow = async () => {
     const location = `${targetCity}, ${selectedState}`;
     const buildUrl = (status) => {
@@ -203,91 +149,63 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
       "X-RapidAPI-Host": "zillow-com1.p.rapidapi.com",
       "accept": "application/json"
     };
-    const [saleRes, rentRes] = await Promise.all([
-      fetch(buildUrl("ForSale"), { headers }),
-      fetch(buildUrl("ForRent"), { headers })
-    ]);
+    const saleRes = await fetch(buildUrl("ForSale"), { headers });
     if (!saleRes.ok) throw new Error(`Zillow request failed (${saleRes.status}). Check your RapidAPI key and subscription.`);
     const saleJson = await saleRes.json();
-    const rentJson = rentRes.ok ? await rentRes.json() : { props: [] };
     const saleList = Array.isArray(saleJson.props) ? saleJson.props : [];
-    const rentList = Array.isArray(rentJson.props) ? rentJson.props : [];
     return {
-      listings: saleList.map(formatZillowListing),
-      rentals: rentList.map(formatZillowListing)
+      listings: saleList.map(formatZillowListing)
     };
   };
 
-  // SaaS path — both sale + rental come through /api/market/* so the RentCast
-  // key stays on the server and each call increments the user's usage counter.
+  // SaaS path — sale listings come through /api/market/listings (Realtor.com).
+  // Rental data is no longer fetched per-listing; HUD FMR + Zillow ZORI +
+  // Census median rent cover that at the county level (rendered in the
+  // Free Data Sources panel above this one).
   const fetchViaSaas = async () => {
-    // Max page-size: Realtor.com tops out at 200 per call. Using the full page
-    // matters on state-only queries — at 50 the results cluster into the 7-ish
-    // highest-volume metros. 200 spreads across ~30-40 cities in large states.
     const qsBase = { state: selectedState, limit: 200 };
-    // City is optional for sale listings (state-wide query supported by Realtor).
     if (queryCity) qsBase.city = queryCity;
-    // Only pass exact bedroom/bathroom when the filter is a specific number;
-    // RentCast's API doesn't support ranges there.
     if (bedsRange.min !== null && bedsRange.min === bedsRange.max) {
       qsBase.bedrooms = bedsRange.min;
     }
     if (bathsRange.min !== null && bathsRange.min === bathsRange.max) {
       qsBase.bathrooms = bathsRange.min;
     }
-
-    // Rentals (RentCast) require a city — skip the call entirely on state-only queries.
-    const rentalPromise = queryCity
-      ? fetchRentalListings(saas.getToken, qsBase).catch(() => ({ rentals: [], usage: null }))
-      : Promise.resolve({ rentals: [], usage: null });
-
-    const [saleRes, rentRes] = await Promise.all([
-      fetchSaleListings(saas.getToken, qsBase).catch(e => { throw e; }),
-      rentalPromise
-    ]);
-
-    // Keep the meter fresh using the usage snapshot the proxy returned.
-    const usage = saleRes.usage || rentRes.usage;
-    if (usage) saas.setUsageLocally(usage);
-
-    return {
-      // Server (/api/market/*) already normalizes the upstream response to
-      // our canonical shape, so no client-side formatter needed here.
-      listings: saleRes.listings || [],
-      rentals: rentRes.rentals || []
-    };
+    const saleRes = await fetchSaleListings(saas.getToken, qsBase);
+    if (saleRes.usage) saas.setUsageLocally(saleRes.usage);
+    return { listings: saleRes.listings || [] };
   };
 
   const loadData = useCallback(async () => {
     if (!selectedState) return;
-    // Legacy BYOK providers (RentCast/Zillow) require a city. The SaaS path
-    // (Realtor.com-primary) supports state-only queries, so we allow null city there.
+    // Legacy BYOK (Zillow) requires a city; the SaaS path supports state-only.
     if (!saasOn && !targetCity) return;
 
-    // SaaS mode, signed in → go through the metered proxy
+    const fallbackToDemo = (msg) => {
+      setListings(buildDemoListings(selectedState, targetCity, referenceMarket));
+      setLiveMode(false);
+      setError(msg);
+      if (onStatsComputed) onStatsComputed(null);
+      if (onListingsLoaded) onListingsLoaded([]);
+    };
+
+    // SaaS mode, signed in → metered Realtor.com proxy
     if (saasOn && saas.user) {
       setLoading(true);
       setError("");
       try {
         const result = await fetchViaSaas();
-        if (result.listings.length === 0 && result.rentals.length === 0) {
-          setListings(buildDemoListings(selectedState, targetCity, referenceMarket));
-          setRentComps(buildDemoComps(selectedState, targetCity, referenceMarket));
-          setLiveMode(false);
-          setError("No live results for this area — showing demo data.");
-          if (onStatsComputed) onStatsComputed(null);
-          if (onListingsLoaded) onListingsLoaded([]);
+        if (!result.listings || result.listings.length === 0) {
+          fallbackToDemo("No live results for this area — showing demo data.");
         } else {
           setListings(result.listings);
-          setRentComps(result.rentals);
           setLiveMode(true);
-          if (onStatsComputed) onStatsComputed(computeLiveStats(result.listings, result.rentals));
+          if (onStatsComputed) onStatsComputed(computeLiveStats(result.listings));
           if (onListingsLoaded) onListingsLoaded(result.listings);
         }
       } catch (err) {
         if (err instanceof QuotaExceededError) {
           setListings([]);
-          setRentComps([]);
           setLiveMode(false);
           const onFree = saas.usage?.plan === "free";
           setError(onFree
@@ -300,10 +218,7 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
           saas.refetch();
         } else {
           console.warn("SaaS market fetch failed:", err);
-          setListings(buildDemoListings(selectedState, targetCity, referenceMarket));
-          setRentComps(buildDemoComps(selectedState, targetCity, referenceMarket));
-          setLiveMode(false);
-          setError(err.message || "Live data unavailable — showing demo data.");
+          fallbackToDemo(err.message || "Live data unavailable — showing demo data.");
         }
       } finally {
         setLoading(false);
@@ -311,45 +226,31 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
       return;
     }
 
-    // SaaS mode but user not signed in → show sign-in prompt + demo data
+    // SaaS mode but user not signed in → demo
     if (saasOn && !saas.user) {
-      setListings(buildDemoListings(selectedState, targetCity, referenceMarket));
-      setRentComps(buildDemoComps(selectedState, targetCity, referenceMarket));
-      setLiveMode(false);
-      setError("");
+      fallbackToDemo("");
       return;
     }
 
-    // Standalone (non-SaaS) path — the legacy BYOK flow.
+    // Standalone (non-SaaS) — legacy Zillow BYOK flow
     if (!apiKey) {
-      setListings(buildDemoListings(selectedState, targetCity, referenceMarket));
-      setRentComps(buildDemoComps(selectedState, targetCity, referenceMarket));
-      setLiveMode(false);
-      setError("");
+      fallbackToDemo("");
       return;
     }
 
     setLoading(true);
     setError("");
     try {
-      const result = provider === "zillow" ? await fetchZillow() : await fetchRentCast();
-
-      if (result.listings.length === 0 && result.rentals.length === 0) {
-        setListings(buildDemoListings(selectedState, targetCity, referenceMarket));
-        setRentComps(buildDemoComps(selectedState, targetCity, referenceMarket));
-        setLiveMode(false);
-        setError("No live results for this area — showing demo data.");
+      const result = await fetchZillow();
+      if (!result.listings || result.listings.length === 0) {
+        fallbackToDemo("No live results for this area — showing demo data.");
       } else {
         setListings(result.listings);
-        setRentComps(result.rentals);
         setLiveMode(true);
       }
     } catch (err) {
       console.warn(`${activeProvider.name} fetch failed:`, err);
-      setListings(buildDemoListings(selectedState, targetCity, referenceMarket));
-      setRentComps(buildDemoComps(selectedState, targetCity, referenceMarket));
-      setLiveMode(false);
-      setError(err.message || "Live data unavailable — showing demo data.");
+      fallbackToDemo(err.message || "Live data unavailable — showing demo data.");
     } finally {
       setLoading(false);
     }
@@ -375,10 +276,6 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
     };
     return out.sort(cmp[sortBy] || cmp.newest);
   }, [listings, bedsRange, bathsRange, sortBy]);
-  const filteredComps = useMemo(
-    () => rentComps.filter(l => matchesRange(l.bedrooms, bedsRange) && matchesRange(l.bathrooms, bathsRange)),
-    [rentComps, bedsRange, bathsRange]
-  );
 
   const saveKey = (providerId, val) => {
     const trimmed = (val || "").trim();
@@ -594,7 +491,7 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
               {bedsFilter !== "any" && <span><strong>{bedsFilter} bed{bedsFilter === "1" ? "" : "s"}</strong></span>}
               {bathsFilter !== "any" && <span><strong>{bathsFilter} bath{bathsFilter === "1" ? "" : "s"}</strong></span>}
               <span style={{ color: THEME.textDim }}>
-                ({filteredListings.length} for sale · {filteredComps.length} rentals)
+                ({filteredListings.length} for sale)
               </span>
             </div>
           )}
@@ -654,31 +551,6 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
             </div>
           )}
 
-          <div style={{
-            fontSize: 12, fontWeight: 700, color: THEME.teal,
-            textTransform: "uppercase", letterSpacing: "0.1em",
-            marginBottom: 10, display: "flex", alignItems: "center", gap: 8
-          }}>
-            <Home size={13} />
-            Rental Comparables ({filteredComps.length})
-          </div>
-          {filteredComps.length === 0 ? (
-            <div style={{ padding: 20, textAlign: "center", color: THEME.textMuted, fontSize: 12 }}>
-              {rentComps.length > 0
-                ? "No rental comps match the current bed/bath filters — try widening them."
-                : !queryCity
-                  ? "Click a county on the map to pull rental comparables for that city."
-                  : "No rental comparables found for this area."}
-            </div>
-          ) : (
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: isMobile() ? "1fr" : "repeat(auto-fill, minmax(260px, 1fr))",
-              gap: 10
-            }}>
-              {filteredComps.map(l => <ListingCard key={l.id} listing={l} type="rental" onOpen={openDetail} />)}
-            </div>
-          )}
         </>
       )}
 
