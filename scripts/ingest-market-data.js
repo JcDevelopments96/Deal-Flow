@@ -25,15 +25,34 @@ import zlib from "node:zlib";
 import { pipeline } from "node:stream/promises";
 import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Strip stray quotes/whitespace — a common mistake when pasting values into
+// GitHub Secrets UI is to include the surrounding quotes from a .env line.
+const clean = (v) => typeof v === "string" ? v.replace(/^['"]|['"]$/g, "").trim() : v;
+const SUPABASE_URL = clean(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL);
+const SERVICE_KEY  = clean(process.env.SUPABASE_SERVICE_ROLE_KEY);
 if (!SUPABASE_URL || !SERVICE_KEY) {
   console.error("Set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (or VITE_SUPABASE_URL).");
   process.exit(1);
 }
+console.log(`Supabase URL: ${SUPABASE_URL}`);
+console.log(`Service key: ${SERVICE_KEY.slice(0, 12)}...${SERVICE_KEY.slice(-4)} (len=${SERVICE_KEY.length})`);
 const db = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false }
 });
+
+// Sanity check: prove we can actually READ before we start downloading 700MB.
+// If the key is wrong this errors out immediately and the job fails loudly.
+{
+  const { count, error } = await db
+    .from("market_indexes")
+    .select("*", { count: "exact", head: true });
+  if (error) {
+    console.error("❌ Supabase connection test failed:", error.message);
+    console.error("   Check that SUPABASE_SERVICE_ROLE_KEY matches the project at SUPABASE_URL.");
+    process.exit(1);
+  }
+  console.log(`Supabase OK — market_indexes currently has ${count} rows.\n`);
+}
 
 const ZILLOW_ZHVI_URL = "https://files.zillowstatic.com/research/public_csvs/zhvi/County_zhvi_uc_sfrcondo_tier_0.33_0.67_sm_sa_month.csv";
 const ZILLOW_ZORI_URL = "https://files.zillowstatic.com/research/public_csvs/zori/County_zori_uc_sfrcondomfr_sm_month.csv";
@@ -249,7 +268,24 @@ async function main() {
     };
   });
   await upsertChunks(merged);
-  console.log(`✅ Done — ${merged.length} counties refreshed.`);
+
+  // Verify the rows we just wrote are actually in the DB with fresh
+  // updated_at. If this fails the upsert was going to a different project
+  // or RLS silently blocked writes.
+  const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  const { count: freshCount, error: verifyErr } = await db
+    .from("market_indexes")
+    .select("*", { count: "exact", head: true })
+    .gt("updated_at", fiveMinAgo);
+  if (verifyErr) {
+    console.error("❌ Post-write verification query failed:", verifyErr.message);
+    process.exit(1);
+  }
+  if (freshCount < merged.length) {
+    console.error(`❌ Expected ${merged.length} fresh rows but only found ${freshCount}. Writes likely went elsewhere.`);
+    process.exit(1);
+  }
+  console.log(`✅ Done — ${merged.length} counties refreshed, ${freshCount} verified fresh.`);
 }
 
 main().catch(err => { console.error(err); process.exit(1); });
