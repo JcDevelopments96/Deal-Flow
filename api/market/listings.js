@@ -20,10 +20,10 @@ import { ensureUser } from "../_lib/db.js";
 import { recordMeteredClick } from "../_lib/metering.js";
 import { normalizeRealtor } from "./_normalize.js";
 
-async function fetchFromRealtor({ city, state, bedrooms, bathrooms, limit, apiKey }) {
+async function fetchRealtorPage({ city, state, bedrooms, bathrooms, offset, apiKey }) {
   const body = {
-    limit: Math.max(1, Math.min(200, Number(limit) || 50)),
-    offset: 0,
+    limit: 200,
+    offset,
     // City is optional — state-only query returns listings across the whole
     // state (tens of thousands for large states, hundreds/thousands for small
     // states). Drill in by clicking a county on the map.
@@ -53,8 +53,29 @@ async function fetchFromRealtor({ city, state, bedrooms, bathrooms, limit, apiKe
     throw new Error(`realtor ${res.status}: ${text.slice(0, 300)}`);
   }
   const json = await res.json();
-  const results = json?.data?.home_search?.results || [];
-  return results.map(normalizeRealtor).filter(Boolean);
+  return json?.data?.home_search?.results || [];
+}
+
+// State-wide queries fetch 3 parallel pages (600 listings) because Realtor's
+// per-call cap of 200 + sort-by-newest clusters results in top metros — at
+// 200 you see ~30 cities; at 600 you see ~200 cities. City-specific queries
+// stay at 1 page since 200 is more than enough for a single city.
+async function fetchFromRealtor({ city, state, bedrooms, bathrooms, apiKey }) {
+  const isStateWide = !city;
+  const offsets = isStateWide ? [0, 200, 400] : [0];
+  const pages = await Promise.all(offsets.map(offset =>
+    fetchRealtorPage({ city, state, bedrooms, bathrooms, offset, apiKey })
+  ));
+  // De-dupe by property_id — unlikely but cheap insurance for overlapping pages.
+  const seen = new Set();
+  const combined = [];
+  for (const p of pages.flat()) {
+    const id = p.property_id || p.listing_id;
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    combined.push(p);
+  }
+  return combined.map(normalizeRealtor).filter(Boolean);
 }
 
 export default handler(async (req, res) => {
@@ -72,14 +93,14 @@ export default handler(async (req, res) => {
       "Set RAPIDAPI_REALTOR_KEY in Vercel env.");
   }
 
-  const { city, state, bedrooms, bathrooms, limit = "50" } = req.query || {};
+  const { city, state, bedrooms, bathrooms } = req.query || {};
   if (!state) {
     throw new ApiError(400, "missing_params",
       "state is required (city is optional — state-only query returns listings across the whole state)");
   }
 
-  // Record the click BEFORE calling upstream so over-quota users can't
-  // abuse retries.
+  // Record the click BEFORE calling upstream. Still 1 click per user even
+  // though state-wide queries internally fan out to 3 parallel Realtor pages.
   const usage = await recordMeteredClick({
     user,
     provider: "realtor",
@@ -89,7 +110,7 @@ export default handler(async (req, res) => {
 
   let listings = [];
   try {
-    listings = await fetchFromRealtor({ city, state, bedrooms, bathrooms, limit, apiKey: realtorKey });
+    listings = await fetchFromRealtor({ city, state, bedrooms, bathrooms, apiKey: realtorKey });
   } catch (err) {
     console.warn("[market/listings] realtor fetch failed:", err.message);
     throw new ApiError(502, "upstream_error", err.message);
