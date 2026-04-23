@@ -3,10 +3,10 @@
    Holds the huge `marketData` atlas + state filter + recommendations +
    Top-5 rankings + the combined Map / Live Listings layout.
    ============================================================================ */
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import {
   Search, MapPin, DollarSign, TrendingUp, Gauge, Target,
-  Filter, RotateCcw, X
+  Filter, RotateCcw, X, Users
 } from "lucide-react";
 import { THEME } from "../theme.js";
 import { fmtUSD, isMobile } from "../utils.js";
@@ -14,6 +14,7 @@ import { Panel, CalcTooltip } from "../primitives.jsx";
 import { USCountyMap } from "./USCountyMap.jsx";
 import { LiveListingsPanel } from "./LiveListingsPanel.jsx";
 import { STATE_NAMES, STATE_DEFAULT_CITIES } from "./mapUtils.js";
+import { isSaasMode, useSaasUser, fetchCountyCensus } from "../lib/saas.js";
 
 const RepeatIcon = RotateCcw;
 
@@ -1040,26 +1041,75 @@ export const AdvancedMarketIntel = () => {
   const [clickedArea, setClickedArea] = useState(null);
 
   // Live stats pushed up from LiveListingsPanel after each successful fetch.
-  // Keyed by city name lower-cased; includes a "__state__" rollup for state-wide queries.
-  // Shape: { [city]: { medianPrice, medianRent, grossYield, listingCount, ... } }
+  // Shape: { [cityKey]: {...}, byCounty: { [countyKey]: {...} }, __state__: {...} }
   const [liveCityStats, setLiveCityStats] = useState(null);
+
+  // Sorted, de-duplicated city + county lists for the filter dropdowns.
+  const liveCityList = useMemo(() => {
+    if (!liveCityStats) return [];
+    // Find the original-cased city name from the first listing that mentioned it.
+    const keys = Object.keys(liveCityStats)
+      .filter(k => k !== "__state__" && k !== "byCounty");
+    return keys
+      .map(k => k.replace(/\b\w/g, ch => ch.toUpperCase()))
+      .sort();
+  }, [liveCityStats]);
+
+  const liveCountyList = useMemo(() => {
+    if (!liveCityStats?.byCounty) return [];
+    return Object.keys(liveCityStats.byCounty)
+      .map(k => k.replace(/\b\w/g, ch => ch.toUpperCase()) + " County")
+      .sort();
+  }, [liveCityStats]);
+
+  // Census demographics for the currently-clicked county. Fetched on-demand
+  // from our /api/census/county proxy (cached 24h server-side).
+  const saas = useSaasUser();
+  const saasOn = isSaasMode();
+  const [countyCensus, setCountyCensus] = useState(null); // { population, medianIncome, ... }
+  const [censusLoading, setCensusLoading] = useState(false);
+  useEffect(() => {
+    if (!saasOn || !saas.user) { setCountyCensus(null); return; }
+    if (!clickedArea || !clickedArea.stateFips || !clickedArea.countyFips) {
+      setCountyCensus(null);
+      return;
+    }
+    let cancelled = false;
+    setCensusLoading(true);
+    fetchCountyCensus(saas.getToken, {
+      stateFips: clickedArea.stateFips,
+      countyFips: clickedArea.countyFips
+    })
+      .then(data => { if (!cancelled) setCountyCensus(data); })
+      .catch(err => { if (!cancelled) { console.warn("Census fetch failed:", err); setCountyCensus(null); }})
+      .finally(() => { if (!cancelled) setCensusLoading(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saasOn, saas.user, clickedArea?.stateFips, clickedArea?.countyFips]);
 
   const handleMapCountyClick = useCallback((payload) => {
     if (!payload) return;
+    // Carry FIPS codes through so we can fetch Census demographics without
+    // re-deriving them.
+    const common = {
+      state: payload.state,
+      city: payload.city,
+      county: payload.county,
+      stateFips: payload.stateFips || null,
+      countyFips: payload.countyFips || null
+    };
     if (payload.synthetic) {
-      // Non-tracked county: surface it as the state + county for live data queries
       setSelectedState(payload.state);
       setShowStateResults(true);
       setSearchQuery("");
       setShowSearchResults(false);
-      setClickedArea({ state: payload.state, city: payload.city, county: payload.county });
     } else {
       setSearchQuery(payload.city);
       setShowSearchResults(true);
       setSelectedState("");
       setShowStateResults(false);
-      setClickedArea({ state: payload.state, city: payload.city, county: payload.county });
     }
+    setClickedArea(common);
   }, []);
 
   const renderMarketCard = (market, showRank = false, rank = 0) => {
@@ -1218,9 +1268,10 @@ export const AdvancedMarketIntel = () => {
           Start by picking a state to narrow the map, then browse the live listings and comparables for that area.
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "2fr 3fr", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr 1fr", gap: 12, marginBottom: 14 }}>
+          {/* STATE — just names; picking one triggers a state-wide fetch. */}
           <div>
-            <div className="label-xs" style={{ marginBottom: 8 }}>Browse by State</div>
+            <div className="label-xs" style={{ marginBottom: 8 }}>State</div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <select
                 value={selectedState}
@@ -1228,18 +1279,9 @@ export const AdvancedMarketIntel = () => {
                 style={{ flex: 1, padding: "10px 12px", fontSize: 14 }}
               >
                 <option value="">Select a state...</option>
-                {ALL_STATES.map(state => {
-                  const info = getStateInfo(state);
-                  const defaultCity = STATE_DEFAULT_CITIES[state];
-                  const label = info.cityCount > 0
-                    ? `${info.name} (${info.cityCount} ${info.cityCount === 1 ? "tracked city" : "tracked cities"})`
-                    : defaultCity
-                      ? `${info.name} — ${defaultCity}`
-                      : info.name;
-                  return (
-                    <option key={state} value={state}>{label}</option>
-                  );
-                })}
+                {ALL_STATES.map(state => (
+                  <option key={state} value={state}>{STATE_NAMES[state] || state}</option>
+                ))}
               </select>
               {selectedState && (
                 <button
@@ -1253,32 +1295,89 @@ export const AdvancedMarketIntel = () => {
             </div>
           </div>
 
+          {/* COUNTY — populated from the live listings' counties. Acts as a
+              filter: picking one narrows the listings + map focus without
+              triggering a new upstream call. */}
           <div>
-            <div className="label-xs" style={{ marginBottom: 8 }}>Or search by city / county</div>
-            <div style={{ position: "relative" }}>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                placeholder="Search by city, state, or county (e.g. Columbus, OH, Tampa)"
+            <div className="label-xs" style={{ marginBottom: 8 }}>County</div>
+            <select
+              value={(clickedArea?.county || "").toLowerCase().replace(/\s+county$/i, "")}
+              onChange={(e) => {
+                const norm = e.target.value;
+                if (!norm) {
+                  setClickedArea(prev => prev ? { ...prev, county: null, countyFips: null, city: null } : null);
+                  return;
+                }
+                // Find the canonical county name (preserve capitalization from listings)
+                const raw = liveCountyList.find(c => c.toLowerCase().replace(/\s+county$/i, "") === norm) || norm;
+                setClickedArea(prev => ({ ...(prev || {}), state: selectedState, county: raw, city: null }));
+              }}
+              disabled={liveCountyList.length === 0}
+              style={{ width: "100%", padding: "10px 12px", fontSize: 14, opacity: liveCountyList.length === 0 ? 0.5 : 1 }}
+            >
+              <option value="">
+                {liveCountyList.length === 0 ? "Load listings first…" : "All counties"}
+              </option>
+              {liveCountyList.map(c => {
+                const norm = c.toLowerCase().replace(/\s+county$/i, "");
+                return <option key={norm} value={norm}>{c}</option>;
+              })}
+            </select>
+          </div>
+
+          {/* CITY — populated from live listings. Picking one filters the
+              listings display without re-fetching. */}
+          <div>
+            <div className="label-xs" style={{ marginBottom: 8 }}>City</div>
+            <select
+              value={(clickedArea?.city || "").toLowerCase()}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (!v) {
+                  setClickedArea(prev => prev ? { ...prev, city: null } : null);
+                  return;
+                }
+                const raw = liveCityList.find(c => c.toLowerCase() === v) || v;
+                setClickedArea(prev => ({ ...(prev || {}), state: selectedState, city: raw }));
+              }}
+              disabled={liveCityList.length === 0}
+              style={{ width: "100%", padding: "10px 12px", fontSize: 14, opacity: liveCityList.length === 0 ? 0.5 : 1 }}
+            >
+              <option value="">
+                {liveCityList.length === 0 ? "Load listings first…" : "All cities"}
+              </option>
+              {liveCityList.map(c => (
+                <option key={c.toLowerCase()} value={c.toLowerCase()}>{c}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <div className="label-xs" style={{ marginBottom: 8 }}>Or search by city / county / state</div>
+          <div style={{ position: "relative" }}>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Search by city, state, or county (e.g. Columbus, OH, Tampa)"
+              style={{
+                width: "100%", padding: "10px 36px 10px 12px", fontSize: 14,
+                border: `1px solid ${THEME.border}`, borderRadius: 6
+              }}
+            />
+            {searchQuery && (
+              <button
+                onClick={clearSearch}
                 style={{
-                  width: "100%", padding: "10px 36px 10px 12px", fontSize: 14,
-                  border: `1px solid ${THEME.border}`, borderRadius: 6
+                  position: "absolute", right: 8, top: "50%",
+                  transform: "translateY(-50%)", background: "transparent",
+                  color: THEME.textMuted, padding: 4
                 }}
-              />
-              {searchQuery && (
-                <button
-                  onClick={clearSearch}
-                  style={{
-                    position: "absolute", right: 8, top: "50%",
-                    transform: "translateY(-50%)", background: "transparent",
-                    color: THEME.textMuted, padding: 4
-                  }}
-                >
-                  <X size={16} />
-                </button>
-              )}
-            </div>
+              >
+                <X size={16} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -1390,10 +1489,65 @@ export const AdvancedMarketIntel = () => {
                 selectedState={mapFocusState}
                 highlightedMarket={mapHighlight}
                 onCountyClick={handleMapCountyClick}
+                liveCountyStats={liveCityStats?.byCounty || null}
               />
             </Panel>
           </div>
           <div>
+            {/* County demographics (US Census ACS 5-year) — only shows when the
+                user has drilled into a specific county on the map. */}
+            {clickedArea && countyCensus && (
+              <Panel
+                title={`${clickedArea.county || clickedArea.city} County Demographics`}
+                icon={<Users size={16} />}
+                style={{ marginBottom: 20 }}
+                action={
+                  <span style={{
+                    padding: "3px 9px", fontSize: 10, fontWeight: 700,
+                    letterSpacing: "0.08em", textTransform: "uppercase",
+                    borderRadius: 4,
+                    background: THEME.greenDim, color: THEME.green
+                  }}>
+                    Live · US Census ({countyCensus.asOf})
+                  </span>
+                }
+              >
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 10, color: THEME.textMuted, letterSpacing: "0.06em", textTransform: "uppercase" }}>Population</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>
+                      {countyCensus.population ? countyCensus.population.toLocaleString() : "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: THEME.textMuted, letterSpacing: "0.06em", textTransform: "uppercase" }}>Median Income</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>
+                      {countyCensus.medianIncome ? fmtUSD(countyCensus.medianIncome, { short: true }) : "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: THEME.textMuted, letterSpacing: "0.06em", textTransform: "uppercase" }}>Renter Share</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2, color: THEME.teal }}>
+                      {countyCensus.renterSharePct != null ? `${countyCensus.renterSharePct}%` : "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: THEME.textMuted, letterSpacing: "0.06em", textTransform: "uppercase" }}>Median Rent</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>
+                      {countyCensus.medianGrossRent ? `$${countyCensus.medianGrossRent.toLocaleString()}` : "—"}
+                    </div>
+                  </div>
+                </div>
+              </Panel>
+            )}
+            {clickedArea && censusLoading && !countyCensus && (
+              <div style={{
+                padding: 10, marginBottom: 14, fontSize: 12, color: THEME.textMuted,
+                background: THEME.bgRaised, borderRadius: 6
+              }}>
+                Loading demographics…
+              </div>
+            )}
             <LiveListingsPanel
               selectedState={liveListingsState}
               selectedCity={liveListingsCity}
@@ -1408,13 +1562,14 @@ export const AdvancedMarketIntel = () => {
       ) : (
         <Panel title="Market Map — US Counties" icon={<MapPin size={16} />} accent style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 14 }}>
-            Every tracked market, color-coded by overall deal score on a red-yellow-green heatmap. Red indicates weaker markets, yellow is average, and green represents the strongest investment conditions. Click a county to drill in — listings for that area will load alongside the map.
+            Counties color-coded by live median sale price from Realtor.com — greener = more affordable, redder = pricier. Click any county to drill in and load listings + rental comps for that area.
           </div>
           <USCountyMap
             allMarkets={allMarkets}
             selectedState={mapFocusState}
             highlightedMarket={mapHighlight}
             onCountyClick={handleMapCountyClick}
+            liveCountyStats={liveCityStats?.byCounty || null}
           />
         </Panel>
       )}

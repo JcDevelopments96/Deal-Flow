@@ -15,7 +15,8 @@ import { n, isMobile } from "./utils.js";
 import { AppActionsContext, useToast, ToastHost } from "./contexts.jsx";
 import {
   isSaasMode, useSaasUser,
-  fetchWatchlist, saveWatchlistItem, removeWatchlistItem, bulkUploadWatchlist
+  fetchWatchlist, saveWatchlistItem, removeWatchlistItem, bulkUploadWatchlist,
+  fetchMortgageRate
 } from "./lib/saas.js";
 import {
   createBlankDeal,
@@ -149,6 +150,28 @@ function BRRRRTrackerInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saasOn, saasUserId, loaded]);
 
+  // Live 30-year mortgage rate (from FRED). Fetched once per sign-in and
+  // used as the default `interestRate` on newly-created deals so the
+  // Analyzer starts from a real-world rate instead of the hardcoded 7.5.
+  const [liveMortgageRate, setLiveMortgageRate] = useState(null);
+  useEffect(() => {
+    if (!saasOn || !saasUserId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const body = await fetchMortgageRate(saas.getToken);
+        if (!cancelled && typeof body.rate === "number") {
+          setLiveMortgageRate({ rate: body.rate, asOf: body.asOf });
+        }
+      } catch (err) {
+        // Non-fatal: analyzer falls back to the hardcoded default.
+        console.warn("Mortgage rate fetch failed:", err);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saasOn, saasUserId]);
+
   // Load recently-viewed deal IDs
   useEffect(() => {
     try {
@@ -202,12 +225,14 @@ function BRRRRTrackerInner() {
 
   const handleTemplateSelect = useCallback((templateKey) => {
     const fresh = createBlankDeal(templateKey);
+    // Override the hardcoded 7.5% default with the live FRED rate when we have it.
+    if (liveMortgageRate?.rate) fresh.interestRate = liveMortgageRate.rate;
     setDraftDeal(fresh);
     setActiveDealId(null);
     setIsDraftDirty(false);
     setShowTemplatePicker(false);
     setView("analyzer");
-  }, []);
+  }, [liveMortgageRate]);
 
   const handleOpenDeal = useCallback((dealId) => {
     setActiveDealId(dealId);
@@ -353,6 +378,7 @@ function BRRRRTrackerInner() {
     const price = n(listing.price);
     const fresh = {
       ...createBlankDeal(),
+      ...(liveMortgageRate?.rate ? { interestRate: liveMortgageRate.rate } : {}),
       address: listing.addressLine1 || parsed.address || listing.formattedAddress || "",
       city: listing.city || parsed.city || "",
       state: listing.state || parsed.state || "",
@@ -376,7 +402,7 @@ function BRRRRTrackerInner() {
     setIsDraftDirty(true);
     setView("analyzer");
     toast.push(`Loaded ${parsed.address || "listing"} into Deal Analyzer`, "success");
-  }, [toast]);
+  }, [toast, liveMortgageRate]);
 
   const appActions = useMemo(() => ({
     isWatched, toggleWatch, removeWatch, useListingAsDeal, watchlist

@@ -10,20 +10,34 @@ import {
   HEAT_SCALE_MIN, HEAT_SCALE_MAX
 } from "./mapUtils.js";
 
-export const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyClick }) => {
+export const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCountyClick, liveCountyStats }) => {
   const [hoveredCounty, setHoveredCounty] = useState(null);
 
-  // Score range across the dataset — drives the gradient scale
-  const { minScore, maxScore } = useMemo(() => {
+  // Live median-price range across the current fetch — drives the heat scale
+  // when live data is available. Falls back to the curated score range.
+  const { minScore, maxScore, usingLiveData } = useMemo(() => {
+    if (liveCountyStats && Object.keys(liveCountyStats).length > 0) {
+      const prices = Object.values(liveCountyStats)
+        .map(s => s.medianPrice)
+        .filter(p => typeof p === "number" && p > 0);
+      if (prices.length > 0) {
+        return {
+          minScore: Math.round(Math.min(...prices)),
+          maxScore: Math.round(Math.max(...prices)),
+          usingLiveData: true
+        };
+      }
+    }
     const scores = allMarkets
       .map(m => (typeof m.brrrrScore === "number" ? m.brrrrScore : m.score))
       .filter(s => typeof s === "number");
-    if (scores.length === 0) return { minScore: 0, maxScore: 100 };
+    if (scores.length === 0) return { minScore: 0, maxScore: 100, usingLiveData: false };
     return {
       minScore: Math.min(...scores),
-      maxScore: Math.max(...scores)
+      maxScore: Math.max(...scores),
+      usingLiveData: false
     };
-  }, [allMarkets]);
+  }, [liveCountyStats, allMarkets]);
 
   // Build lookup: stateFips -> Map(normalizedCountyName -> market)
   const marketLookup = useMemo(() => {
@@ -36,6 +50,21 @@ export const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCo
     });
     return lookup;
   }, [allMarkets]);
+
+  // Map each live county's median price to a 0..1 "t" value for the heat
+  // scale. Inverted: LOWER median price = GREENER (better for investors,
+  // higher implied yield); HIGHER median price = REDDER.
+  const liveCountyHeat = useMemo(() => {
+    const out = new Map();
+    if (!usingLiveData || !liveCountyStats) return out;
+    const range = maxScore - minScore;
+    for (const [countyKey, stats] of Object.entries(liveCountyStats)) {
+      if (typeof stats.medianPrice !== "number") continue;
+      const t = range > 0 ? 1 - ((stats.medianPrice - minScore) / range) : 0.5;
+      out.set(countyKey, { t, stats });
+    }
+    return out;
+  }, [usingLiveData, liveCountyStats, minScore, maxScore]);
 
   const view = (selectedState && STATE_MAP_VIEW[selectedState])
     ? STATE_MAP_VIEW[selectedState]
@@ -82,30 +111,33 @@ export const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCo
                   const isMarket = !!market;
                   const isHighlighted = highlightedFips === stateFips && highlightedCounty === countyNorm;
                   const isInSelectedState = selectedFips === stateFips;
+                  const liveHeat = liveCountyHeat.get(countyNorm);
 
-                  // Every US county is covered by our listings data (Realtor.com is
-                  // nationwide), so every county gets a visible colored fill — the
-                  // map reads as "you can click anywhere" not "only 7 markets".
-                  //
-                  // Priority:
-                  //   1. Highlighted (active pin)  → accent
-                  //   2. Curated "tracked market"  → full heat-scale based on score
-                  //   3. Selected state            → teal tint
-                  //   4. Every other county        → soft mid-scale heat fill (coverage signal)
-                  const t_default = 0.5; // mid-scale neutral for untracked counties
+                  // Fill priority:
+                  //   1. Highlighted (active pin) → accent
+                  //   2. Live county data (real listings in this county) → price-based heat
+                  //   3. Selected state → teal tint
+                  //   4. Curated market (legacy, only when no live data) → score-based heat
+                  //   5. Otherwise → soft mid-scale coverage fill
+                  const t_default = 0.5;
                   let fill = scoreToHeatFill(t_default);
                   let stroke = scoreToHeatStroke(t_default);
                   let strokeWidth = 0.45;
-                  // Dim non-tracked counties slightly so the tracked-market ones pop
-                  let opacity = 0.55;
+                  let opacity = 0.35;
 
-                  if (isInSelectedState) {
+                  if (isInSelectedState && !liveHeat) {
                     fill = THEME.bgTeal;
                     stroke = THEME.teal;
                     strokeWidth = 0.55;
                     opacity = 0.95;
                   }
-                  if (isMarket) {
+                  if (liveHeat) {
+                    fill = scoreToHeatFill(liveHeat.t);
+                    stroke = scoreToHeatStroke(liveHeat.t);
+                    strokeWidth = 0.6;
+                    opacity = 1;
+                  } else if (isMarket && !usingLiveData) {
+                    // Only fall back to curated scores when we have no live data at all
                     const score = getScore(market);
                     const t = scoreToT(score);
                     fill = scoreToHeatFill(t);
@@ -151,20 +183,28 @@ export const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCo
                           name: countyName,
                           state: stateCode,
                           market: market || null,
-                          isMarket
+                          isMarket,
+                          liveStats: liveHeat ? liveHeat.stats : null
                         });
                       }}
                       onMouseLeave={() => setHoveredCounty(null)}
                       onClick={() => {
                         if (!onCountyClick) return;
+                        // Pass FIPS codes alongside so the caller can hit the
+                        // Census API without another lookup round-trip.
+                        const fipsData = {
+                          stateFips: stateFips,
+                          countyFips: fips.slice(2) // geo.id = state(2) + county(3)
+                        };
                         if (market) {
-                          onCountyClick(market);
+                          onCountyClick({ ...market, ...fipsData });
                         } else if (stateCode) {
                           onCountyClick({
                             city: countyName,
                             county: countyName,
                             state: stateCode,
-                            synthetic: true
+                            synthetic: true,
+                            ...fipsData
                           });
                         }
                       }}
@@ -189,9 +229,17 @@ export const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCo
               {hoveredCounty.name} County, {hoveredCounty.state}
             </div>
             <div style={{ fontSize: 11, opacity: 0.85 }}>
-              {hoveredCounty.isMarket
-                ? `${hoveredCounty.market.city} • Score ${getScore(hoveredCounty.market)} • Click to drill in`
-                : "Click to load live listings for this area"}
+              {hoveredCounty.liveStats ? (
+                <>
+                  Median ${(hoveredCounty.liveStats.medianPrice / 1000).toFixed(0)}k
+                  {hoveredCounty.liveStats.grossYield ? ` · ${hoveredCounty.liveStats.grossYield}% yield` : ""}
+                  {` · ${hoveredCounty.liveStats.listingCount} listings`}
+                </>
+              ) : hoveredCounty.isMarket ? (
+                `${hoveredCounty.market.city} • Click to drill in`
+              ) : (
+                "Click to load live listings for this area"
+              )}
             </div>
           </div>
         )}
@@ -211,14 +259,18 @@ export const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCo
           justifyContent: "space-between",
           marginBottom: 6
         }}>
-          <span className="label-xs">Deal Score Heatmap</span>
+          <span className="label-xs">
+            {usingLiveData ? "County Median Price (Live)" : "Deal Score Heatmap"}
+          </span>
           <span style={{ fontSize: 10, color: THEME.textDim }}>
-            {allMarkets.length} markets &bull; your range {minScore}-{maxScore}
+            {usingLiveData
+              ? `${Object.keys(liveCountyStats || {}).length} counties · range $${Math.round(minScore/1000)}k – $${Math.round(maxScore/1000)}k`
+              : `${allMarkets.length} markets · your range ${minScore}-${maxScore}`}
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span className="mono" style={{ fontSize: 11, color: "#B91C1C", minWidth: 28, fontWeight: 700 }}>
-            {HEAT_SCALE_MIN}
+          <span className="mono" style={{ fontSize: 11, color: "#15803D", minWidth: 44, fontWeight: 700 }}>
+            {usingLiveData ? `$${Math.round(minScore/1000)}k` : HEAT_SCALE_MIN}
           </span>
           <div style={{
             flex: 1,
@@ -227,12 +279,12 @@ export const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCo
             borderRadius: 2,
             overflow: "hidden"
           }}>
-            {[0, 0.2, 0.4, 0.6, 0.8, 1].map(t => (
+            {[1, 0.8, 0.6, 0.4, 0.2, 0].map(t => (
               <div key={t} style={{ flex: 1, height: 12, background: scoreToHeatFill(t) }} />
             ))}
           </div>
-          <span className="mono" style={{ fontSize: 11, color: "#15803D", minWidth: 28, textAlign: "right", fontWeight: 700 }}>
-            {HEAT_SCALE_MAX}
+          <span className="mono" style={{ fontSize: 11, color: "#B91C1C", minWidth: 44, textAlign: "right", fontWeight: 700 }}>
+            {usingLiveData ? `$${Math.round(maxScore/1000)}k` : HEAT_SCALE_MAX}
           </span>
         </div>
         <div style={{
@@ -241,12 +293,12 @@ export const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCo
           marginTop: 4,
           fontSize: 10,
           color: THEME.textDim,
-          paddingLeft: 38,
-          paddingRight: 38
+          paddingLeft: 46,
+          paddingRight: 46
         }}>
-          <span>Weak</span>
-          <span>Average</span>
-          <span>Strong</span>
+          <span>{usingLiveData ? "More affordable" : "Strong"}</span>
+          <span>{usingLiveData ? "Mid-market" : "Average"}</span>
+          <span>{usingLiveData ? "Pricier" : "Weak"}</span>
         </div>
       </div>
 
@@ -264,18 +316,10 @@ export const USCountyMap = ({ allMarkets, selectedState, highlightedMarket, onCo
           <span style={{
             width: 14, height: 14, borderRadius: 2,
             background: scoreToHeatFill(0.5),
-            border: `1px solid ${scoreToHeatStroke(0.5)}`
-          }} />
-          <span>Tracked Market</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{
-            width: 14, height: 14, borderRadius: 2,
-            background: scoreToHeatFill(0.5),
             border: `1px solid ${scoreToHeatStroke(0.5)}`,
-            opacity: 0.55
+            opacity: 0.35
           }} />
-          <span>Coverage (click any county)</span>
+          <span>No data yet (click to load)</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{

@@ -40,48 +40,58 @@ const medianOf = (arr) => {
   return nums.length % 2 ? nums[mid] : Math.round((nums[mid - 1] + nums[mid]) / 2);
 };
 
-// Build per-city live stats from the fetched listings so the market cards
-// above can show live Realtor numbers instead of the hardcoded demo ones.
-// Keyed by city name lower-cased. Also includes a "__state__" rollup.
+// Build per-city + per-county live stats from the fetched listings so the
+// market cards can show live Realtor numbers and the map can color counties
+// by live median price. Keyed by city name / county name lower-cased. Also
+// includes a "__state__" rollup.
 const computeLiveStats = (sales, rentals) => {
-  const buckets = new Map(); // cityKey -> { prices: [], rents: [], ppsqft: [] }
+  const cityBuckets = new Map();   // cityKey -> { prices, rents, ppsqft }
+  const countyBuckets = new Map(); // countyKey -> { prices, rents, ppsqft, cities:Set }
   const state = { prices: [], rents: [], ppsqft: [] };
-  const bump = (key, field, value) => {
-    if (!buckets.has(key)) buckets.set(key, { prices: [], rents: [], ppsqft: [] });
-    buckets.get(key)[field].push(value);
+  const bump = (map, key, field, value) => {
+    if (!map.has(key)) map.set(key, { prices: [], rents: [], ppsqft: [], cities: new Set() });
+    map.get(key)[field].push(value);
   };
   for (const s of sales || []) {
     if (!s.price) continue;
-    const key = (s.city || "").toLowerCase();
-    if (key) {
-      bump(key, "prices", s.price);
-      if (s.pricePerSqft) bump(key, "ppsqft", s.pricePerSqft);
+    const cityKey = (s.city || "").toLowerCase();
+    const countyKey = (s.county || "").toLowerCase().replace(/\s+county$/i, "");
+    if (cityKey) {
+      bump(cityBuckets, cityKey, "prices", s.price);
+      if (s.pricePerSqft) bump(cityBuckets, cityKey, "ppsqft", s.pricePerSqft);
+    }
+    if (countyKey) {
+      bump(countyBuckets, countyKey, "prices", s.price);
+      if (s.pricePerSqft) bump(countyBuckets, countyKey, "ppsqft", s.pricePerSqft);
+      if (s.city) countyBuckets.get(countyKey).cities.add(s.city);
     }
     state.prices.push(s.price);
     if (s.pricePerSqft) state.ppsqft.push(s.pricePerSqft);
   }
   for (const r of rentals || []) {
     if (!r.price) continue;
-    const key = (r.city || "").toLowerCase();
-    if (key) bump(key, "rents", r.price);
+    const cityKey = (r.city || "").toLowerCase();
+    const countyKey = (r.county || "").toLowerCase().replace(/\s+county$/i, "");
+    if (cityKey) bump(cityBuckets, cityKey, "rents", r.price);
+    if (countyKey) bump(countyBuckets, countyKey, "rents", r.price);
     state.rents.push(r.price);
   }
-  const out = {};
-  for (const [key, { prices, rents, ppsqft }] of buckets) {
-    const medianPrice = medianOf(prices);
-    const medianRent = medianOf(rents);
-    out[key] = {
+  const finish = (bucket) => {
+    const medianPrice = medianOf(bucket.prices);
+    const medianRent = medianOf(bucket.rents);
+    return {
       medianPrice,
       medianRent,
-      medianPpsqft: medianOf(ppsqft),
-      // Gross yield = annual rent / price * 100. Not a true cap rate (no expense
-      // data), but close enough for a live freshness indicator.
+      medianPpsqft: medianOf(bucket.ppsqft),
       grossYield: medianPrice && medianRent ? +((medianRent * 12 / medianPrice) * 100).toFixed(1) : null,
-      listingCount: prices.length,
-      rentalCount: rents.length,
+      listingCount: bucket.prices.length,
+      rentalCount: bucket.rents.length,
       isLive: true
     };
-  }
+  };
+  const out = { byCounty: {} };
+  for (const [key, bucket] of cityBuckets) out[key] = finish(bucket);
+  for (const [key, bucket] of countyBuckets) out.byCounty[key] = finish(bucket);
   out.__state__ = {
     medianPrice: medianOf(state.prices),
     medianRent: medianOf(state.rents),

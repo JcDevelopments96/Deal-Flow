@@ -4,8 +4,28 @@
    which provider served the data.
    ============================================================================ */
 
+// Realtor's `primary_photo.href` is a low-res thumbnail (~640x480) which
+// looks blurry in a 4:3 card. Their CDN (rdcpix.com) supports on-the-fly
+// resizing via path suffixes — we rewrite "xxxs.jpg" → "xxxod-w1024_h768.jpg"
+// to get a crisp image at card size without wasting bandwidth on 4K originals.
+// Safe to call on non-Realtor URLs (no-op if the pattern doesn't match).
+const upgradeRealtorPhoto = (url) => {
+  if (typeof url !== "string" || !url) return url;
+  if (!url.includes("rdcpix.com")) return url;
+  // Common suffixes: s.jpg (small), c.jpg (cropped), m.jpg (medium), t.jpg (tiny).
+  // Replace any of them with the resize directive. Also handle URLs that
+  // already have a dimension suffix — upgrade width to 1024.
+  return url
+    .replace(/-w\d+_h\d+(_q\d+)?(\.jpg)/i, "-w1024_h768_q80$2")
+    .replace(/([a-z])s(\.jpg)(\?|$)/i, "$1od-w1024_h768_q80$2$3")
+    .replace(/([a-z])c(\.jpg)(\?|$)/i, "$1od-w1024_h768_q80$2$3")
+    .replace(/([a-z])m(\.jpg)(\?|$)/i, "$1od-w1024_h768_q80$2$3")
+    .replace(/([a-z])t(\.jpg)(\?|$)/i, "$1od-w1024_h768_q80$2$3");
+};
+
 const pushUnique = (arr, url) => {
-  if (typeof url === "string" && url && !arr.includes(url)) arr.push(url);
+  const up = upgradeRealtorPhoto(url);
+  if (typeof up === "string" && up && !arr.includes(up)) arr.push(up);
 };
 
 /**
@@ -37,6 +57,10 @@ export function normalizeRealtor(r) {
   const state = addr.state_code || addr.state || null;
   const street = addr.line || null;
   const zip = addr.postal_code || null;
+  // County name is inconsistently populated in v3/list responses — take it
+  // when present so the client can color the map by county-level medians.
+  const county = r.location?.county?.name || r.location?.county || null;
+  const countyFips = r.location?.county?.fips_code || null;
 
   const price = r.list_price ?? null;
   const sqft = r.description?.sqft ?? null;
@@ -52,6 +76,7 @@ export function normalizeRealtor(r) {
     formattedAddress,
     addressLine1: street,
     city, state, zipCode: zip,
+    county, countyFips,
     price,
     bedrooms: r.description?.beds ?? null,
     bathrooms: r.description?.baths ?? null,

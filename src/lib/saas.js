@@ -160,3 +160,18 @@ export async function bulkUploadWatchlist(getToken, listings) {
     body: JSON.stringify({ listings })
   });
 }
+
+/* ── Live economic data (free, unmetered — FRED + Census) ────────────── */
+
+// Live 30-year mortgage rate from the Federal Reserve. Cached server-side for
+// 12h, so this is safe to call on every page mount.
+export async function fetchMortgageRate(getToken) {
+  return fetchMetered(getToken, "/api/rates/mortgage");
+}
+
+// Census ACS county demographics (population, median income, owner/renter
+// share). Cached server-side for 24h per (stateFips, countyFips) pair.
+export async function fetchCountyCensus(getToken, { stateFips, countyFips }) {
+  const qs = new URLSearchParams({ stateFips, countyFips });
+  return fetchMetered(getToken, `/api/census/county?${qs.toString()}`);
+}
