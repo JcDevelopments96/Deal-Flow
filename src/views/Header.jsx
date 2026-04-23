@@ -3,11 +3,12 @@
    ============================================================================ */
 import React from "react";
 import {
-  Building2, Layout, Calculator, MapPin, Star, GraduationCap, Plus
+  Building2, Layout, Calculator, MapPin, Star, GraduationCap, Plus, Lock
 } from "lucide-react";
 import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/react";
 import { THEME } from "../theme.js";
 import { isMobile } from "../utils.js";
+import { isSaasMode, useSaasUser } from "../lib/saas.js";
 
 // Only render the auth slot when Clerk is actually configured — lets the app
 // keep working in its standalone (no-auth) mode if the env var isn't set.
@@ -33,7 +34,15 @@ const AuthSlot = () => (
   </div>
 );
 
-export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchlistCount = 0 }) => (
+export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchlistCount = 0 }) => {
+  // Plan-aware lock on Market Intel: anyone who can't actually use Market
+  // Intel (signed-out, or signed-in on the free plan) sees a lock icon.
+  // Signed-in users on any paid plan (starter/pro/scale) see no lock.
+  const saas = useSaasUser();
+  const marketLocked =
+    isSaasMode() && (!saas.user || saas.usage?.plan === "free");
+
+  return (
   <div style={{
     borderBottom: `1px solid ${THEME.border}`,
     background: THEME.bg,
@@ -67,7 +76,7 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
         {[
           { key: "dashboard", label: "Dashboard", icon: <Layout size={14} /> },
           { key: "analyzer", label: "Analyzer", icon: <Calculator size={14} /> },
-          { key: "market", label: "Market Intel", icon: <MapPin size={14} /> },
+          { key: "market", label: "Market Intel", icon: <MapPin size={14} />, locked: marketLocked },
           { key: "watchlist", label: "Watchlist", icon: <Star size={14} />, badge: watchlistCount || null },
           { key: "education", label: "Learn", icon: <GraduationCap size={14} /> }
         ].map(tab => (
@@ -83,9 +92,18 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
               display: "flex", alignItems: "center", gap: 6, cursor: "pointer",
               position: "relative"
             }}
+            title={tab.locked ? "Market Intel requires a paid plan" : undefined}
           >
             {tab.icon}
             {!isMobile() && tab.label}
+            {tab.locked && (
+              <Lock
+                size={11}
+                color={THEME.orange}
+                aria-label="Paid plan required"
+                style={{ marginLeft: 2 }}
+              />
+            )}
             {tab.badge ? (
               <span style={{
                 minWidth: 18, height: 18, padding: "0 5px",
@@ -122,4 +140,5 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
       </div>
     </div>
   </div>
-);
+  );
+};
