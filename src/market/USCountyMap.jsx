@@ -264,12 +264,24 @@ export const USCountyMap = ({
               }}
             </Geographies>
 
-            {/* Listing pins — dropped for each live property with lat/lng
-                so the user can spot clusters and outliers at a glance. */}
-            {listings && listings.map(l => {
-              const lat = Number(l.latitude);
-              const lng = Number(l.longitude);
-              if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+            {/* Listing pins — dropped for each live property with a valid
+                US lat/lng. geoAlbersUsa returns null for points outside its
+                valid range (most of the world, plus the sentinel 0,0), and
+                react-simple-maps' <Marker> crashes when the projection
+                returns null — hence the strict bounds check. */}
+            {Array.isArray(listings) && listings.map(l => {
+              const lat = Number(l?.latitude);
+              const lng = Number(l?.longitude);
+              // Rough continental US + AK/HI bounds. Anything outside this
+              // won't project, so skip it rather than crash the whole map.
+              const validUS =
+                Number.isFinite(lat) && Number.isFinite(lng) &&
+                lat >= 18 && lat <= 72 &&
+                lng >= -180 && lng <= -65 &&
+                // Exclude the origin sentinel — we see a fair number of
+                // listings coming back with (0, 0) when geocode is missing.
+                !(lat === 0 && lng === 0);
+              if (!validUS) return null;
               return (
                 <Marker key={l.id} coordinates={[lng, lat]}>
                   <circle
