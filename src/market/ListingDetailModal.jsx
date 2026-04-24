@@ -60,8 +60,8 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
   const [floodErr, setFloodErr] = useState(null);
   const [walk, setWalk] = useState(null);
   const [walkErr, setWalkErr] = useState(null);
-  const [photos, setPhotos] = useState(null);        // { streetview_url, satellite_url }
-  const [nearby, setNearby] = useState(null);        // { schools: [...], amenityCounts: {...} }
+  const [gmapsPhotos, setGmapsPhotos] = useState(null);  // { streetview_url, satellite_url }
+  const [nearby, setNearby] = useState(null);             // { schools: [...], amenityCounts: {...} }
   const [intelLoading, setIntelLoading] = useState(false);
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -100,7 +100,7 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
     if (!saasOn || !saas.user) return;
     const lat = Number(listing.latitude);
     const lng = Number(listing.longitude);
-    setFlood(null); setWalk(null); setPhotos(null); setNearby(null);
+    setFlood(null); setWalk(null); setGmapsPhotos(null); setNearby(null);
     setFloodErr(null); setWalkErr(null);
     if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) {
       setFloodErr("This listing has no geocode (lat/lng) — Realtor didn't return coordinates for it.");
@@ -120,7 +120,7 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
       else setFloodErr(floodRes.reason?.message || "Flood lookup failed");
       if (walkRes.status === "fulfilled") setWalk(walkRes.value);
       else setWalkErr(walkRes.reason?.detail || walkRes.reason?.message || null);
-      if (photosRes.status === "fulfilled") setPhotos(photosRes.value);
+      if (photosRes.status === "fulfilled") setGmapsPhotos(photosRes.value);
       if (nearbyRes.status === "fulfilled") setNearby(nearbyRes.value);
     }).finally(() => { if (!cancelled) setIntelLoading(false); });
     return () => { cancelled = true; };
@@ -552,13 +552,13 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
 
             {/* Satellite view (Google Maps Static) + nearby (Places Nearby).
                 Render below the flood/walk row so the 2-up pairing stays tight. */}
-            {photos?.satellite_url && (
+            {gmapsPhotos?.satellite_url && (
               <div style={{ marginTop: 12 }}>
                 <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: THEME.textMuted, marginBottom: 6 }}>
                   Aerial view
                 </div>
                 <img
-                  src={photos.satellite_url}
+                  src={gmapsPhotos.satellite_url}
                   alt="Aerial view of property"
                   loading="lazy"
                   style={{ width: "100%", aspectRatio: "640 / 400", objectFit: "cover", borderRadius: 8, background: THEME.bgPanel, border: `1px solid ${THEME.border}` }}
