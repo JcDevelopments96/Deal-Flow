@@ -57,8 +57,11 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
   const saas = useSaasUser();
   const saasOn = isSaasMode();
   const [flood, setFlood] = useState(null);
+  const [floodErr, setFloodErr] = useState(null);
   const [walk, setWalk] = useState(null);
-  const [detail, setDetail] = useState(null);        // { photos, photoCount, description, ... }
+  const [walkErr, setWalkErr] = useState(null);
+  const [intelLoading, setIntelLoading] = useState(false);
+  const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [photoIdx, setPhotoIdx] = useState(0);
   const [heroErrored, setHeroErrored] = useState(false);
@@ -95,16 +98,24 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
     if (!saasOn || !saas.user) return;
     const lat = Number(listing.latitude);
     const lng = Number(listing.longitude);
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    setFlood(null); setWalk(null); setFloodErr(null); setWalkErr(null);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) {
+      setFloodErr("This listing has no geocode (lat/lng) — Realtor didn't return coordinates for it.");
+      setWalkErr("This listing has no geocode.");
+      return;
+    }
     let cancelled = false;
+    setIntelLoading(true);
     Promise.allSettled([
       fetchFloodZone(saas.getToken, { lat, lng }),
       fetchWalkScore(saas.getToken, { lat, lng, address: listing.formattedAddress })
     ]).then(([floodRes, walkRes]) => {
       if (cancelled) return;
       if (floodRes.status === "fulfilled") setFlood(floodRes.value);
+      else setFloodErr(floodRes.reason?.message || "Flood lookup failed");
       if (walkRes.status === "fulfilled") setWalk(walkRes.value);
-    });
+      else setWalkErr(walkRes.reason?.detail || walkRes.reason?.message || "Walk Score not configured");
+    }).finally(() => { if (!cancelled) setIntelLoading(false); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saasOn, saas.user, listing.id, listing.latitude, listing.longitude]);
@@ -422,14 +433,22 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
             </div>
           )}
 
-          {/* Property intelligence — FEMA flood + Walk Score (all free APIs). */}
-          {(flood || walk) && (
+          {/* Property intelligence — FEMA flood + Walk Score. Always render
+              the section so users know what was attempted, even when one or
+              both signals are missing (e.g. listing without lat/lng, or
+              Walk Score key not configured). */}
+          <div style={{
+            marginBottom: 20
+          }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: THEME.textMuted, marginBottom: 8 }}>
+              Property Intelligence {intelLoading && <span style={{ marginLeft: 6, fontWeight: 500, color: THEME.accent }}>· loading…</span>}
+            </div>
             <div style={{
               display: "grid",
-              gridTemplateColumns: (flood && walk) ? "1fr 1fr" : "1fr",
-              gap: 12, marginBottom: 20
+              gridTemplateColumns: "1fr 1fr",
+              gap: 12
             }}>
-              {flood && (
+              {flood ? (
                 <div style={{
                   padding: 14,
                   background: flood.riskLevel === "high" ? THEME.bgOrange
@@ -453,8 +472,23 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
                     {flood.insuranceGuidance}
                   </div>
                 </div>
+              ) : (
+                <div style={{
+                  padding: 14, background: THEME.bgPanel, border: `1px solid ${THEME.border}`,
+                  borderRadius: 8
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    <Droplets size={14} color={THEME.textMuted} />
+                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: THEME.textMuted }}>
+                      FEMA Flood Zone
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 12, color: THEME.textDim, lineHeight: 1.4 }}>
+                    {intelLoading ? "Checking FEMA…" : floodErr || "Not available"}
+                  </div>
+                </div>
               )}
-              {walk && walk.walkScore != null && (
+              {walk && walk.walkScore != null ? (
                 <div style={{
                   padding: 14,
                   background: THEME.bgPanel,
@@ -491,9 +525,27 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
                     </div>
                   )}
                 </div>
+              ) : (
+                <div style={{
+                  padding: 14, background: THEME.bgPanel, border: `1px solid ${THEME.border}`,
+                  borderRadius: 8
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    <Footprints size={14} color={THEME.textMuted} />
+                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: THEME.textMuted }}>
+                      Walk / Bike / Transit
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 12, color: THEME.textDim, lineHeight: 1.4 }}>
+                    {intelLoading ? "Checking Walk Score…" :
+                      typeof walkErr === "string" && walkErr.includes("walkscore_not_configured")
+                        ? "Walk Score API key not configured (free at walkscore.com)."
+                        : walkErr || "Not available"}
+                  </div>
+                </div>
               )}
             </div>
-          )}
+          </div>
 
           {/* Actions */}
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>

@@ -1,13 +1,38 @@
 /* ============================================================================
    REHAB SECTION — planning + budgeting for the rehab scope.
    ============================================================================ */
-import React, { useState, useMemo } from "react";
-import { Hammer, Calendar } from "lucide-react";
+import React, { useState, useMemo, useEffect } from "react";
+import { Hammer, Calendar, Users } from "lucide-react";
 import { THEME } from "../theme.js";
 import { fmtUSD, isMobile } from "../utils.js";
 import { StatRow, Panel } from "../primitives.jsx";
+import { isSaasMode, useSaasUser, fetchTeam } from "../lib/saas.js";
 
 export const RehabSection = ({ deal, onUpdate }) => {
+  // Pull saved team contacts (contractor + other roles) so the user can
+  // assign a tradesperson to each rehab line item without retyping.
+  const saas = useSaasUser();
+  const saasOn = isSaasMode();
+  const [teamContractors, setTeamContractors] = useState([]);
+  useEffect(() => {
+    if (!saasOn || !saas.user) return;
+    let cancelled = false;
+    fetchTeam(saas.getToken)
+      .then(list => {
+        if (cancelled) return;
+        // Show contractors first, then anyone else with a role that might
+        // do rehab work (electrician/plumber are typically logged as
+        // "contractor" or "other" in the Team CRM).
+        const useful = list.filter(c =>
+          c.role === "contractor" || c.role === "other"
+        );
+        setTeamContractors(useful);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saasOn, saas.user]);
+  const teamListId = "rehab-team-contractors";
   const [rehabDetails, setRehabDetails] = useState(deal.rehabDetails || {
     kitchen: { cost: 0, weeks: 0, priority: "high", contractor: "", notes: "" },
     bathrooms: { cost: 0, weeks: 0, priority: "high", contractor: "", notes: "" },
@@ -101,6 +126,17 @@ export const RehabSection = ({ deal, onUpdate }) => {
 
   return (
     <div>
+      {/* Shared datalist powering the Contractor field on every rehab line.
+          Pulled from the user's Team CRM (contractor + other roles). Native
+          <datalist> gives us a free combobox: type to filter, pick to fill,
+          override at any time. */}
+      {teamContractors.length > 0 && (
+        <datalist id={teamListId}>
+          {teamContractors.map(c => (
+            <option key={c.id} value={c.company ? `${c.name} — ${c.company}` : c.name} />
+          ))}
+        </datalist>
+      )}
       <Panel title="Comprehensive Rehab Planning" icon={<Hammer size={16} />} accent style={{ marginBottom: 24 }}>
         <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
           <div style={{ padding: 16, background: THEME.bgRaised, borderRadius: 6, textAlign: "center" }}>
@@ -240,10 +276,16 @@ export const RehabSection = ({ deal, onUpdate }) => {
                       </div>
 
                       <div>
-                        <div className="label-xs" style={{ marginBottom: 6 }}>Contractor</div>
+                        <div className="label-xs" style={{ marginBottom: 6, display: "flex", alignItems: "center", gap: 4 }}>
+                          Contractor
+                          {teamContractors.length > 0 && (
+                            <Users size={10} color={THEME.accent} aria-label="Pick from your saved team" title="Pick from your saved team" />
+                          )}
+                        </div>
                         <input
                           type="text"
-                          placeholder="TBD"
+                          list={teamContractors.length > 0 ? teamListId : undefined}
+                          placeholder={teamContractors.length > 0 ? "Pick from team or type…" : "TBD"}
                           value={item.contractor}
                           onChange={(e) => updateRehabDetail(itemKey, 'contractor', e.target.value)}
                           style={{
