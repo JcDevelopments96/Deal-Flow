@@ -30,6 +30,7 @@ import { TeamView } from "./views/TeamView.jsx";
 import { Analyzer } from "./analyzer/Analyzer.jsx";
 import { AdvancedMarketIntel } from "./market/AdvancedMarketIntel.jsx";
 import { ErrorBoundary } from "./ErrorBoundary.jsx";
+import { AriChat } from "./AriChat.jsx";
 import { MarketIntelRibbon } from "./market/MarketIntelRibbon.jsx";
 import { TemplatePicker } from "./modals/TemplatePicker.jsx";
 import { UnsavedChangesModal } from "./modals/UnsavedChangesModal.jsx";
@@ -508,6 +509,10 @@ function BRRRRTrackerInner() {
         <div>DealTrack v3.0 Professional</div>
         <div>© 2026 DealTrack</div>
       </div>
+
+      {/* Ari — Claude-powered floating chat assistant. Always mounted; the
+          widget itself decides whether to render the launcher or panel. */}
+      <AriChat />
     </div>
     </AppActionsContext.Provider>
   );

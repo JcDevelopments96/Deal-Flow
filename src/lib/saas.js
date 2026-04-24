@@ -144,6 +144,15 @@ export async function removeWatchlistItem(getToken, listingId) {
   return fetchMetered(getToken, `/api/watchlist?${qs.toString()}`, { method: "DELETE" });
 }
 
+/* ── Ari chat (Claude proxy) ─────────────────────────────────────────── */
+
+export async function chatWithAri(getToken, messages) {
+  return fetchMetered(getToken, "/api/chat", {
+    method: "POST",
+    body: JSON.stringify({ messages })
+  });
+}
+
 /* ── Team / local pros CRUD (per-user contacts for each market) ──────── */
 
 export async function fetchTeam(getToken) {
