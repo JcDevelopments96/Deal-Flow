@@ -293,6 +293,35 @@ const EmailModal = ({ lead, onSend, onClose }) => {
   );
 };
 
+const PropertyPhoto = ({ src, alt, aspectRatio = "4 / 3" }) => {
+  const [errored, setErrored] = useState(false);
+  if (!src || errored) {
+    return (
+      <div style={{
+        width: "100%", aspectRatio,
+        background: THEME.bgPanel, borderRadius: 6,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: THEME.textDim
+      }}>
+        <Home size={24} />
+      </div>
+    );
+  }
+  return (
+    <img
+      src={src}
+      alt={alt}
+      onError={() => setErrored(true)}
+      loading="lazy"
+      style={{
+        width: "100%", aspectRatio,
+        objectFit: "cover", borderRadius: 6,
+        background: THEME.bgPanel, display: "block"
+      }}
+    />
+  );
+};
+
 const LeadCard = ({ lead, onSkipTrace, onStatusChange, onDelete, onEmail, onPostcard, busy }) => {
   const status = STATUS_BY_KEY[lead.status] || STATUS_BY_KEY.new;
   const flags = [];
@@ -305,6 +334,8 @@ const LeadCard = ({ lead, onSkipTrace, onStatusChange, onDelete, onEmail, onPost
       border: `1px solid ${THEME.border}`, borderRadius: 8, padding: 14,
       background: THEME.bg, display: "flex", flexDirection: "column", gap: 10
     }}>
+      <PropertyPhoto src={lead.streetview_url} alt={lead.address} />
+
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 700 }}>{lead.address}</div>
@@ -339,11 +370,33 @@ const LeadCard = ({ lead, onSkipTrace, onStatusChange, onDelete, onEmail, onPost
         </div>
       )}
 
+      {/* Owner block — name + mailing address are PUBLIC record (ATTOM).
+          Phone/email only appear once the user skip-traces the lead. */}
+      <div style={{
+        padding: "8px 10px", background: THEME.bgPanel,
+        border: `1px solid ${THEME.borderLight}`, borderRadius: 6, fontSize: 11
+      }}>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: THEME.textMuted, marginBottom: 4 }}>
+          Owner
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 2 }}>{lead.owner_name || "—"}</div>
+        {lead.owner_mailing_address && (
+          <div style={{ fontSize: 11, color: THEME.textMuted, lineHeight: 1.4 }}>
+            {lead.owner_mailing_address}
+            {(lead.owner_mailing_city || lead.owner_mailing_state) && <>
+              <br />
+              {[lead.owner_mailing_city, lead.owner_mailing_state, lead.owner_mailing_zip].filter(Boolean).join(", ")}
+            </>}
+            {lead.is_absentee && <span style={{ marginLeft: 6, color: THEME.accent, fontWeight: 600 }}>· absentee</span>}
+          </div>
+        )}
+      </div>
+
       <div style={{ fontSize: 11, color: THEME.textMuted, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
-        <div><strong>Owner:</strong> {lead.owner_name || "—"}</div>
         <div><strong>Built:</strong> {lead.year_built || "—"}</div>
         <div><strong>Sqft:</strong> {lead.sqft ? lead.sqft.toLocaleString() : "—"}</div>
         <div><strong>Beds/Bath:</strong> {lead.bedrooms || "?"}/{lead.bathrooms || "?"}</div>
+        {lead.years_owned != null && <div><strong>Held:</strong> {lead.years_owned}yr</div>}
         {lead.market_value && <div><strong>Value:</strong> {fmtUSD(lead.market_value, { short: true })}</div>}
         {lead.last_sale_price && <div><strong>Bought:</strong> {fmtUSD(lead.last_sale_price, { short: true })}</div>}
       </div>
@@ -637,18 +690,32 @@ export const WholesaleView = () => {
           }>
           <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "repeat(auto-fill, minmax(320px, 1fr))", gap: 10 }}>
             {searchResults.map((p, idx) => (
-              <div key={idx} style={{ border: `1px solid ${THEME.border}`, borderRadius: 8, padding: 12, background: THEME.bgPanel }}>
-                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 3 }}>{p.address}</div>
-                <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 6 }}>
-                  {[p.city, p.state, p.zip].filter(Boolean).join(", ")}
+              <div key={idx} style={{ border: `1px solid ${THEME.border}`, borderRadius: 8, padding: 12, background: THEME.bgPanel, display: "flex", flexDirection: "column", gap: 8 }}>
+                <PropertyPhoto src={p.streetview_url} alt={p.address} aspectRatio="16 / 9" />
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700 }}>{p.address}</div>
+                  <div style={{ fontSize: 10, color: THEME.textMuted }}>
+                    {[p.city, p.state, p.zip].filter(Boolean).join(", ")}
+                  </div>
                 </div>
-                <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 8 }}>
+                {p.owner_name && (
+                  <div style={{ fontSize: 11 }}>
+                    <strong>Owner:</strong> <span style={{ color: THEME.textMuted }}>{p.owner_name}</span>
+                    {p.owner_mailing_address && p.is_absentee && (
+                      <div style={{ fontSize: 10, color: THEME.textMuted, marginTop: 2 }}>
+                        Mail: {p.owner_mailing_address}, {[p.owner_mailing_city, p.owner_mailing_state, p.owner_mailing_zip].filter(Boolean).join(", ")}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div style={{ fontSize: 10, color: THEME.textMuted }}>
                   Score <strong style={{ color: THEME.accent }}>{p.lead_score}/100</strong>
                   {p.years_owned != null && <> · {p.years_owned}yr owned</>}
                   {p.is_absentee && <> · absentee</>}
+                  {p.market_value && <> · {fmtUSD(p.market_value, { short: true })}</>}
                 </div>
                 <button onClick={() => onSaveSearchResult(p)} className="btn-primary"
-                  style={{ padding: "6px 10px", fontSize: 11, width: "100%", justifyContent: "center" }}>
+                  style={{ padding: "6px 10px", fontSize: 11, width: "100%", justifyContent: "center", marginTop: "auto" }}>
                   <Star size={11} /> Save lead
                 </button>
               </div>

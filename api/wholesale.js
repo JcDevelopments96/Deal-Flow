@@ -43,6 +43,24 @@ function requirePaidPlan(user) {
   }
 }
 
+/* ── Google Street View static image URL for a property ─────────────── */
+// Caller includes the raw URL on each result. The Google Maps key MUST be
+// restricted by HTTP-referrer in Google Cloud Console to the app's domain
+// — otherwise the URL is scrape-able and the key quota can be abused.
+function streetViewUrl({ address, city, state, zip, latitude, longitude }) {
+  const key = process.env.GOOGLE_MAPS_API_KEY;
+  if (!key) return null;
+  const qs = new URLSearchParams({ size: "400x260", key, fov: "80", pitch: "0" });
+  if (Number.isFinite(Number(latitude)) && Number.isFinite(Number(longitude))) {
+    qs.set("location", `${latitude},${longitude}`);
+  } else {
+    const loc = [address, city, state, zip].filter(Boolean).join(", ");
+    if (!loc) return null;
+    qs.set("location", loc);
+  }
+  return `https://maps.googleapis.com/maps/api/streetview?${qs.toString()}`;
+}
+
 /* ── Heuristic lead scoring (0-100) ──────────────────────────────────── */
 function computeLeadScore({ years_owned, is_absentee, is_tax_delinquent, assessed_value, market_value }) {
   let score = 0;
@@ -139,6 +157,7 @@ async function handleSearch(body, user) {
       lead_score: 0
     };
     lead.lead_score = computeLeadScore(lead);
+    lead.streetview_url = streetViewUrl(lead);
     return lead;
   });
 
@@ -205,7 +224,7 @@ async function handleSkipTrace({ leadId }, user) {
     .select().single();
   if (uErr) throw new ApiError(500, "db_update_failed", uErr.message);
 
-  return { lead: updated, phoneFound: !!phone, emailFound: !!email };
+  return { lead: { ...updated, streetview_url: streetViewUrl(updated) }, phoneFound: !!phone, emailFound: !!email };
 }
 
 /* ── CRUD ─────────────────────────────────────────────────────────────── */
@@ -218,7 +237,10 @@ async function handleList(user) {
     .order("lead_score", { ascending: false })
     .order("created_at", { ascending: false });
   if (error) throw new ApiError(500, "db_read_failed", error.message);
-  return { leads: data || [] };
+  // Attach a fresh Street View URL per lead — stored nowhere since the
+  // Google key shouldn't be persisted in user-readable columns.
+  const leads = (data || []).map(l => ({ ...l, streetview_url: streetViewUrl(l) }));
+  return { leads };
 }
 
 async function handleSave({ property }, user) {
@@ -233,7 +255,7 @@ async function handleSave({ property }, user) {
     .upsert(row, { onConflict: "user_id,address,zip" })
     .select().single();
   if (error) throw new ApiError(500, "db_insert_failed", error.message);
-  return { lead: data };
+  return { lead: { ...data, streetview_url: streetViewUrl(data) } };
 }
 
 async function handleUpdate(id, { updates }, user) {
@@ -249,7 +271,7 @@ async function handleUpdate(id, { updates }, user) {
     .select().single();
   if (error) throw new ApiError(500, "db_update_failed", error.message);
   if (!data) throw new ApiError(404, "not_found");
-  return { lead: data };
+  return { lead: { ...data, streetview_url: streetViewUrl(data) } };
 }
 
 async function handleDelete(id, user) {
