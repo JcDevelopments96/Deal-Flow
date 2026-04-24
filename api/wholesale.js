@@ -98,13 +98,24 @@ async function handleSearch(body, user) {
   if (!apiKey) throw new ApiError(503, "attom_not_configured",
     "Set ATTOM_API_KEY in Vercel env (sign up at api.developer.attomdata.com).");
 
-  const { zip, minYearsOwned, absenteeOnly, taxDelinquentOnly, limit = 25 } = body || {};
-  if (!zip || !/^\d{5}$/.test(String(zip))) {
-    throw new ApiError(400, "bad_zip", "zip code (5 digits) required");
+  const { zip, city, state, minYearsOwned, absenteeOnly, taxDelinquentOnly, limit = 25 } = body || {};
+
+  // Accept either a ZIP, or a city+state pair. ATTOM's /property/snapshot
+  // supports both; ZIP tends to return cleaner results because cities can
+  // span multiple postal codes.
+  const hasZip = zip && /^\d{5}$/.test(String(zip));
+  const hasCityState = city && state && /^[A-Z]{2}$/.test(String(state).toUpperCase());
+  if (!hasZip && !hasCityState) {
+    throw new ApiError(400, "missing_location",
+      "Provide either a 5-digit ZIP, or both a city and a 2-letter state code.");
   }
 
   const headers = { "apikey": apiKey, accept: "application/json" };
   const pagesize = Math.min(100, Number(limit) || 25);
+
+  const locationQs = hasZip
+    ? `postalcode=${encodeURIComponent(zip)}`
+    : `city=${encodeURIComponent(city)}&countrysubd=${encodeURIComponent(String(state).toUpperCase())}`;
 
   // Fan out three parallel calls:
   //   1. /property/snapshot     — base property + owner + sale + assessment
@@ -112,9 +123,9 @@ async function handleSearch(body, user) {
   //   3. /preforeclosure/snapshot — alternative NOD/NOS events (some regions)
   // Cross-reference by property_id so we can flag tax-delinquent properties.
   const [snapshotRes, foreclosureRes, preforeRes] = await Promise.all([
-    fetch(`https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/snapshot?postalcode=${encodeURIComponent(zip)}&pagesize=${pagesize}`, { headers }),
-    fetch(`https://api.gateway.attomdata.com/propertyapi/v1.0.0/foreclosure/snapshot?postalcode=${encodeURIComponent(zip)}&pagesize=${pagesize}`, { headers }).catch(() => null),
-    fetch(`https://api.gateway.attomdata.com/propertyapi/v1.0.0/preforeclosure/snapshot?postalcode=${encodeURIComponent(zip)}&pagesize=${pagesize}`, { headers }).catch(() => null)
+    fetch(`https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/snapshot?${locationQs}&pagesize=${pagesize}`, { headers }),
+    fetch(`https://api.gateway.attomdata.com/propertyapi/v1.0.0/foreclosure/snapshot?${locationQs}&pagesize=${pagesize}`, { headers }).catch(() => null),
+    fetch(`https://api.gateway.attomdata.com/propertyapi/v1.0.0/preforeclosure/snapshot?${locationQs}&pagesize=${pagesize}`, { headers }).catch(() => null)
   ]);
 
   if (!snapshotRes.ok) {

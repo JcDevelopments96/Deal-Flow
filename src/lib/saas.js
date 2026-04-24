@@ -146,10 +146,10 @@ export async function removeWatchlistItem(getToken, listingId) {
 
 /* ── Wholesaling (ATTOM + BatchSkipTracing + Resend) ─────────────────── */
 
-export async function searchWholesaleLeads(getToken, { zip, minYearsOwned, absenteeOnly, taxDelinquentOnly, limit }) {
+export async function searchWholesaleLeads(getToken, { zip, city, state, minYearsOwned, absenteeOnly, taxDelinquentOnly, limit }) {
   return fetchMetered(getToken, "/api/wholesale?action=search", {
     method: "POST",
-    body: JSON.stringify({ zip, minYearsOwned, absenteeOnly, taxDelinquentOnly, limit })
+    body: JSON.stringify({ zip, city, state, minYearsOwned, absenteeOnly, taxDelinquentOnly, limit })
   });
 }
 
@@ -281,6 +281,13 @@ export async function fetchMortgageRate(getToken) {
 // GitHub Actions cron. Stays on its own endpoint because it's DB-backed.
 export async function fetchMarketIndexes(getToken, { regionType, regionId }) {
   const qs = new URLSearchParams({ regionType, regionId });
+  return fetchMetered(getToken, `/api/market/indexes?${qs.toString()}`);
+}
+
+// Bulk per-state fetch — returns every county in the state keyed by 5-char
+// FIPS. Used to color the Market Intel map before any live search fires.
+export async function fetchStateMarketIndexes(getToken, stateCode) {
+  const qs = new URLSearchParams({ state: stateCode });
   return fetchMetered(getToken, `/api/market/indexes?${qs.toString()}`);
 }
 

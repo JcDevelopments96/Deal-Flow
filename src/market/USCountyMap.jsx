@@ -54,6 +54,7 @@ export const USCountyMap = ({
   highlightedMarket,
   onCountyClick,
   liveCountyStats,
+  staticCountyStats,  // keyed by 5-char FIPS, from market_indexes (Zillow ZHVI)
   metric = "price",
   listings = [],
   onResetView
@@ -116,6 +117,31 @@ export const USCountyMap = ({
     return out;
   }, [usingLiveData, liveCountyStats, minScore, maxScore, metricDef]);
 
+  // Static heat — keyed by 5-char FIPS so we can look up by geo.id directly.
+  // Sourced from the Zillow ZHVI snapshot in market_indexes. Covers ~3,000
+  // counties nationwide so the map doesn't read as "yellow everywhere"
+  // when the user hasn't run a live search yet. Only used for price metric
+  // since ZHVI is a home-value index.
+  const staticCountyHeat = useMemo(() => {
+    const out = new Map();
+    if (!staticCountyStats || metric !== "price") return out;
+    const values = Object.values(staticCountyStats)
+      .map(s => Number(s?.zhvi_latest))
+      .filter(v => Number.isFinite(v) && v > 0);
+    if (values.length === 0) return out;
+    const sMin = Math.min(...values);
+    const sMax = Math.max(...values);
+    const range = sMax - sMin;
+    for (const [fips, s] of Object.entries(staticCountyStats)) {
+      const v = Number(s?.zhvi_latest);
+      if (!Number.isFinite(v) || v <= 0) continue;
+      const raw = range > 0 ? (v - sMin) / range : 0.5;
+      const t = 1 - raw; // price inverted: lower = greener
+      out.set(fips, { t, value: v, zhvi: v, zori: s?.zori_latest || null });
+    }
+    return out;
+  }, [staticCountyStats, metric]);
+
   const view = (selectedState && STATE_MAP_VIEW[selectedState])
     ? STATE_MAP_VIEW[selectedState]
     : { center: [-96, 38], zoom: 1 };
@@ -162,32 +188,37 @@ export const USCountyMap = ({
                   const isHighlighted = highlightedFips === stateFips && highlightedCounty === countyNorm;
                   const isInSelectedState = selectedFips === stateFips;
                   const liveHeat = liveCountyHeat.get(countyNorm);
+                  const staticHeat = staticCountyHeat.get(fips);
 
-                  // Fill priority:
-                  //   1. Highlighted (active pin) → accent
-                  //   2. Live county data (real listings in this county) → price-based heat
-                  //   3. Selected state → teal tint
-                  //   4. Curated market (legacy, only when no live data) → score-based heat
-                  //   5. Otherwise → soft mid-scale coverage fill
-                  const t_default = 0.5;
-                  let fill = scoreToHeatFill(t_default);
-                  let stroke = scoreToHeatStroke(t_default);
-                  let strokeWidth = 0.45;
-                  let opacity = 0.35;
+                  // Fill priority (first match wins):
+                  //   1. Highlighted active pin → accent
+                  //   2. Live county data from recent search → price heat
+                  //   3. Static ZHVI snapshot (Zillow) → price heat
+                  //   4. Selected state tint → teal
+                  //   5. Otherwise → neutral gray (no data — quiet, not yellow)
+                  let fill = THEME.bgPanel;           // neutral gray, not yellow
+                  let stroke = THEME.border;
+                  let strokeWidth = 0.4;
+                  let opacity = 0.9;
 
-                  if (isInSelectedState && !liveHeat) {
+                  if (isInSelectedState && !liveHeat && !staticHeat) {
                     fill = THEME.bgTeal;
                     stroke = THEME.teal;
                     strokeWidth = 0.55;
                     opacity = 0.95;
+                  }
+                  if (staticHeat && !liveHeat) {
+                    fill = scoreToHeatFill(staticHeat.t);
+                    stroke = scoreToHeatStroke(staticHeat.t);
+                    strokeWidth = 0.5;
+                    opacity = 0.82;                   // slightly muted vs. live
                   }
                   if (liveHeat) {
                     fill = scoreToHeatFill(liveHeat.t);
                     stroke = scoreToHeatStroke(liveHeat.t);
                     strokeWidth = 0.6;
                     opacity = 1;
-                  } else if (isMarket && !usingLiveData) {
-                    // Only fall back to curated scores when we have no live data at all
+                  } else if (isMarket && !usingLiveData && !staticHeat) {
                     const score = getScore(market);
                     const t = scoreToT(score);
                     fill = scoreToHeatFill(t);
@@ -234,7 +265,8 @@ export const USCountyMap = ({
                           state: stateCode,
                           market: market || null,
                           isMarket,
-                          liveStats: liveHeat ? liveHeat.stats : null
+                          liveStats: liveHeat ? liveHeat.stats : null,
+                          staticStats: staticHeat || null
                         });
                       }}
                       onMouseLeave={() => setHoveredCounty(null)}
@@ -361,10 +393,16 @@ export const USCountyMap = ({
                   {metricDef.label}: {metricDef.format(metricDef.extract(hoveredCounty.liveStats))}
                   {hoveredCounty.liveStats.listingCount ? ` · ${hoveredCounty.liveStats.listingCount} listings` : ""}
                 </>
+              ) : hoveredCounty.staticStats?.zhvi ? (
+                <>
+                  Median value (ZHVI): ${Math.round(hoveredCounty.staticStats.zhvi / 1000)}k
+                  {hoveredCounty.staticStats.zori ? ` · Rent: $${Math.round(hoveredCounty.staticStats.zori)}` : ""}
+                  <div style={{ marginTop: 2, fontSize: 10, opacity: 0.7 }}>Click to load live listings</div>
+                </>
               ) : hoveredCounty.isMarket ? (
                 `${hoveredCounty.market.city} • Click to drill in`
               ) : (
-                "Click to load live listings for this area"
+                "No data yet — click to load live listings"
               )}
             </div>
           </div>

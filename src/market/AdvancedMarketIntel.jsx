@@ -14,7 +14,7 @@ import { Panel, CalcTooltip } from "../primitives.jsx";
 import { USCountyMap, MAP_METRICS } from "./USCountyMap.jsx";
 import { LiveListingsPanel } from "./LiveListingsPanel.jsx";
 import { STATE_NAMES, STATE_DEFAULT_CITIES } from "./mapUtils.js";
-import { isSaasMode, useSaasUser, fetchCountyCensus, fetchCountyFMR, fetchMarketIndexes, fetchCountyUnemployment, fetchMortgageRate } from "../lib/saas.js";
+import { isSaasMode, useSaasUser, fetchCountyCensus, fetchCountyFMR, fetchMarketIndexes, fetchStateMarketIndexes, fetchCountyUnemployment, fetchMortgageRate } from "../lib/saas.js";
 
 const RepeatIcon = RotateCcw;
 
@@ -1083,6 +1083,23 @@ export const AdvancedMarketIntel = () => {
   const saas = useSaasUser();
   const saasOn = isSaasMode();
 
+  // Pre-ingested Zillow+Redfin snapshot for every county in the selected
+  // state, keyed by FIPS. Populates the map heat layer even before any
+  // live search — so un-searched counties aren't all yellow.
+  const [stateCountyIndexes, setStateCountyIndexes] = useState(null);
+  useEffect(() => {
+    if (!saasOn || !saas.user || !selectedState) {
+      setStateCountyIndexes(null);
+      return;
+    }
+    let cancelled = false;
+    fetchStateMarketIndexes(saas.getToken, selectedState)
+      .then(body => { if (!cancelled && body?.byFips) setStateCountyIndexes(body.byFips); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saasOn, saas.user, selectedState]);
+
   // Live 30-year mortgage rate — fetched once per session (12h cache server-side)
   // and passed to the listing cards for quick-cashflow estimates.
   const [mortgageRate, setMortgageRate] = useState(null);
@@ -1587,6 +1604,7 @@ export const AdvancedMarketIntel = () => {
                 highlightedMarket={mapHighlight}
                 onCountyClick={handleMapCountyClick}
                 liveCountyStats={liveCityStats?.byCounty || null}
+                staticCountyStats={stateCountyIndexes}
                 metric={mapMetric}
                 listings={liveListings}
                 onResetView={handleResetView}
@@ -1815,6 +1833,7 @@ export const AdvancedMarketIntel = () => {
             highlightedMarket={mapHighlight}
             onCountyClick={handleMapCountyClick}
             liveCountyStats={liveCityStats?.byCounty || null}
+                staticCountyStats={stateCountyIndexes}
             metric={mapMetric}
             listings={liveListings}
             onResetView={handleResetView}
