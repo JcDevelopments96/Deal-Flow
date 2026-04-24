@@ -10,7 +10,7 @@ import {
 import { THEME } from "../theme.js";
 import { fmtUSD, isMobile } from "../utils.js";
 import { Panel } from "../primitives.jsx";
-import { useToast } from "../contexts.jsx";
+import { useToast, useAppActions } from "../contexts.jsx";
 import {
   isSaasMode, useSaasUser,
   searchWholesaleLeads, listWholesaleLeads, saveWholesaleLead,
@@ -553,10 +553,36 @@ const LeadCard = ({ lead, onSkipTrace, onStatusChange, onDelete, onEmail, onOpen
   );
 };
 
+// Adapt a wholesale lead into the shape ListingCard / Watchlist expect so
+// saved leads surface in the main Watchlist tab alongside Market Intel
+// favorites. The `__wholesale` flag lets the UI show a "Wholesale lead"
+// chip on the card so the origin is obvious.
+const leadToWatchlist = (lead) => ({
+  id: `wholesale-${lead.id}`,
+  wholesale_lead_id: lead.id,
+  __wholesale: true,
+  formattedAddress: [
+    lead.address,
+    [lead.city, lead.state, lead.zip].filter(Boolean).join(", ")
+  ].filter(Boolean).join(", "),
+  city: lead.city, state: lead.state, zip: lead.zip,
+  latitude: lead.latitude, longitude: lead.longitude,
+  price: lead.market_value || lead.last_sale_price || null,
+  bedrooms: lead.bedrooms, bathrooms: lead.bathrooms,
+  squareFootage: lead.sqft, yearBuilt: lead.year_built,
+  propertyType: lead.property_type,
+  imageUrl: lead.streetview_url || lead.satellite_url || null,
+  photos: [lead.streetview_url, lead.satellite_url].filter(Boolean),
+  streetview_url: lead.streetview_url,
+  satellite_url: lead.satellite_url,
+  demo: false
+});
+
 export const WholesaleView = () => {
   const saas = useSaasUser();
   const saasOn = isSaasMode();
   const toast = useToast();
+  const { toggleWatch, isWatched } = useAppActions();
   const plan = saas.usage?.plan;
   const isPaid = plan && plan !== "free";
 
@@ -615,8 +641,16 @@ export const WholesaleView = () => {
     try {
       const { lead } = await saveWholesaleLead(saas.getToken, property);
       setLeads(prev => [lead, ...prev.filter(l => l.id !== lead.id)]);
-      toast.push("Lead saved", "success");
+      // Also push to the app-wide Watchlist so it's easy to find from the
+      // Watchlist tab alongside Market Intel favorites.
+      const watchShape = leadToWatchlist(lead);
+      if (!isWatched(watchShape.id)) toggleWatch(watchShape);
+      toast.push("Lead saved to Your Leads + Watchlist", "success");
       setSearchResults(prev => prev.filter(p => p.address !== property.address));
+      // Also refetch in the background so the server's authoritative state
+      // replaces the optimistic prepend — guards against edge cases where
+      // the upsert returns a slightly different shape than we expected.
+      loadLeads();
     } catch (e) { toast.push(e.message || "Save failed", "error"); }
   };
 
@@ -645,6 +679,9 @@ export const WholesaleView = () => {
     try {
       await deleteWholesaleLead(saas.getToken, id);
       setLeads(prev => prev.filter(l => l.id !== id));
+      // Keep the Watchlist in sync — toggleWatch removes when already present.
+      const watchId = `wholesale-${id}`;
+      if (isWatched(watchId)) toggleWatch({ id: watchId });
       toast.push("Lead removed", "info");
     } catch (e) { toast.push(e.message, "error"); }
   };
