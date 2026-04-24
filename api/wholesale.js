@@ -219,12 +219,14 @@ async function handleSearch(body, user) {
   return { results: filtered, total: properties.length, filtered: filtered.length, user_id: user.id };
 }
 
-/* ── BatchSkipTracing (user's OWN key — BYOK) ─────────────────────────── */
+/* ── BatchSkipTracing (server key, with per-user override) ─────────────── */
 async function handleSkipTrace({ leadId }, user) {
-  // User pays their own BatchData bill — we never store a master key.
-  const apiKey = user.batchskip_api_key;
-  if (!apiKey) throw new ApiError(400, "byok_required",
-    "Add your BatchData API key in Wholesale → Integrations first (sign up at batchdata.com; typically ~$0.15/trace).");
+  // Prefer the app-wide server key (set BATCHSKIP_API_KEY in Vercel env).
+  // Users can also bring their own via user.batchskip_api_key so power users
+  // stay billed on their own BatchData account.
+  const apiKey = user.batchskip_api_key || process.env.BATCHSKIP_API_KEY;
+  if (!apiKey) throw new ApiError(503, "batchskip_not_configured",
+    "Skip trace isn't available — the BATCHSKIP_API_KEY env var isn't set on the server.");
   if (!leadId) throw new ApiError(400, "missing_lead_id");
 
   const db = adminDb();
@@ -395,13 +397,24 @@ async function handleEmail({ leadId, subject, body }, user) {
   return { ok: true, resendId: emailData?.id || null };
 }
 
-/* ── Lob direct-mail postcards (BYOK — user pays Lob directly) ────────── */
+/* ── Lob direct-mail postcards (server key with per-user override) ────── */
 async function handlePostcard({ leadId, message }, user) {
-  const apiKey = user.lob_api_key;
-  if (!apiKey) throw new ApiError(400, "byok_required",
-    "Add your Lob API key in Wholesale → Integrations first (sign up at lob.com; postcards are ~$0.69 each).");
-  if (!user.return_address?.street) throw new ApiError(400, "return_address_missing",
-    "Set your return address in Wholesale → Integrations first.");
+  const apiKey = user.lob_api_key || process.env.LOB_API_KEY;
+  if (!apiKey) throw new ApiError(503, "lob_not_configured",
+    "Postcards aren't available — the LOB_API_KEY env var isn't set on the server.");
+  // Return address falls back to a server-default envelope when the user
+  // hasn't set their own.
+  const returnAddress = user.return_address?.street ? user.return_address : (
+    process.env.LOB_FROM_STREET ? {
+      name:  process.env.LOB_FROM_NAME  || "DealTrack Investor",
+      street: process.env.LOB_FROM_STREET,
+      city:  process.env.LOB_FROM_CITY  || "",
+      state: process.env.LOB_FROM_STATE || "",
+      zip:   process.env.LOB_FROM_ZIP   || ""
+    } : null
+  );
+  if (!returnAddress) throw new ApiError(503, "return_address_missing",
+    "No return address configured for postcards — set LOB_FROM_STREET/CITY/STATE/ZIP in server env.");
   if (!leadId || !message) throw new ApiError(400, "missing_fields", "leadId + message required");
 
   const db = adminDb();
@@ -420,7 +433,7 @@ async function handlePostcard({ leadId, message }, user) {
     throw new ApiError(400, "bad_destination", "Lead is missing a usable mailing address.");
   }
 
-  const from = user.return_address || {};
+  const from = returnAddress;
 
   // Lob uses HTTP Basic auth: username=API_KEY, password blank
   const auth = "Basic " + Buffer.from(apiKey + ":").toString("base64");
