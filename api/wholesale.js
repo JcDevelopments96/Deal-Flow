@@ -4,7 +4,7 @@
  * Single serverless function routing multiple actions to stay under the
  * Vercel Hobby 12-function cap:
  *
- *   POST   /api/wholesale?action=search       { zip, filters }   → ATTOM search
+ *   POST   /api/wholesale?action=search       { zip, filters }   → RealEstateAPI
  *   POST   /api/wholesale?action=skiptrace    { leadId }         → BatchSkipTracing
  *   GET    /api/wholesale?action=leads                           → list user's saved
  *   POST   /api/wholesale?action=save         { property }       → save as lead
@@ -15,9 +15,11 @@
  * Paid tiers only (starter/pro/scale). Free users get 403 upgrade_required.
  *
  * Upstream providers:
- *   - ATTOM Data     — property + owner records. Pay-per-call (~$0.05)
+ *   - RealEstateAPI    — property + owner + foreclosure records in one call.
+ *                        Flat-rate subscription ($59+/mo unlimited residential)
+ *                        so each user search costs us $0 at the margin.
  *   - BatchSkipTracing — phone/email skip trace. Pay-per-call (~$0.15)
- *   - Resend         — transactional email. Free tier 3k/mo
+ *   - Resend           — transactional email. Free tier 3k/mo
  */
 import { handler, ApiError } from "./_lib/errors.js";
 import { requireUserId } from "./_lib/auth.js";
@@ -63,35 +65,19 @@ function computeLeadScore({ years_owned, is_absentee, is_tax_delinquent, assesse
   return Math.min(100, score);
 }
 
-/* ── Google Geocoding (city+state → lat/lng) ─────────────────────────── */
-// ATTOM's /property/snapshot does NOT accept city+state as query params —
-// it wants either postalcode or latitude+longitude+radius. So when the
-// user searches by city, we geocode first via Google, then hand ATTOM a
-// 5-mile radius centered on the city.
-async function geocodeCityState(city, state) {
-  const key = process.env.GOOGLE_MAPS_API_KEY;
-  if (!key) throw new ApiError(503, "geocoding_not_configured",
-    "City-level search requires GOOGLE_MAPS_API_KEY — set it in Vercel env or search by ZIP.");
-  const qs = new URLSearchParams({ address: `${city}, ${state}, USA`, key });
-  const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?${qs.toString()}`);
-  if (!res.ok) throw new ApiError(502, "geocoding_failed", `Google ${res.status}`);
-  const json = await res.json();
-  if (json.status !== "OK" || !json.results?.[0]) {
-    throw new ApiError(400, "city_not_found",
-      `Couldn't find "${city}, ${state}". Double-check spelling or search by ZIP.`);
-  }
-  const loc = json.results[0].geometry?.location;
-  if (!loc) throw new ApiError(502, "geocoding_failed", "no location in geocoder response");
-  return { lat: loc.lat, lng: loc.lng };
-}
-
-/* ── ATTOM Data property search ───────────────────────────────────────── */
+/* ── RealEstateAPI property search ───────────────────────────────────────
+   Single POST to /v2/PropertySearch replaces the old 3-call ATTOM fan-out
+   (snapshot + foreclosure + preforeclosure). Flat-rate subscription means
+   each user search costs us $0 at the margin once we pass the plan's
+   included quota — much better economics than ATTOM's pay-per-call.
+   Sign up: https://realestateapi.com  (env: REAL_ESTATE_API_KEY)
+────────────────────────────────────────────────────────────────────────── */
 async function handleSearch(body, user) {
-  const apiKey = process.env.ATTOM_API_KEY;
-  if (!apiKey) throw new ApiError(503, "attom_not_configured",
-    "Set ATTOM_API_KEY in Vercel env (sign up at api.developer.attomdata.com).");
+  const apiKey = process.env.REAL_ESTATE_API_KEY;
+  if (!apiKey) throw new ApiError(503, "reapi_not_configured",
+    "Set REAL_ESTATE_API_KEY in Vercel env (sign up at realestateapi.com).");
 
-  const { zip, city, state, minYearsOwned, absenteeOnly, taxDelinquentOnly, limit = 25 } = body || {};
+  const { zip, city, state, minYearsOwned, absenteeOnly, taxDelinquentOnly, limit = 50 } = body || {};
 
   const hasZip = zip && /^\d{5}$/.test(String(zip));
   const hasCityState = city && state && /^[A-Z]{2}$/.test(String(state).toUpperCase());
@@ -100,105 +86,79 @@ async function handleSearch(body, user) {
       "Provide either a 5-digit ZIP, or both a city and a 2-letter state code.");
   }
 
-  const headers = { "apikey": apiKey, accept: "application/json" };
-  const pagesize = Math.min(100, Number(limit) || 25);
+  // RealEstateAPI supports exposing distress + absentee + years-owned as
+  // first-class filters — no post-filter needed. `size` caps the page.
+  const reqBody = {
+    size: Math.min(250, Number(limit) || 50),
+    ids_only: false,
+    ...(hasZip ? { zip: String(zip) } : { city, state: String(state).toUpperCase() }),
+    ...(minYearsOwned ? { years_owned_min: Number(minYearsOwned) } : {}),
+    ...(absenteeOnly ? { absentee_owner: true } : {}),
+    // Either pre-foreclosure OR tax-delinquent qualifies as "distressed" in
+    // our UI. REAPI exposes them as separate filter flags; OR'ing them is
+    // done by firing the request without either flag set and filtering on
+    // the response boolean — simpler than two requests.
+  };
 
-  // Build the ATTOM location query string. ZIP is a direct pass-through;
-  // city+state goes through a Google geocode → lat/lng + 5-mile radius.
-  let locationQs;
-  if (hasZip) {
-    locationQs = `postalcode=${encodeURIComponent(zip)}`;
-  } else {
-    const { lat, lng } = await geocodeCityState(city, String(state).toUpperCase());
-    locationQs = `latitude=${lat}&longitude=${lng}&radius=5`;
+  const res = await fetch("https://api.realestateapi.com/v2/PropertySearch", {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "Content-Type": "application/json",
+      "accept": "application/json"
+    },
+    body: JSON.stringify(reqBody)
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    throw new ApiError(502, "reapi_error", `RealEstateAPI ${res.status}: ${t.slice(0, 300)}`);
   }
+  const data = await res.json();
+  const properties = Array.isArray(data?.data) ? data.data : [];
 
-  // Fan out three parallel calls:
-  //   1. /property/snapshot     — base property + owner + sale + assessment
-  //   2. /foreclosure/snapshot  — pre-foreclosure list (tax / mortgage default)
-  //   3. /preforeclosure/snapshot — alternative NOD/NOS events (some regions)
-  // Cross-reference by property_id so we can flag tax-delinquent properties.
-  const [snapshotRes, foreclosureRes, preforeRes] = await Promise.all([
-    fetch(`https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/snapshot?${locationQs}&pagesize=${pagesize}`, { headers }),
-    fetch(`https://api.gateway.attomdata.com/propertyapi/v1.0.0/foreclosure/snapshot?${locationQs}&pagesize=${pagesize}`, { headers }).catch(() => null),
-    fetch(`https://api.gateway.attomdata.com/propertyapi/v1.0.0/preforeclosure/snapshot?${locationQs}&pagesize=${pagesize}`, { headers }).catch(() => null)
-  ]);
-
-  if (!snapshotRes.ok) {
-    const t = await snapshotRes.text().catch(() => "");
-    throw new ApiError(502, "attom_error", `ATTOM ${snapshotRes.status}: ${t.slice(0, 300)}`);
-  }
-  const data = await snapshotRes.json();
-  const properties = Array.isArray(data?.property) ? data.property : [];
-
-  // Build a Set of ATTOM IDs that appear in either foreclosure feed. Many
-  // accounts don't have access to these endpoints, which returns non-ok —
-  // in that case we silently degrade (no tax-delinquent flag, rest works).
-  const distressedIds = new Set();
-  for (const r of [foreclosureRes, preforeRes]) {
-    if (!r || !r.ok) continue;
-    const j = await r.json().catch(() => null);
-    for (const p of (j?.property || [])) {
-      const id = p.identifier?.attomId?.toString() || p.identifier?.Id?.toString();
-      if (id) distressedIds.add(id);
-    }
-  }
-
-  const now = new Date();
   const leads = properties.map(p => {
     const addr = p.address || {};
-    const sale = p.sale || {};
-    const owner = p.owner || {};
-    const assessment = p.assessment || {};
-    const building = p.building || {};
-    const loc = p.location || {};
-    const summary = p.summary || {};
-    const lead_attom_id = p.identifier?.attomId?.toString() || p.identifier?.Id?.toString() || null;
+    const info = p.propertyInfo || {};
+    const owner = p.ownerInfo || {};
+    const mail = owner.mailingAddress || {};
+    const years_owned = typeof p.yearsOwned === "number" ? p.yearsOwned : null;
 
-    // Derive years_owned from saletransdate
-    const saleDate = sale.saleTransDate || sale.salesearchdate || sale.saleTranDate;
-    const years_owned = saleDate
-      ? Math.floor((now - new Date(saleDate)) / (365.25 * 86400000))
-      : null;
-
-    // Owner address differs from property address → absentee
-    const ownerMail = owner.mailingAddress || owner.mailingaddress || {};
-    const propAddr1 = (addr.line1 || addr.line || "").toLowerCase().trim();
-    const ownerAddr1 = (ownerMail.line1 || ownerMail.line || "").toLowerCase().trim();
-    const is_absentee = ownerAddr1 && propAddr1 && ownerAddr1 !== propAddr1;
-
-    const assessed_value = Number(assessment.assessed?.assdttlvalue) || null;
-    const market_value = Number(assessment.market?.mktttlvalue) || null;
-
+    const is_absentee = !!p.absenteeOwner;
+    const is_tax_delinquent = !!(p.taxDelinquent || p.preForeclosure || p.foreclosure);
     const is_long_time_owner = years_owned != null && years_owned >= (minYearsOwned || 20);
 
+    const assessed_value = Number(p.assessedValue) || null;
+    const market_value = Number(p.estimatedValue) || null;
+
     const lead = {
-      attom_id: lead_attom_id,
-      address: addr.line1 || addr.line || "",
-      city: addr.locality || null,
-      state: addr.countrySubd || addr.state || null,
-      zip: addr.postal1 || addr.postal || null,
-      county: addr.country === "US" ? (p.area?.countrysecsubd || null) : null,
-      latitude: Number(loc.latitude) || null,
-      longitude: Number(loc.longitude) || null,
-      property_type: summary.propclass || summary.proptype || null,
-      bedrooms: Number(building.rooms?.beds) || null,
-      bathrooms: Number(building.rooms?.bathstotal) || null,
-      sqft: Number(building.size?.livingsize) || Number(building.size?.universalsize) || null,
-      year_built: Number(summary.yearbuilt) || null,
+      attom_id: p.id != null ? String(p.id) : null, // column name kept for back-compat
+      address: addr.address || addr.street || "",
+      city: addr.city || null,
+      state: addr.state || null,
+      zip: addr.zip || null,
+      county: addr.county || null,
+      latitude: typeof p.latitude === "number" ? p.latitude : (Number(p.latitude) || null),
+      longitude: typeof p.longitude === "number" ? p.longitude : (Number(p.longitude) || null),
+      property_type: info.propertyType || info.propertyUse || null,
+      bedrooms: Number(info.bedrooms) || null,
+      bathrooms: Number(info.bathroomsTotal || info.bathrooms) || null,
+      sqft: Number(info.livingSquareFeet || info.buildingSqft) || null,
+      year_built: Number(info.yearBuilt) || null,
       assessed_value,
       market_value,
-      last_sale_date: saleDate ? String(saleDate).slice(0, 10) : null,
-      last_sale_price: Number(sale.amount?.saleamt) || null,
+      last_sale_date: p.lastSaleDate ? String(p.lastSaleDate).slice(0, 10) : null,
+      last_sale_price: Number(p.lastSalePrice) || null,
       years_owned,
-      owner_name: [owner.owner1?.lastname, owner.owner1?.firstname].filter(Boolean).join(", ") || null,
-      owner_mailing_address: ownerMail.line1 || ownerMail.line || null,
-      owner_mailing_city: ownerMail.locality || null,
-      owner_mailing_state: ownerMail.countrySubd || null,
-      owner_mailing_zip: ownerMail.postal1 || null,
-      is_absentee: !!is_absentee,
+      owner_name: owner.name
+        || [owner.lastName, owner.firstName].filter(Boolean).join(", ")
+        || null,
+      owner_mailing_address: mail.address || mail.street || null,
+      owner_mailing_city: mail.city || null,
+      owner_mailing_state: mail.state || null,
+      owner_mailing_zip: mail.zip || null,
+      is_absentee,
       is_long_time_owner,
-      is_tax_delinquent: lead_attom_id ? distressedIds.has(lead_attom_id) : false,
+      is_tax_delinquent,
       lead_score: 0
     };
     lead.lead_score = computeLeadScore(lead);
@@ -207,13 +167,14 @@ async function handleSearch(body, user) {
     return lead;
   });
 
-  // Server-side filters
+  // Client-requested post-filters (REAPI already filters absentee/years_owned
+  // server-side when set, but distress is OR'd across two flags so we filter
+  // here). Also handles the case where the caller passed minYearsOwned=20
+  // but REAPI returned records with years_owned=null.
   let filtered = leads;
-  if (absenteeOnly) filtered = filtered.filter(l => l.is_absentee);
   if (taxDelinquentOnly) filtered = filtered.filter(l => l.is_tax_delinquent);
   if (minYearsOwned) filtered = filtered.filter(l => l.years_owned != null && l.years_owned >= minYearsOwned);
 
-  // Sort by lead_score desc so the best hits surface first
   filtered.sort((a, b) => b.lead_score - a.lead_score);
 
   return { results: filtered, total: properties.length, filtered: filtered.length, user_id: user.id };
