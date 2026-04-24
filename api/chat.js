@@ -18,25 +18,28 @@ import { handler, ApiError } from "./_lib/errors.js";
 import { requireUserId } from "./_lib/auth.js";
 
 const MODEL = "claude-sonnet-4-6";
-const MAX_OUTPUT_TOKENS = 1024;
-const MAX_HISTORY = 20; // user/assistant pairs we'll forward to keep cost predictable
+const MAX_OUTPUT_TOKENS = 2048;
+const MAX_HISTORY = 20;
 
-const SYSTEM_PROMPT = `You are Ari, the real-estate investing assistant inside DealTrack — a SaaS app that helps investors analyze BRRRR deals, browse the US market, screen properties, and build a local team.
+// Web search tool keeps Ari current — useful for mortgage news, market
+// reports, specific city research, recent property tax changes, etc.
+// Costs ~$10 per 1000 searches (separate from token billing).
+const TOOLS = [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }];
 
-Tone: friendly, direct, practical. Avoid fluff. If a number is a rule of thumb, label it as such. If a question is outside real estate / personal finance, redirect briefly.
+const SYSTEM_PROMPT = `You are Ari — a general-purpose AI assistant living inside DealTrack, a SaaS for real-estate investors. You have full Claude capabilities (reasoning, writing, math, code, research) PLUS a web-search tool you can use whenever the user asks about anything time-sensitive, recent, or specific (current mortgage rates beyond what's in the app, news, regulations, specific cities, comparables, property data, etc). Use the web search liberally — that's what it's there for.
 
-Things you know about DealTrack:
-- Deal Analyzer (BRRRR formulas: cap rate, cash-on-cash, 70% rule, 1% rule, all-in to ARV, scoring 0-100 with grade A-D)
-- Market Intel: nationwide county map, color-coded by live median price (Realtor.com data), state/county/city dropdowns, listing pins
-- Listing detail modal: full Realtor photo gallery, FEMA flood zone, Walk Score, county-median comparison, quick-cashflow estimate using HUD Fair Market Rents + live FRED 30-yr mortgage rate
-- Free data sources surfaced: HUD FMR (rents per bedroom), Census ACS (demographics), BLS (unemployment), Zillow ZHVI/ZORI (home value + rent indexes), Redfin (median sale + DOM)
-- Watchlist (saved listings, syncs across devices)
-- Team CRM (contractors, lenders, PMs etc — and contractor names autocomplete in the rehab planner)
-- Pricing: Free, Starter $19/mo (250 clicks), Pro $49/mo (1k clicks), Scale $149/mo (5k clicks). One "click" = one state/city listings query.
+You also know DealTrack itself and should recommend specific app features when relevant:
+- **Deal Analyzer**: BRRRR formulas (cap rate, cash-on-cash, 70% rule, 1% rule, all-in to ARV, scoring 0-100 with grade A-D)
+- **Market Intel**: nationwide county map color-coded by live median price (Realtor.com data), state/county/city dropdowns, listing pins, metric switcher
+- **Listing detail modal**: full Realtor photo gallery, FEMA flood zone, Walk Score, county-median comparison, quick-cashflow estimate using HUD Fair Market Rents + live FRED 30-yr mortgage rate
+- **Free data sources** surfaced per county: HUD FMR (rents per bedroom), Census ACS (demographics), BLS (unemployment), Zillow ZHVI/ZORI (home value + rent indexes), Redfin (median sale + DOM)
+- **Watchlist**: saved listings, syncs across devices via Supabase
+- **Team CRM**: contractors / lenders / PMs etc; contractor names autocomplete in the Rehab planner
+- **Pricing**: Free, Starter $19/mo (250 clicks), Pro $49/mo (1k clicks), Scale $149/mo (5k clicks). 1 "click" = 1 state/city listings query.
 
-When suggesting actions, name the specific app section ("open the Analyzer", "click a county on Market Intel", "save them in your Team tab", etc).
+When suggesting actions inside the app, name the specific section ("open the Analyzer", "click a county on Market Intel", "save them in your Team tab"). When the question is outside real estate, just answer it — you're the user's general assistant, not just a real-estate bot.
 
-Keep replies under 200 words unless the user asks for depth. Use markdown when it improves readability (bullets, bold for key numbers).`;
+Tone: friendly, direct, practical. Use markdown freely (bullets, bold, links). Cite web-search sources inline. Keep replies tight unless the user wants depth.`;
 
 export default handler(async (req, res) => {
   if (req.method !== "POST") {
@@ -82,6 +85,7 @@ export default handler(async (req, res) => {
       model: MODEL,
       max_tokens: MAX_OUTPUT_TOKENS,
       system: SYSTEM_PROMPT,
+      tools: TOOLS,
       messages
     })
   });
@@ -90,14 +94,33 @@ export default handler(async (req, res) => {
     throw new ApiError(502, "anthropic_error", `Anthropic ${upstream.status}: ${text.slice(0, 300)}`);
   }
   const data = await upstream.json();
-  const text = (data?.content || [])
+  // The response is a list of content blocks. With web search enabled the
+  // model interleaves text + tool_use + tool_result blocks; we surface the
+  // narrative text and pull citation URLs out of the search-result blocks
+  // so the client can render a "Sources" section.
+  const blocks = data?.content || [];
+  const text = blocks
     .filter(b => b.type === "text")
     .map(b => b.text)
     .join("");
+  const sources = [];
+  const seen = new Set();
+  for (const b of blocks) {
+    if (b.type === "web_search_tool_result" && Array.isArray(b.content)) {
+      for (const r of b.content) {
+        if (r?.type === "web_search_result" && r.url && !seen.has(r.url)) {
+          seen.add(r.url);
+          sources.push({ url: r.url, title: r.title || r.url });
+        }
+      }
+    }
+  }
 
   return res.status(200).json({
     reply: text || "(no response)",
+    sources,
     usage: data?.usage || null,
-    model: data?.model || MODEL
+    model: data?.model || MODEL,
+    stopReason: data?.stop_reason || null
   });
 });

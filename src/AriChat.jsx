@@ -13,7 +13,7 @@ const STORAGE_KEY = "dealtrack-ari-history-v1";
 
 const GREETING = {
   role: "assistant",
-  content: "Hi, I'm **Ari** — your DealTrack co-pilot. Ask me about a deal you're analyzing, what a market looks like, BRRRR math, or where to find a contractor in your team. What's on your mind?"
+  content: "Hi, I'm **Ari** — full Claude assistant + DealTrack co-pilot. I can answer anything (real estate or otherwise), search the live web for recent info, and point you to the right section of the app. What's on your mind?"
 };
 
 // Tiny markdown → JSX renderer. Handles bold, bullets, paragraphs, inline
@@ -120,8 +120,8 @@ export const AriChat = () => {
       // Don't include the canned greeting in the wire payload — the system
       // prompt covers tone + context.
       const wire = next.filter(m => m !== GREETING);
-      const { reply } = await chatWithAri(saas.getToken, wire);
-      setHistory(prev => [...prev, { role: "assistant", content: reply }]);
+      const { reply, sources } = await chatWithAri(saas.getToken, wire);
+      setHistory(prev => [...prev, { role: "assistant", content: reply, sources: sources || [] }]);
     } catch (e) {
       console.warn("Ari error:", e);
       setError(e.message || "Ari couldn't reply. Try again in a moment.");
@@ -233,6 +233,27 @@ export const AriChat = () => {
               wordWrap: "break-word"
             }}>
               {m.role === "user" ? m.content : renderMarkdown(m.content)}
+              {m.role === "assistant" && Array.isArray(m.sources) && m.sources.length > 0 && (
+                <div style={{
+                  marginTop: 8, paddingTop: 8,
+                  borderTop: `1px solid ${THEME.borderLight}`,
+                  fontSize: 11, color: THEME.textMuted
+                }}>
+                  <div style={{ fontWeight: 700, marginBottom: 4, letterSpacing: "0.06em", textTransform: "uppercase", fontSize: 10 }}>
+                    Sources
+                  </div>
+                  <ol style={{ margin: 0, paddingLeft: 16, lineHeight: 1.5 }}>
+                    {m.sources.slice(0, 6).map((s, idx) => (
+                      <li key={idx}>
+                        <a href={s.url} target="_blank" rel="noopener noreferrer"
+                          style={{ color: THEME.accent, wordBreak: "break-all" }}>
+                          {s.title || s.url}
+                        </a>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
             </div>
           </div>
         ))}
