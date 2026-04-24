@@ -1057,6 +1057,8 @@ export const AdvancedMarketIntel = () => {
   const [liveCityStats, setLiveCityStats] = useState(null);
   // Full listings array so the map can drop a pin for each one.
   const [liveListings, setLiveListings] = useState([]);
+  // A clicked map pin filters the listings column down to that one property.
+  const [pinnedListingId, setPinnedListingId] = useState(null);
   // Which metric colors the map (price | yield | rent | listings).
   const [mapMetric, setMapMetric] = useState("price");
 
@@ -1607,6 +1609,8 @@ export const AdvancedMarketIntel = () => {
                 staticCountyStats={stateCountyIndexes}
                 metric={mapMetric}
                 listings={liveListings}
+                onListingClick={(l) => setPinnedListingId(l.id)}
+                pinnedListingId={pinnedListingId}
                 onResetView={handleResetView}
               />
             </Panel>
@@ -1794,10 +1798,12 @@ export const AdvancedMarketIntel = () => {
               bedsFilter={bedsFilter}
               bathsFilter={bathsFilter}
               onStatsComputed={setLiveCityStats}
-              onListingsLoaded={setLiveListings}
+              onListingsLoaded={(ls) => { setLiveListings(ls); setPinnedListingId(null); }}
               countyFmr={countyFmr}
               mortgageRate={mortgageRate}
               countyStats={liveCityStats?.byCounty || null}
+              pinnedListingId={pinnedListingId}
+              onClearPin={() => setPinnedListingId(null)}
             />
           </div>
         </div>
@@ -1836,6 +1842,8 @@ export const AdvancedMarketIntel = () => {
                 staticCountyStats={stateCountyIndexes}
             metric={mapMetric}
             listings={liveListings}
+            onListingClick={(l) => setPinnedListingId(l.id)}
+            pinnedListingId={pinnedListingId}
             onResetView={handleResetView}
           />
         </Panel>

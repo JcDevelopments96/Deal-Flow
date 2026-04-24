@@ -18,6 +18,8 @@ import {
   skipTraceLead, updateWholesaleLead, deleteWholesaleLead, emailWholesaleLead,
   sendPostcard
 } from "../lib/saas.js";
+import { STATE_NAMES } from "../market/mapUtils.js";
+import { CITIES_BY_STATE } from "../lib/usCities.js";
 
 const STATUSES = [
   { key: "new",         label: "New",         color: THEME.textMuted },
@@ -661,17 +663,17 @@ export const WholesaleView = () => {
 
   const onSearch = async () => {
     const hasZip = /^\d{5}$/.test(zip);
-    const hasCityState = searchCity.trim() && /^[A-Za-z]{2}$/.test(searchState.trim());
+    const hasCityState = !!searchCity && !!searchState;
     if (!hasZip && !hasCityState) {
-      setSearchError("Enter a 5-digit ZIP, or fill in both City and State.");
+      setSearchError("Pick a state + city, or enter a 5-digit ZIP.");
       return;
     }
     setSearching(true); setSearchError(null);
     try {
       const { results } = await searchWholesaleLeads(saas.getToken, {
         zip: hasZip ? zip : undefined,
-        city: hasZip ? undefined : searchCity.trim(),
-        state: hasZip ? undefined : searchState.trim().toUpperCase(),
+        city: hasZip ? undefined : searchCity,
+        state: hasZip ? undefined : searchState,
         taxDelinquentOnly
       });
       setSearchResults(results || []);
@@ -776,22 +778,34 @@ export const WholesaleView = () => {
       </div>
 
       <Panel title="Find leads" icon={<Search size={16} />} accent style={{ marginBottom: 20 }}>
-        <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "100px 1fr 1fr auto", gap: 10, alignItems: "end" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "160px 1fr 140px auto", gap: 10, alignItems: "end" }}>
           <div>
             <div className="label-xs" style={{ marginBottom: 4 }}>State</div>
-            <input value={searchState} onChange={(e) => setSearchState(e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2))}
-              placeholder="FL" maxLength={2}
-              style={{ width: "100%", padding: "9px 10px", fontSize: 14, textTransform: "uppercase" }} />
+            <select value={searchState}
+              onChange={(e) => { setSearchState(e.target.value); setSearchCity(""); }}
+              style={{ width: "100%", padding: "9px 10px", fontSize: 14, background: THEME.bg }}>
+              <option value="">Select state…</option>
+              {Object.keys(STATE_NAMES).sort((a, b) => STATE_NAMES[a].localeCompare(STATE_NAMES[b])).map(code => (
+                <option key={code} value={code}>{STATE_NAMES[code]}</option>
+              ))}
+            </select>
           </div>
           <div>
             <div className="label-xs" style={{ marginBottom: 4 }}>City</div>
-            <input value={searchCity} onChange={(e) => setSearchCity(e.target.value)}
-              placeholder="Miami"
-              style={{ width: "100%", padding: "9px 10px", fontSize: 14 }} />
+            <select value={searchCity}
+              onChange={(e) => setSearchCity(e.target.value)}
+              disabled={!searchState}
+              style={{ width: "100%", padding: "9px 10px", fontSize: 14, background: THEME.bg,
+                opacity: searchState ? 1 : 0.5 }}>
+              <option value="">{searchState ? "Select city…" : "Pick a state first"}</option>
+              {(CITIES_BY_STATE[searchState] || []).map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
           </div>
           <div>
             <div className="label-xs" style={{ marginBottom: 4 }}>
-              ZIP <span style={{ color: THEME.textDim, fontWeight: 400 }}>(overrides city)</span>
+              ZIP <span style={{ color: THEME.textDim, fontWeight: 400 }}>(overrides)</span>
             </div>
             <input value={zip} onChange={(e) => setZip(e.target.value.replace(/\D/g, "").slice(0, 5))}
               placeholder="33101" maxLength={5}

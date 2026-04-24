@@ -92,6 +92,28 @@ function computeLeadScore({ years_owned, is_absentee, is_tax_delinquent, assesse
   return Math.min(100, score);
 }
 
+/* ── Google Geocoding (city+state → lat/lng) ─────────────────────────── */
+// ATTOM's /property/snapshot does NOT accept city+state as query params —
+// it wants either postalcode or latitude+longitude+radius. So when the
+// user searches by city, we geocode first via Google, then hand ATTOM a
+// 5-mile radius centered on the city.
+async function geocodeCityState(city, state) {
+  const key = process.env.GOOGLE_MAPS_API_KEY;
+  if (!key) throw new ApiError(503, "geocoding_not_configured",
+    "City-level search requires GOOGLE_MAPS_API_KEY — set it in Vercel env or search by ZIP.");
+  const qs = new URLSearchParams({ address: `${city}, ${state}, USA`, key });
+  const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?${qs.toString()}`);
+  if (!res.ok) throw new ApiError(502, "geocoding_failed", `Google ${res.status}`);
+  const json = await res.json();
+  if (json.status !== "OK" || !json.results?.[0]) {
+    throw new ApiError(400, "city_not_found",
+      `Couldn't find "${city}, ${state}". Double-check spelling or search by ZIP.`);
+  }
+  const loc = json.results[0].geometry?.location;
+  if (!loc) throw new ApiError(502, "geocoding_failed", "no location in geocoder response");
+  return { lat: loc.lat, lng: loc.lng };
+}
+
 /* ── ATTOM Data property search ───────────────────────────────────────── */
 async function handleSearch(body, user) {
   const apiKey = process.env.ATTOM_API_KEY;
@@ -100,9 +122,6 @@ async function handleSearch(body, user) {
 
   const { zip, city, state, minYearsOwned, absenteeOnly, taxDelinquentOnly, limit = 25 } = body || {};
 
-  // Accept either a ZIP, or a city+state pair. ATTOM's /property/snapshot
-  // supports both; ZIP tends to return cleaner results because cities can
-  // span multiple postal codes.
   const hasZip = zip && /^\d{5}$/.test(String(zip));
   const hasCityState = city && state && /^[A-Z]{2}$/.test(String(state).toUpperCase());
   if (!hasZip && !hasCityState) {
@@ -113,9 +132,15 @@ async function handleSearch(body, user) {
   const headers = { "apikey": apiKey, accept: "application/json" };
   const pagesize = Math.min(100, Number(limit) || 25);
 
-  const locationQs = hasZip
-    ? `postalcode=${encodeURIComponent(zip)}`
-    : `city=${encodeURIComponent(city)}&countrysubd=${encodeURIComponent(String(state).toUpperCase())}`;
+  // Build the ATTOM location query string. ZIP is a direct pass-through;
+  // city+state goes through a Google geocode → lat/lng + 5-mile radius.
+  let locationQs;
+  if (hasZip) {
+    locationQs = `postalcode=${encodeURIComponent(zip)}`;
+  } else {
+    const { lat, lng } = await geocodeCityState(city, String(state).toUpperCase());
+    locationQs = `latitude=${lat}&longitude=${lng}&radius=5`;
+  }
 
   // Fan out three parallel calls:
   //   1. /property/snapshot     — base property + owner + sale + assessment

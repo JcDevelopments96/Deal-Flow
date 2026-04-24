@@ -57,6 +57,8 @@ export const USCountyMap = ({
   staticCountyStats,  // keyed by 5-char FIPS, from market_indexes (Zillow ZHVI)
   metric = "price",
   listings = [],
+  onListingClick,
+  pinnedListingId,
   onResetView
 }) => {
   const [hoveredCounty, setHoveredCounty] = useState(null);
@@ -314,15 +316,23 @@ export const USCountyMap = ({
                 // listings coming back with (0, 0) when geocode is missing.
                 !(lat === 0 && lng === 0);
               if (!validUS) return null;
+              const isPinned = pinnedListingId && pinnedListingId === l.id;
+              const clickable = !!onListingClick;
               return (
                 <Marker key={l.id} coordinates={[lng, lat]}>
                   <circle
-                    r={2.2}
-                    fill={THEME.accent}
+                    r={isPinned ? 3.6 : 2.2}
+                    fill={isPinned ? THEME.orange : THEME.accent}
                     stroke="#FFFFFF"
-                    strokeWidth={0.6}
-                    style={{ pointerEvents: "none" }}
-                  />
+                    strokeWidth={isPinned ? 1 : 0.6}
+                    onClick={clickable ? (e) => { e.stopPropagation(); onListingClick(l); } : undefined}
+                    style={{
+                      cursor: clickable ? "pointer" : "default",
+                      pointerEvents: clickable ? "auto" : "none"
+                    }}
+                  >
+                    {clickable && <title>{l.address || "listing"} — click to filter</title>}
+                  </circle>
                 </Marker>
               );
             })}
