@@ -517,8 +517,6 @@ export const WholesaleView = () => {
   const isPaid = plan && plan !== "free";
 
   const [zip, setZip] = useState("");
-  const [minYearsOwned, setMinYearsOwned] = useState(20);
-  const [absenteeOnly, setAbsenteeOnly] = useState(false);
   const [taxDelinquentOnly, setTaxDelinquentOnly] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -574,7 +572,7 @@ export const WholesaleView = () => {
     if (!/^\d{5}$/.test(zip)) { setSearchError("Enter a 5-digit ZIP code"); return; }
     setSearching(true); setSearchError(null);
     try {
-      const { results } = await searchWholesaleLeads(saas.getToken, { zip, minYearsOwned: Number(minYearsOwned), absenteeOnly, taxDelinquentOnly });
+      const { results } = await searchWholesaleLeads(saas.getToken, { zip, taxDelinquentOnly });
       setSearchResults(results || []);
       if (!results || results.length === 0) setSearchError("No matching properties in that ZIP.");
     } catch (e) {
@@ -686,34 +684,17 @@ export const WholesaleView = () => {
       </div>
 
       <Panel title="Find leads" icon={<Search size={16} />} accent style={{ marginBottom: 20 }}>
-        <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1.5fr 1fr 1fr auto", gap: 12, alignItems: "end" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1.5fr 1fr auto", gap: 12, alignItems: "end" }}>
           <div>
             <div className="label-xs" style={{ marginBottom: 4 }}>ZIP code</div>
             <input value={zip} onChange={(e) => setZip(e.target.value.replace(/\D/g, "").slice(0, 5))}
               placeholder="33101" maxLength={5}
               style={{ width: "100%", padding: "9px 10px", fontSize: 14 }} />
           </div>
-          <div>
-            <div className="label-xs" style={{ marginBottom: 4 }}>Min years owned</div>
-            <select value={minYearsOwned} onChange={(e) => setMinYearsOwned(Number(e.target.value))}
-              style={{ width: "100%", padding: "9px 10px", fontSize: 13 }}>
-              <option value={0}>Any</option>
-              <option value={10}>10+ years</option>
-              <option value={15}>15+ years</option>
-              <option value={20}>20+ years</option>
-              <option value={30}>30+ years</option>
-            </select>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-              <input type="checkbox" checked={absenteeOnly} onChange={(e) => setAbsenteeOnly(e.target.checked)} />
-              <span>Absentee only</span>
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }} title="Cross-references ATTOM's foreclosure + pre-foreclosure feeds">
-              <input type="checkbox" checked={taxDelinquentOnly} onChange={(e) => setTaxDelinquentOnly(e.target.checked)} />
-              <span>Pre-foreclosure / tax-distressed only</span>
-            </label>
-          </div>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }} title="Cross-references ATTOM's foreclosure + pre-foreclosure feeds">
+            <input type="checkbox" checked={taxDelinquentOnly} onChange={(e) => setTaxDelinquentOnly(e.target.checked)} />
+            <span>Pre-foreclosure / tax-distressed only</span>
+          </label>
           <button onClick={onSearch} disabled={searching || !zip} className="btn-primary"
             style={{ padding: "10px 16px", fontSize: 13 }}>
             <Search size={14} /> {searching ? "Searching…" : "Search"}
