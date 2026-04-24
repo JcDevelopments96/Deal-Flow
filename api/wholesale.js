@@ -153,11 +153,12 @@ async function handleSearch(body, user) {
   return { results: filtered, total: properties.length, filtered: filtered.length, user_id: user.id };
 }
 
-/* ── BatchSkipTracing ─────────────────────────────────────────────────── */
+/* ── BatchSkipTracing (user's OWN key — BYOK) ─────────────────────────── */
 async function handleSkipTrace({ leadId }, user) {
-  const apiKey = process.env.BATCHSKIP_API_KEY;
-  if (!apiKey) throw new ApiError(503, "batchskip_not_configured",
-    "Set BATCHSKIP_API_KEY in Vercel env (sign up at batchdata.com).");
+  // User pays their own BatchData bill — we never store a master key.
+  const apiKey = user.batchskip_api_key;
+  if (!apiKey) throw new ApiError(400, "byok_required",
+    "Add your BatchData API key in Wholesale → Integrations first (sign up at batchdata.com; typically ~$0.15/trace).");
   if (!leadId) throw new ApiError(400, "missing_lead_id");
 
   const db = adminDb();
@@ -312,6 +313,124 @@ async function handleEmail({ leadId, subject, body }, user) {
   return { ok: true, resendId: emailData?.id || null };
 }
 
+/* ── Lob direct-mail postcards (BYOK — user pays Lob directly) ────────── */
+async function handlePostcard({ leadId, message }, user) {
+  const apiKey = user.lob_api_key;
+  if (!apiKey) throw new ApiError(400, "byok_required",
+    "Add your Lob API key in Wholesale → Integrations first (sign up at lob.com; postcards are ~$0.69 each).");
+  if (!user.return_address?.street) throw new ApiError(400, "return_address_missing",
+    "Set your return address in Wholesale → Integrations first.");
+  if (!leadId || !message) throw new ApiError(400, "missing_fields", "leadId + message required");
+
+  const db = adminDb();
+  const { data: lead, error: lErr } = await db
+    .from(TABLE).select("*").eq("id", leadId).eq("user_id", user.id).single();
+  if (lErr) throw new ApiError(404, "lead_not_found");
+
+  const toAddress = {
+    name: lead.owner_name || "Resident",
+    address_line1: lead.owner_mailing_address || lead.address,
+    address_city:  lead.owner_mailing_city  || lead.city,
+    address_state: lead.owner_mailing_state || lead.state,
+    address_zip:   lead.owner_mailing_zip   || lead.zip
+  };
+  if (!toAddress.address_line1 || !toAddress.address_zip) {
+    throw new ApiError(400, "bad_destination", "Lead is missing a usable mailing address.");
+  }
+
+  const from = user.return_address || {};
+
+  // Lob uses HTTP Basic auth: username=API_KEY, password blank
+  const auth = "Basic " + Buffer.from(apiKey + ":").toString("base64");
+
+  const form = new URLSearchParams();
+  form.set("description", `DealTrack wholesale outreach ${new Date().toISOString()}`);
+  form.set("to[name]",          toAddress.name);
+  form.set("to[address_line1]", toAddress.address_line1);
+  form.set("to[address_city]",  toAddress.address_city || "");
+  form.set("to[address_state]", toAddress.address_state || "");
+  form.set("to[address_zip]",   toAddress.address_zip);
+  form.set("to[address_country]", "US");
+  form.set("from[name]",          from.name || "");
+  form.set("from[address_line1]", from.street || "");
+  form.set("from[address_city]",  from.city || "");
+  form.set("from[address_state]", from.state || "");
+  form.set("from[address_zip]",   from.zip || "");
+  form.set("from[address_country]", "US");
+  // 4x6 template: front & back as HTML strings Lob renders. Default branded-template.
+  form.set("front", `<html><body style="margin:0;padding:0;font-family:Helvetica,Arial,sans-serif;width:6in;height:4in;background:#0F172A;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;"><h1 style="font-size:36pt;margin:0">Interested in your home?</h1><p style="font-size:14pt;margin-top:14pt;">I may have a cash offer for you.</p></body></html>`);
+  form.set("back", `<html><body style="margin:0.25in;font-family:Helvetica,Arial,sans-serif;font-size:10pt;line-height:1.4;white-space:pre-wrap;">${message.replace(/</g, "&lt;")}</body></html>`);
+  form.set("size", "4x6");
+
+  const res = await fetch("https://api.lob.com/v1/postcards", {
+    method: "POST",
+    headers: {
+      "Authorization": auth,
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Accept": "application/json"
+    },
+    body: form.toString()
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new ApiError(502, "lob_error",
+      body?.error?.message || `Lob ${res.status}: ${JSON.stringify(body).slice(0, 300)}`);
+  }
+
+  await db.from(OUTREACH_TABLE).insert({
+    user_id: user.id, lead_id: leadId, channel: "mail",
+    subject: "DealTrack postcard", body: message,
+    status: body.tracking_number ? "sent" : "created",
+    external_id: body.id || null
+  });
+  await db.from(TABLE).update({ status: "contacted", updated_at: new Date().toISOString() })
+    .eq("id", leadId).eq("user_id", user.id);
+
+  return {
+    ok: true, lobId: body.id,
+    expectedDeliveryDate: body.expected_delivery_date || null,
+    trackingUrl: body.url || null
+  };
+}
+
+/* ── Save / update BYOK integration keys ──────────────────────────────── */
+// Accepts any subset of { batchskip_api_key, lob_api_key, return_address }.
+// Returns only a "connected" map so keys never leak back to the client.
+async function handleSaveIntegration({ updates }, user) {
+  if (!updates || typeof updates !== "object") throw new ApiError(400, "missing_updates");
+  const allowed = {};
+  if (updates.batchskip_api_key !== undefined) allowed.batchskip_api_key = updates.batchskip_api_key ? String(updates.batchskip_api_key).trim() : null;
+  if (updates.lob_api_key !== undefined)       allowed.lob_api_key       = updates.lob_api_key ? String(updates.lob_api_key).trim() : null;
+  if (updates.return_address !== undefined)    allowed.return_address    = updates.return_address || null;
+  if (Object.keys(allowed).length === 0) throw new ApiError(400, "nothing_to_update");
+  allowed.updated_at = new Date().toISOString();
+
+  const db = adminDb();
+  const { data, error } = await db
+    .from("users").update(allowed)
+    .eq("id", user.id)
+    .select("batchskip_api_key, lob_api_key, return_address").single();
+  if (error) throw new ApiError(500, "db_update_failed", error.message);
+  return {
+    connected: {
+      batchskip: !!data.batchskip_api_key,
+      lob: !!data.lob_api_key
+    },
+    return_address: data.return_address || null
+  };
+}
+
+// GET-style version — what's connected (without leaking the keys)
+async function handleIntegrationStatus(user) {
+  return {
+    connected: {
+      batchskip: !!user.batchskip_api_key,
+      lob: !!user.lob_api_key
+    },
+    return_address: user.return_address || null
+  };
+}
+
 /* ── Router ───────────────────────────────────────────────────────────── */
 export default handler(async (req, res) => {
   const { clerkUserId, email } = await requireUserId(req);
@@ -352,9 +471,18 @@ export default handler(async (req, res) => {
       if (req.method !== "POST") throw new ApiError(405, "method_not_allowed");
       payload = await handleEmail(body, user);
       break;
+    case "postcard":
+      if (req.method !== "POST") throw new ApiError(405, "method_not_allowed");
+      payload = await handlePostcard(body, user);
+      break;
+    case "integrations":
+      if (req.method === "GET") payload = await handleIntegrationStatus(user);
+      else if (req.method === "POST") payload = await handleSaveIntegration(body, user);
+      else throw new ApiError(405, "method_not_allowed");
+      break;
     default:
       throw new ApiError(400, "unknown_action",
-        "action must be one of: search, skiptrace, leads, save, update, delete, email");
+        "action must be one of: search, skiptrace, leads, save, update, delete, email, postcard, integrations");
   }
 
   return res.status(200).json(payload);

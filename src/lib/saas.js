@@ -192,6 +192,25 @@ export async function emailWholesaleLead(getToken, { leadId, subject, body }) {
   });
 }
 
+export async function sendPostcard(getToken, { leadId, message }) {
+  return fetchMetered(getToken, "/api/wholesale?action=postcard", {
+    method: "POST",
+    body: JSON.stringify({ leadId, message })
+  });
+}
+
+// Integrations (BYOK) — save / read wholesale-feature keys + return address.
+// Server never sends the keys back, only a "connected" map.
+export async function getWholesaleIntegrations(getToken) {
+  return fetchMetered(getToken, "/api/wholesale?action=integrations");
+}
+export async function saveWholesaleIntegrations(getToken, updates) {
+  return fetchMetered(getToken, "/api/wholesale?action=integrations", {
+    method: "POST",
+    body: JSON.stringify({ updates })
+  });
+}
+
 /* ── Ari chat proxy ───────────────────────────────────────────────────── */
 
 export async function chatWithAri(getToken, messages) {

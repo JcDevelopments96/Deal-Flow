@@ -26,9 +26,20 @@ create table if not exists public.users (
   stripe_customer_id    text unique,
   plan                  text not null default 'free'
                         check (plan in ('free', 'starter', 'pro', 'scale')),
+  -- BYOK integration keys for the wholesale feature (user pays their own
+  -- upstream bills). Service-role only — RLS never exposes these via API.
+  batchskip_api_key     text,      -- BatchData skip-tracing key (optional)
+  lob_api_key           text,      -- Lob postcard-mail key (optional)
+  return_address        jsonb,     -- { name, street, city, state, zip } for postcards
   created_at            timestamptz not null default now(),
   updated_at            timestamptz not null default now()
 );
+
+-- If the users table already existed from a previous migration, add the
+-- new columns idempotently. (IF NOT EXISTS guard on ADD COLUMN is Postgres 9.6+.)
+alter table public.users add column if not exists batchskip_api_key text;
+alter table public.users add column if not exists lob_api_key text;
+alter table public.users add column if not exists return_address jsonb;
 
 create index if not exists users_clerk_user_id_idx on public.users(clerk_user_id);
 

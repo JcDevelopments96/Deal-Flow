@@ -5,7 +5,8 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   Search, Filter, Phone, Mail, Trash2, Star, Crown, Users, Clock,
-  Home, Zap, CheckCircle2, MessageSquare, DollarSign, AlertTriangle, X
+  Home, Zap, CheckCircle2, MessageSquare, DollarSign, AlertTriangle, X,
+  Settings, Send
 } from "lucide-react";
 import { THEME } from "../theme.js";
 import { fmtUSD, isMobile } from "../utils.js";
@@ -14,7 +15,8 @@ import { useToast } from "../contexts.jsx";
 import {
   isSaasMode, useSaasUser,
   searchWholesaleLeads, listWholesaleLeads, saveWholesaleLead,
-  skipTraceLead, updateWholesaleLead, deleteWholesaleLead, emailWholesaleLead
+  skipTraceLead, updateWholesaleLead, deleteWholesaleLead, emailWholesaleLead,
+  sendPostcard, getWholesaleIntegrations, saveWholesaleIntegrations
 } from "../lib/saas.js";
 
 const STATUSES = [
@@ -46,6 +48,184 @@ Best,
 [Your Name]
 [Your Phone]`
 });
+
+const POSTCARD_TEMPLATE = (lead) => (
+`Hi ${(lead.owner_name || "").split(",")[1]?.trim() || "there"},
+
+I'm a local real estate investor interested in your property at ${lead.address}${lead.city ? ", " + lead.city : ""}. I'm not a realtor — I'd like to make a direct cash offer.
+
+What I can offer:
+  - Cash close, no financing contingency
+  - Flexible closing timeline, as-is, no repairs needed
+  - Zero agent fees
+
+If you'd consider selling, please give me a call — worst case I hand you a free estimate of the current market value of your home.
+
+Thanks for your time,
+[Your Name]
+[Your Phone]`
+);
+
+const IntegrationsModal = ({ status, onSave, onClose }) => {
+  const [batchskip, setBatchskip] = useState("");
+  const [lobKey, setLobKey] = useState("");
+  const [addr, setAddr] = useState(status?.return_address || {
+    name: "", street: "", city: "", state: "", zip: ""
+  });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setSaving(true); setErr(null);
+    const updates = {};
+    if (batchskip.trim()) updates.batchskip_api_key = batchskip.trim();
+    if (lobKey.trim()) updates.lob_api_key = lobKey.trim();
+    if (addr.street && addr.zip) updates.return_address = addr;
+    if (Object.keys(updates).length === 0) {
+      setErr("Nothing to save — fill at least one field.");
+      setSaving(false); return;
+    }
+    try { await onSave(updates); onClose(); }
+    catch (e) { setErr(e.message || "Save failed"); setSaving(false); }
+  };
+
+  return (
+    <div role="dialog" aria-modal="true" onClick={onClose} style={{
+      position: "fixed", inset: 0, background: "rgba(15,23,42,0.6)",
+      display: "flex", alignItems: "flex-start", justifyContent: "center",
+      zIndex: 150, padding: 16, overflowY: "auto"
+    }}>
+      <form onSubmit={submit} onClick={(e) => e.stopPropagation()} style={{
+        background: THEME.bg, borderRadius: 12, maxWidth: 560, width: "100%",
+        marginTop: 40, padding: 24, boxShadow: "0 20px 60px rgba(15,23,42,0.22)"
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <h2 className="serif" style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Wholesale Integrations</h2>
+          <button type="button" onClick={onClose} style={{ border: "none", background: "transparent", cursor: "pointer", color: THEME.textMuted }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <div style={{ fontSize: 12, color: THEME.textMuted, lineHeight: 1.5, marginBottom: 16 }}>
+          You pay these services directly — we only proxy your requests. Keys are stored encrypted and only used when you click Skip Trace or Send Postcard.
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: "block" }}>
+            <div className="label-xs" style={{ marginBottom: 4 }}>
+              BatchData skip-trace key {status?.connected?.batchskip && <span style={{ color: THEME.green }}>✓ connected</span>}
+            </div>
+            <input type="password" value={batchskip} onChange={(e) => setBatchskip(e.target.value)}
+              placeholder={status?.connected?.batchskip ? "(leave blank to keep existing)" : "Paste your BatchData API token"}
+              style={{ width: "100%", padding: "8px 10px", fontSize: 13 }} />
+          </label>
+          <div style={{ fontSize: 10, color: THEME.textDim, marginTop: 3 }}>
+            Sign up at <a href="https://batchdata.com" target="_blank" rel="noopener noreferrer" style={{ color: THEME.accent }}>batchdata.com</a> — ~$0.15 per successful trace.
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: "block" }}>
+            <div className="label-xs" style={{ marginBottom: 4 }}>
+              Lob postcards key {status?.connected?.lob && <span style={{ color: THEME.green }}>✓ connected</span>}
+            </div>
+            <input type="password" value={lobKey} onChange={(e) => setLobKey(e.target.value)}
+              placeholder={status?.connected?.lob ? "(leave blank to keep existing)" : "Paste your Lob live or test API key"}
+              style={{ width: "100%", padding: "8px 10px", fontSize: 13 }} />
+          </label>
+          <div style={{ fontSize: 10, color: THEME.textDim, marginTop: 3 }}>
+            Sign up at <a href="https://lob.com" target="_blank" rel="noopener noreferrer" style={{ color: THEME.accent }}>lob.com</a> — postcards ~$0.69 each, printed + mailed for you.
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <div className="label-xs" style={{ marginBottom: 6 }}>Your return address (printed on every postcard)</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <input placeholder="Name" value={addr.name || ""} onChange={(e) => setAddr({ ...addr, name: e.target.value })}
+              style={{ padding: "7px 10px", fontSize: 12, gridColumn: "1 / -1" }} />
+            <input placeholder="Street address" value={addr.street || ""} onChange={(e) => setAddr({ ...addr, street: e.target.value })}
+              style={{ padding: "7px 10px", fontSize: 12, gridColumn: "1 / -1" }} />
+            <input placeholder="City" value={addr.city || ""} onChange={(e) => setAddr({ ...addr, city: e.target.value })}
+              style={{ padding: "7px 10px", fontSize: 12 }} />
+            <div style={{ display: "grid", gridTemplateColumns: "60px 1fr", gap: 8 }}>
+              <input placeholder="ST" maxLength={2} value={addr.state || ""} onChange={(e) => setAddr({ ...addr, state: e.target.value.toUpperCase() })}
+                style={{ padding: "7px 10px", fontSize: 12, textTransform: "uppercase" }} />
+              <input placeholder="ZIP" value={addr.zip || ""} onChange={(e) => setAddr({ ...addr, zip: e.target.value })}
+                style={{ padding: "7px 10px", fontSize: 12 }} />
+            </div>
+          </div>
+        </div>
+
+        {err && (
+          <div style={{ padding: 10, background: THEME.redDim, color: THEME.red, borderRadius: 6, fontSize: 12, marginBottom: 12 }}>
+            {err}
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <button type="button" onClick={onClose} className="btn-secondary" style={{ padding: "8px 14px", fontSize: 12 }}>Cancel</button>
+          <button type="submit" disabled={saving} className="btn-primary" style={{ padding: "8px 14px", fontSize: 12 }}>
+            {saving ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+const PostcardModal = ({ lead, onSend, onClose }) => {
+  const [message, setMessage] = useState(POSTCARD_TEMPLATE(lead));
+  const [sending, setSending] = useState(false);
+  const [err, setErr] = useState(null);
+
+  return (
+    <div role="dialog" aria-modal="true" onClick={onClose} style={{
+      position: "fixed", inset: 0, background: "rgba(15,23,42,0.6)",
+      display: "flex", alignItems: "flex-start", justifyContent: "center",
+      zIndex: 150, padding: 16, overflowY: "auto"
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: THEME.bg, borderRadius: 12, maxWidth: 600, width: "100%",
+        marginTop: 40, padding: 24, boxShadow: "0 20px 60px rgba(15,23,42,0.22)"
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <h2 className="serif" style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>
+            Send postcard — {lead.owner_name || "owner"}
+          </h2>
+          <button onClick={onClose} style={{ border: "none", background: "transparent", cursor: "pointer", color: THEME.textMuted }}>
+            <X size={18} />
+          </button>
+        </div>
+        <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 12, lineHeight: 1.5 }}>
+          Mails to: <strong>{lead.owner_mailing_address || lead.address}, {lead.owner_mailing_city || lead.city} {lead.owner_mailing_state || lead.state} {lead.owner_mailing_zip || lead.zip}</strong>
+          <br />Charged to your Lob account (~$0.69).
+        </div>
+        <label style={{ display: "block" }}>
+          <div className="label-xs" style={{ marginBottom: 4 }}>Back-of-postcard message</div>
+          <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={13}
+            style={{ width: "100%", padding: "8px 10px", fontSize: 12, fontFamily: "inherit", resize: "vertical" }} />
+        </label>
+        <div style={{ fontSize: 10, color: THEME.textDim, marginTop: 6 }}>
+          Replace <code>[Your Name]</code> / <code>[Your Phone]</code> before sending. Front of postcard uses a default DealTrack-branded "Interested in your home?" header.
+        </div>
+        {err && <div style={{ marginTop: 10, padding: 10, background: THEME.redDim, color: THEME.red, borderRadius: 6, fontSize: 12 }}>{err}</div>}
+        <div style={{ display: "flex", gap: 8, marginTop: 16, justifyContent: "flex-end" }}>
+          <button onClick={onClose} className="btn-secondary" style={{ padding: "8px 14px", fontSize: 12 }}>Cancel</button>
+          <button className="btn-primary" disabled={sending || !message.trim()}
+            onClick={async () => {
+              setSending(true); setErr(null);
+              try { await onSend({ message }); onClose(); }
+              catch (e) { setErr(e.message || "Send failed"); setSending(false); }
+            }}
+            style={{ padding: "8px 14px", fontSize: 12 }}>
+            <Send size={13} /> {sending ? "Sending…" : "Send postcard"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const EmailModal = ({ lead, onSend, onClose }) => {
   const [subject, setSubject] = useState(EMAIL_TEMPLATE(lead).subject);
@@ -113,7 +293,7 @@ const EmailModal = ({ lead, onSend, onClose }) => {
   );
 };
 
-const LeadCard = ({ lead, onSkipTrace, onStatusChange, onDelete, onEmail, busy }) => {
+const LeadCard = ({ lead, onSkipTrace, onStatusChange, onDelete, onEmail, onPostcard, busy }) => {
   const status = STATUS_BY_KEY[lead.status] || STATUS_BY_KEY.new;
   const flags = [];
   if (lead.is_tax_delinquent) flags.push({ icon: <DollarSign size={10} />, label: "Tax delinquent", color: THEME.red });
@@ -223,6 +403,11 @@ const LeadCard = ({ lead, onSkipTrace, onStatusChange, onDelete, onEmail, busy }
             <Mail size={11} /> Email
           </button>
         )}
+        {(lead.owner_mailing_address || lead.address) && (
+          <button onClick={() => onPostcard(lead)} className="btn-secondary" style={{ padding: "5px 9px", fontSize: 11 }}>
+            <Send size={11} /> Postcard
+          </button>
+        )}
         <button onClick={() => onDelete(lead.id)} className="btn-ghost"
           style={{ padding: "5px 9px", fontSize: 11, color: THEME.red, marginLeft: "auto" }}>
           <Trash2 size={11} />
@@ -250,7 +435,33 @@ export const WholesaleView = () => {
   const [loadingLeads, setLoadingLeads] = useState(true);
   const [busyIds, setBusyIds] = useState(new Set());
   const [emailingLead, setEmailingLead] = useState(null);
+  const [postcardLead, setPostcardLead] = useState(null);
+  const [integrations, setIntegrations] = useState(null);
+  const [showIntegrations, setShowIntegrations] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
+
+  const loadIntegrations = useCallback(async () => {
+    if (!saasOn || !saas.user || !isPaid) return;
+    try {
+      const data = await getWholesaleIntegrations(saas.getToken);
+      setIntegrations(data);
+    } catch (e) { console.warn(e); }
+  }, [saasOn, saas.user, saas.getToken, isPaid]);
+  useEffect(() => { loadIntegrations(); }, [loadIntegrations]);
+
+  const onSaveIntegrations = async (updates) => {
+    const data = await saveWholesaleIntegrations(saas.getToken, updates);
+    setIntegrations(data);
+    toast.push("Integrations updated", "success");
+  };
+
+  const onSendPostcard = async ({ message }) => {
+    if (!postcardLead) return;
+    await sendPostcard(saas.getToken, { leadId: postcardLead.id, message });
+    const { lead } = await updateWholesaleLead(saas.getToken, postcardLead.id, { status: "contacted" }).catch(() => ({}));
+    if (lead) setLeads(prev => prev.map(l => l.id === lead.id ? lead : l));
+    toast.push("Postcard queued with Lob", "success");
+  };
 
   const loadLeads = useCallback(async () => {
     if (!saasOn || !saas.user || !isPaid) { setLeads([]); setLoadingLeads(false); return; }
@@ -362,15 +573,23 @@ export const WholesaleView = () => {
   /* ── Main UI ─────────────────────────────────────────────────────── */
   return (
     <div style={{ maxWidth: 1400, margin: "0 auto", padding: isMobile() ? 16 : "24px 28px" }}>
-      <div style={{ marginBottom: 20 }}>
-        <h1 className="serif" style={{ fontSize: 26, fontWeight: 700, margin: 0 }}>
-          <Crown size={20} style={{ display: "inline", verticalAlign: "-4px", marginRight: 8, color: THEME.accent }} />
-          Wholesale Lead Finder
-        </h1>
-        <p style={{ fontSize: 13, color: THEME.textMuted, margin: "4px 0 0" }}>
-          Absentee owners, long-time holders, and distressed properties by ZIP. Skip-trace to pull phone/email.
-          Every lookup hits ATTOM Data ($0.05/property) or BatchSkipTracing ($0.15/trace) — usage shows on your invoice.
-        </p>
+      <div style={{ marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 280 }}>
+          <h1 className="serif" style={{ fontSize: 26, fontWeight: 700, margin: 0 }}>
+            <Crown size={20} style={{ display: "inline", verticalAlign: "-4px", marginRight: 8, color: THEME.accent }} />
+            Wholesale Lead Finder
+          </h1>
+          <p style={{ fontSize: 13, color: THEME.textMuted, margin: "4px 0 0" }}>
+            Absentee owners, long-time holders, and distressed properties by ZIP. Send direct-mail postcards or skip-trace for phone/email. You pay your own Lob + BatchData bills.
+          </p>
+        </div>
+        <button onClick={() => setShowIntegrations(true)} className="btn-secondary"
+          style={{ padding: "8px 14px", fontSize: 12 }}>
+          <Settings size={13} />
+          {integrations?.connected?.lob || integrations?.connected?.batchskip
+            ? "Integrations ✓"
+            : "Set up integrations"}
+        </button>
       </div>
 
       <Panel title="Find leads" icon={<Search size={16} />} accent style={{ marginBottom: 20 }}>
@@ -471,6 +690,7 @@ export const WholesaleView = () => {
                 onStatusChange={onStatusChange}
                 onDelete={onDeleteLead}
                 onEmail={setEmailingLead}
+                onPostcard={setPostcardLead}
               />
             ))}
           </div>
@@ -482,6 +702,22 @@ export const WholesaleView = () => {
           lead={emailingLead}
           onSend={onSendEmail}
           onClose={() => setEmailingLead(null)}
+        />
+      )}
+
+      {postcardLead && (
+        <PostcardModal
+          lead={postcardLead}
+          onSend={onSendPostcard}
+          onClose={() => setPostcardLead(null)}
+        />
+      )}
+
+      {showIntegrations && (
+        <IntegrationsModal
+          status={integrations}
+          onSave={onSaveIntegrations}
+          onClose={() => setShowIntegrations(false)}
         />
       )}
 
