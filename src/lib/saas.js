@@ -144,7 +144,55 @@ export async function removeWatchlistItem(getToken, listingId) {
   return fetchMetered(getToken, `/api/watchlist?${qs.toString()}`, { method: "DELETE" });
 }
 
-/* ── Ari chat (Claude proxy) ─────────────────────────────────────────── */
+/* ── Wholesaling (ATTOM + BatchSkipTracing + Resend) ─────────────────── */
+
+export async function searchWholesaleLeads(getToken, { zip, minYearsOwned, absenteeOnly, limit }) {
+  return fetchMetered(getToken, "/api/wholesale?action=search", {
+    method: "POST",
+    body: JSON.stringify({ zip, minYearsOwned, absenteeOnly, limit })
+  });
+}
+
+export async function listWholesaleLeads(getToken) {
+  const body = await fetchMetered(getToken, "/api/wholesale?action=leads");
+  return body.leads || [];
+}
+
+export async function saveWholesaleLead(getToken, property) {
+  return fetchMetered(getToken, "/api/wholesale?action=save", {
+    method: "POST",
+    body: JSON.stringify({ property })
+  });
+}
+
+export async function skipTraceLead(getToken, leadId) {
+  return fetchMetered(getToken, "/api/wholesale?action=skiptrace", {
+    method: "POST",
+    body: JSON.stringify({ leadId })
+  });
+}
+
+export async function updateWholesaleLead(getToken, id, updates) {
+  return fetchMetered(getToken, `/api/wholesale?action=update&id=${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ updates })
+  });
+}
+
+export async function deleteWholesaleLead(getToken, id) {
+  return fetchMetered(getToken, `/api/wholesale?action=delete&id=${encodeURIComponent(id)}`, {
+    method: "DELETE"
+  });
+}
+
+export async function emailWholesaleLead(getToken, { leadId, subject, body }) {
+  return fetchMetered(getToken, "/api/wholesale?action=email", {
+    method: "POST",
+    body: JSON.stringify({ leadId, subject, body })
+  });
+}
+
+/* ── Ari chat proxy ───────────────────────────────────────────────────── */
 
 export async function chatWithAri(getToken, messages) {
   return fetchMetered(getToken, "/api/chat", {
@@ -225,14 +273,14 @@ export async function fetchListingDetail(getToken, { id }) {
   return fetchMetered(getToken, `/api/market/listing-detail?${qs.toString()}`);
 }
 
-// Per-property (lat/lng) lookups — flood zone + walk score — route through
-// /api/property?kind=... (also consolidated).
+// Per-property (lat/lng) lookups — flood zone + walk score — consolidated
+// into /api/lookup with the rest of the free-data multiplexer.
 export async function fetchFloodZone(getToken, { lat, lng }) {
-  const qs = new URLSearchParams({ kind: "flood", lat: String(lat), lng: String(lng) });
-  return fetchMetered(getToken, `/api/property?${qs.toString()}`);
+  const qs = new URLSearchParams({ source: "flood", lat: String(lat), lng: String(lng) });
+  return fetchMetered(getToken, `/api/lookup?${qs.toString()}`);
 }
 export async function fetchWalkScore(getToken, { lat, lng, address }) {
-  const qs = new URLSearchParams({ kind: "walkscore", lat: String(lat), lng: String(lng) });
+  const qs = new URLSearchParams({ source: "walkscore", lat: String(lat), lng: String(lng) });
   if (address) qs.set("address", address);
-  return fetchMetered(getToken, `/api/property?${qs.toString()}`);
+  return fetchMetered(getToken, `/api/lookup?${qs.toString()}`);
 }

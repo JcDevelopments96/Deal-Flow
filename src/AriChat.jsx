@@ -13,7 +13,7 @@ const STORAGE_KEY = "dealtrack-ari-history-v1";
 
 const GREETING = {
   role: "assistant",
-  content: "Hi, I'm **Ari** — full Claude assistant + DealTrack co-pilot. I can answer anything (real estate or otherwise), search the live web for recent info, and point you to the right section of the app. What's on your mind?"
+  content: "Hi, I'm **Ari** — your DealTrack co-pilot. I can answer anything (real estate or otherwise), search the live web for recent info, and point you to the right section of the app. What's on your mind?"
 };
 
 // Tiny markdown → JSX renderer. Handles bold, bullets, paragraphs, inline

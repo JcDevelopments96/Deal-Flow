@@ -196,6 +196,111 @@ create policy team_contacts_self_read on public.team_contacts
 
 
 -- ────────────────────────────────────────────────────────────────────────
+-- wholesale_leads (distressed-owner / long-time-owner / absentee leads)
+--
+-- Source: ATTOM Data Property API (pay-as-you-go). Leads are saved per
+-- user with skip-trace status and outreach tracking.
+-- ────────────────────────────────────────────────────────────────────────
+create table if not exists public.wholesale_leads (
+  id                uuid primary key default gen_random_uuid(),
+  user_id           uuid not null references public.users(id) on delete cascade,
+
+  -- Property
+  address           text not null,
+  city              text,
+  state             text,
+  zip               text,
+  county            text,
+  latitude          numeric,
+  longitude         numeric,
+
+  -- Property details
+  property_type     text,
+  bedrooms          integer,
+  bathrooms         numeric,
+  sqft              integer,
+  year_built        integer,
+  assessed_value    numeric,
+  market_value      numeric,
+  last_sale_date    date,
+  last_sale_price   numeric,
+  years_owned       integer,
+
+  -- Owner
+  owner_name              text,
+  owner_mailing_address   text,
+  owner_mailing_city      text,
+  owner_mailing_state     text,
+  owner_mailing_zip       text,
+
+  -- Lead flags — why this is worth pursuing
+  is_absentee             boolean default false,
+  is_long_time_owner      boolean default false,   -- 20+ years
+  is_tax_delinquent       boolean default false,
+  lead_score              integer default 0,        -- 0-100 heuristic
+
+  -- Skip trace (BatchSkipTracing)
+  owner_phone             text,
+  owner_email             text,
+  skip_traced_at          timestamptz,
+
+  -- Outreach status + notes
+  status                  text not null default 'new'
+                          check (status in ('new','contacted','responded','negotiating','closed','passed')),
+  notes                   text,
+
+  -- Provider data
+  attom_id                text,
+  raw_data                jsonb,
+
+  created_at              timestamptz not null default now(),
+  updated_at              timestamptz not null default now(),
+
+  unique (user_id, address, zip)
+);
+
+create index if not exists wholesale_leads_user_idx
+  on public.wholesale_leads(user_id, status);
+create index if not exists wholesale_leads_user_state_idx
+  on public.wholesale_leads(user_id, state, zip);
+
+alter table public.wholesale_leads enable row level security;
+
+drop policy if exists wholesale_leads_self_read on public.wholesale_leads;
+create policy wholesale_leads_self_read on public.wholesale_leads
+  for select using (
+    user_id in (select id from public.users where clerk_user_id = auth.jwt() ->> 'sub')
+  );
+
+
+-- ────────────────────────────────────────────────────────────────────────
+-- wholesale_outreach (log of emails/calls/mail sent to each lead)
+-- ────────────────────────────────────────────────────────────────────────
+create table if not exists public.wholesale_outreach (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null references public.users(id) on delete cascade,
+  lead_id       uuid not null references public.wholesale_leads(id) on delete cascade,
+  channel       text not null check (channel in ('email','call','mail')),
+  subject       text,
+  body          text,
+  status        text default 'sent',    -- sent | delivered | bounced | failed
+  external_id   text,                   -- Resend email id, Twilio SID, etc
+  sent_at       timestamptz not null default now()
+);
+
+create index if not exists wholesale_outreach_lead_idx
+  on public.wholesale_outreach(lead_id, sent_at desc);
+
+alter table public.wholesale_outreach enable row level security;
+
+drop policy if exists wholesale_outreach_self_read on public.wholesale_outreach;
+create policy wholesale_outreach_self_read on public.wholesale_outreach
+  for select using (
+    user_id in (select id from public.users where clerk_user_id = auth.jwt() ->> 'sub')
+  );
+
+
+-- ────────────────────────────────────────────────────────────────────────
 -- market_indexes (snapshot of public research data — Zillow + Redfin)
 --
 -- Populated by scripts/ingest-market-data.js (monthly cron / manual run).

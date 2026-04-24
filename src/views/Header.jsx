@@ -3,7 +3,7 @@
    ============================================================================ */
 import React from "react";
 import {
-  Building2, Layout, Calculator, MapPin, Star, GraduationCap, Plus, Lock, Users, CreditCard
+  Building2, Layout, Calculator, MapPin, Star, GraduationCap, Plus, Lock, Users, CreditCard, Crown
 } from "lucide-react";
 import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/react";
 import { THEME } from "../theme.js";
@@ -46,6 +46,11 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
     !saas.user ||
     (usage?.plan === "free" && (usage?.remaining ?? 0) === 0)
   );
+  // Wholesale is premium — paid plans only. Free users see the crown lock,
+  // which routes them into the paywalled view where they can upgrade.
+  const wholesaleLocked = isSaasMode() && (
+    !saas.user || usage?.plan === "free"
+  );
 
   return (
   <div style={{
@@ -83,8 +88,8 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
       <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
         {[
           { key: "dashboard", label: "Dashboard", icon: <Layout size={14} /> },
-          { key: "analyzer", label: "Analyzer", icon: <Calculator size={14} /> },
           { key: "market", label: "Market Intel", icon: <MapPin size={14} />, locked: marketLocked },
+          { key: "wholesale", label: "Wholesale", icon: <Crown size={14} />, locked: wholesaleLocked },
           { key: "watchlist", label: "Watchlist", icon: <Star size={14} />, badge: watchlistCount || null },
           { key: "team", label: "Team", icon: <Users size={14} /> },
           { key: "education", label: "Learn", icon: <GraduationCap size={14} /> },
