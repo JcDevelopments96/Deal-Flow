@@ -5,8 +5,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   Search, Phone, Mail, Trash2, Star, Crown, Users, Clock,
-  Home, Zap, CheckCircle2, MessageSquare, DollarSign, AlertTriangle, X,
-  Send
+  Home, Zap, CheckCircle2, MessageSquare, DollarSign, AlertTriangle, X
 } from "lucide-react";
 import { THEME } from "../theme.js";
 import { fmtUSD, isMobile } from "../utils.js";
@@ -15,8 +14,7 @@ import { useToast } from "../contexts.jsx";
 import {
   isSaasMode, useSaasUser,
   searchWholesaleLeads, listWholesaleLeads, saveWholesaleLead,
-  skipTraceLead, updateWholesaleLead, deleteWholesaleLead, emailWholesaleLead,
-  sendPostcard
+  skipTraceLead, updateWholesaleLead, deleteWholesaleLead, emailWholesaleLead
 } from "../lib/saas.js";
 import { STATE_NAMES } from "../market/mapUtils.js";
 import { CITIES_BY_STATE } from "../lib/usCities.js";
@@ -50,76 +48,6 @@ Best,
 [Your Name]
 [Your Phone]`
 });
-
-const POSTCARD_TEMPLATE = (lead) => (
-`Hi ${(lead.owner_name || "").split(",")[1]?.trim() || "there"},
-
-I'm a local real estate investor interested in your property at ${lead.address}${lead.city ? ", " + lead.city : ""}. I'm not a realtor — I'd like to make a direct cash offer.
-
-What I can offer:
-  - Cash close, no financing contingency
-  - Flexible closing timeline, as-is, no repairs needed
-  - Zero agent fees
-
-If you'd consider selling, please give me a call — worst case I hand you a free estimate of the current market value of your home.
-
-Thanks for your time,
-[Your Name]
-[Your Phone]`
-);
-
-const PostcardModal = ({ lead, onSend, onClose }) => {
-  const [message, setMessage] = useState(POSTCARD_TEMPLATE(lead));
-  const [sending, setSending] = useState(false);
-  const [err, setErr] = useState(null);
-
-  return (
-    <div role="dialog" aria-modal="true" onClick={onClose} style={{
-      position: "fixed", inset: 0, background: "rgba(15,23,42,0.6)",
-      display: "flex", alignItems: "flex-start", justifyContent: "center",
-      zIndex: 150, padding: 16, overflowY: "auto"
-    }}>
-      <div onClick={(e) => e.stopPropagation()} style={{
-        background: THEME.bg, borderRadius: 12, maxWidth: 600, width: "100%",
-        marginTop: 40, padding: 24, boxShadow: "0 20px 60px rgba(15,23,42,0.22)"
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <h2 className="serif" style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>
-            Send postcard — {lead.owner_name || "owner"}
-          </h2>
-          <button onClick={onClose} style={{ border: "none", background: "transparent", cursor: "pointer", color: THEME.textMuted }}>
-            <X size={18} />
-          </button>
-        </div>
-        <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 12, lineHeight: 1.5 }}>
-          Mails to: <strong>{lead.owner_mailing_address || lead.address}, {lead.owner_mailing_city || lead.city} {lead.owner_mailing_state || lead.state} {lead.owner_mailing_zip || lead.zip}</strong>
-          <br />Charged to your Lob account (~$0.69).
-        </div>
-        <label style={{ display: "block" }}>
-          <div className="label-xs" style={{ marginBottom: 4 }}>Back-of-postcard message</div>
-          <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={13}
-            style={{ width: "100%", padding: "8px 10px", fontSize: 12, fontFamily: "inherit", resize: "vertical" }} />
-        </label>
-        <div style={{ fontSize: 10, color: THEME.textDim, marginTop: 6 }}>
-          Replace <code>[Your Name]</code> / <code>[Your Phone]</code> before sending. Front of postcard uses a default DealTrack-branded "Interested in your home?" header.
-        </div>
-        {err && <div style={{ marginTop: 10, padding: 10, background: THEME.redDim, color: THEME.red, borderRadius: 6, fontSize: 12 }}>{err}</div>}
-        <div style={{ display: "flex", gap: 8, marginTop: 16, justifyContent: "flex-end" }}>
-          <button onClick={onClose} className="btn-secondary" style={{ padding: "8px 14px", fontSize: 12 }}>Cancel</button>
-          <button className="btn-primary" disabled={sending || !message.trim()}
-            onClick={async () => {
-              setSending(true); setErr(null);
-              try { await onSend({ message }); onClose(); }
-              catch (e) { setErr(e.message || "Send failed"); setSending(false); }
-            }}
-            style={{ padding: "8px 14px", fontSize: 12 }}>
-            <Send size={13} /> {sending ? "Sending…" : "Send postcard"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const EmailModal = ({ lead, onSend, onClose }) => {
   const [subject, setSubject] = useState(EMAIL_TEMPLATE(lead).subject);
@@ -189,7 +117,7 @@ const EmailModal = ({ lead, onSend, onClose }) => {
 
 /** Full-detail modal — opened by clicking a lead card. Surfaces every
  * field ATTOM + skip-trace + Google gave us, with inline actions. */
-const WholesaleDetailModal = ({ lead, onClose, onSkipTrace, onEmail, onPostcard, onStatusChange, onSave, busy }) => {
+const WholesaleDetailModal = ({ lead, onClose, onSkipTrace, onEmail, onStatusChange, onSave, busy }) => {
   const status = STATUS_BY_KEY[lead.status] || STATUS_BY_KEY.new;
   const isSearchResult = !!lead.__isSearchResult;
   const flags = [];
@@ -390,9 +318,6 @@ const WholesaleDetailModal = ({ lead, onClose, onSkipTrace, onEmail, onPostcard,
               </button>
             ) : (
               <>
-                <button onClick={() => onPostcard(lead)} className="btn-secondary" style={{ padding: "8px 14px", fontSize: 12 }}>
-                  <Send size={13} /> Send postcard
-                </button>
                 {lead.owner_email && (
                   <button onClick={() => onEmail(lead)} className="btn-secondary" style={{ padding: "8px 14px", fontSize: 12 }}>
                     <Mail size={13} /> Email owner
@@ -481,7 +406,7 @@ const PropertyPhoto = ({ streetSrc, satelliteSrc, alt, aspectRatio = "4 / 3" }) 
   );
 };
 
-const LeadCard = ({ lead, onSkipTrace, onStatusChange, onDelete, onEmail, onPostcard, onOpen, busy }) => {
+const LeadCard = ({ lead, onSkipTrace, onStatusChange, onDelete, onEmail, onOpen, busy }) => {
   const status = STATUS_BY_KEY[lead.status] || STATUS_BY_KEY.new;
   const flags = [];
   if (lead.is_tax_delinquent) flags.push({ icon: <DollarSign size={10} />, label: "Tax delinquent", color: THEME.red });
@@ -619,11 +544,6 @@ const LeadCard = ({ lead, onSkipTrace, onStatusChange, onDelete, onEmail, onPost
             <Mail size={11} /> Email
           </button>
         )}
-        {(lead.owner_mailing_address || lead.address) && (
-          <button onClick={(e) => { stop(e); onPostcard(lead); }} className="btn-secondary" style={{ padding: "5px 9px", fontSize: 11 }}>
-            <Send size={11} /> Postcard
-          </button>
-        )}
         <button onClick={(e) => { stop(e); onDelete(lead.id); }} className="btn-ghost"
           style={{ padding: "5px 9px", fontSize: 11, color: THEME.red, marginLeft: "auto" }}>
           <Trash2 size={11} />
@@ -653,16 +573,7 @@ export const WholesaleView = () => {
   const [loadingLeads, setLoadingLeads] = useState(true);
   const [busyIds, setBusyIds] = useState(new Set());
   const [emailingLead, setEmailingLead] = useState(null);
-  const [postcardLead, setPostcardLead] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
-
-  const onSendPostcard = async ({ message }) => {
-    if (!postcardLead) return;
-    await sendPostcard(saas.getToken, { leadId: postcardLead.id, message });
-    const { lead } = await updateWholesaleLead(saas.getToken, postcardLead.id, { status: "contacted" }).catch(() => ({}));
-    if (lead) setLeads(prev => prev.map(l => l.id === lead.id ? lead : l));
-    toast.push("Postcard queued with Lob", "success");
-  };
 
   const loadLeads = useCallback(async () => {
     if (!saasOn || !saas.user || !isPaid) { setLeads([]); setLoadingLeads(false); return; }
@@ -790,7 +701,7 @@ export const WholesaleView = () => {
           Wholesale Lead Finder
         </h1>
         <p style={{ fontSize: 13, color: THEME.textMuted, margin: "4px 0 0" }}>
-          Absentee owners, long-time holders, and distressed properties by ZIP. Send direct-mail postcards or skip-trace for phone/email.
+          Absentee owners, long-time holders, and distressed properties by ZIP. Skip-trace for phone/email and reach out directly.
         </p>
       </div>
 
@@ -933,7 +844,6 @@ export const WholesaleView = () => {
                 onStatusChange={onStatusChange}
                 onDelete={onDeleteLead}
                 onEmail={setEmailingLead}
-                onPostcard={setPostcardLead}
                 onOpen={setDetailLead}
               />
             ))}
@@ -949,14 +859,6 @@ export const WholesaleView = () => {
         />
       )}
 
-      {postcardLead && (
-        <PostcardModal
-          lead={postcardLead}
-          onSend={onSendPostcard}
-          onClose={() => setPostcardLead(null)}
-        />
-      )}
-
       {detailLead && (
         <WholesaleDetailModal
           lead={detailLead.__isSearchResult ? detailLead : (leads.find(l => l.id === detailLead.id) || detailLead)}
@@ -965,7 +867,6 @@ export const WholesaleView = () => {
           onSkipTrace={onSkipTrace}
           onStatusChange={onStatusChange}
           onEmail={(l) => { setEmailingLead(l); setDetailLead(null); }}
-          onPostcard={(l) => { setPostcardLead(l); setDetailLead(null); }}
           onSave={async (l) => {
             const { __isSearchResult, id, ...property } = l;
             await onSaveSearchResult(property);

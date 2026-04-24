@@ -397,97 +397,6 @@ async function handleEmail({ leadId, subject, body }, user) {
   return { ok: true, resendId: emailData?.id || null };
 }
 
-/* ── Lob direct-mail postcards (server key with per-user override) ────── */
-async function handlePostcard({ leadId, message }, user) {
-  const apiKey = user.lob_api_key || process.env.LOB_API_KEY;
-  if (!apiKey) throw new ApiError(503, "lob_not_configured",
-    "Postcards aren't available — the LOB_API_KEY env var isn't set on the server.");
-  // Return address falls back to a server-default envelope when the user
-  // hasn't set their own.
-  const returnAddress = user.return_address?.street ? user.return_address : (
-    process.env.LOB_FROM_STREET ? {
-      name:  process.env.LOB_FROM_NAME  || "DealTrack Investor",
-      street: process.env.LOB_FROM_STREET,
-      city:  process.env.LOB_FROM_CITY  || "",
-      state: process.env.LOB_FROM_STATE || "",
-      zip:   process.env.LOB_FROM_ZIP   || ""
-    } : null
-  );
-  if (!returnAddress) throw new ApiError(503, "return_address_missing",
-    "No return address configured for postcards — set LOB_FROM_STREET/CITY/STATE/ZIP in server env.");
-  if (!leadId || !message) throw new ApiError(400, "missing_fields", "leadId + message required");
-
-  const db = adminDb();
-  const { data: lead, error: lErr } = await db
-    .from(TABLE).select("*").eq("id", leadId).eq("user_id", user.id).single();
-  if (lErr) throw new ApiError(404, "lead_not_found");
-
-  const toAddress = {
-    name: lead.owner_name || "Resident",
-    address_line1: lead.owner_mailing_address || lead.address,
-    address_city:  lead.owner_mailing_city  || lead.city,
-    address_state: lead.owner_mailing_state || lead.state,
-    address_zip:   lead.owner_mailing_zip   || lead.zip
-  };
-  if (!toAddress.address_line1 || !toAddress.address_zip) {
-    throw new ApiError(400, "bad_destination", "Lead is missing a usable mailing address.");
-  }
-
-  const from = returnAddress;
-
-  // Lob uses HTTP Basic auth: username=API_KEY, password blank
-  const auth = "Basic " + Buffer.from(apiKey + ":").toString("base64");
-
-  const form = new URLSearchParams();
-  form.set("description", `DealTrack wholesale outreach ${new Date().toISOString()}`);
-  form.set("to[name]",          toAddress.name);
-  form.set("to[address_line1]", toAddress.address_line1);
-  form.set("to[address_city]",  toAddress.address_city || "");
-  form.set("to[address_state]", toAddress.address_state || "");
-  form.set("to[address_zip]",   toAddress.address_zip);
-  form.set("to[address_country]", "US");
-  form.set("from[name]",          from.name || "");
-  form.set("from[address_line1]", from.street || "");
-  form.set("from[address_city]",  from.city || "");
-  form.set("from[address_state]", from.state || "");
-  form.set("from[address_zip]",   from.zip || "");
-  form.set("from[address_country]", "US");
-  // 4x6 template: front & back as HTML strings Lob renders. Default branded-template.
-  form.set("front", `<html><body style="margin:0;padding:0;font-family:Helvetica,Arial,sans-serif;width:6in;height:4in;background:#0F172A;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;"><h1 style="font-size:36pt;margin:0">Interested in your home?</h1><p style="font-size:14pt;margin-top:14pt;">I may have a cash offer for you.</p></body></html>`);
-  form.set("back", `<html><body style="margin:0.25in;font-family:Helvetica,Arial,sans-serif;font-size:10pt;line-height:1.4;white-space:pre-wrap;">${message.replace(/</g, "&lt;")}</body></html>`);
-  form.set("size", "4x6");
-
-  const res = await fetch("https://api.lob.com/v1/postcards", {
-    method: "POST",
-    headers: {
-      "Authorization": auth,
-      "Content-Type": "application/x-www-form-urlencoded",
-      "Accept": "application/json"
-    },
-    body: form.toString()
-  });
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new ApiError(502, "lob_error",
-      body?.error?.message || `Lob ${res.status}: ${JSON.stringify(body).slice(0, 300)}`);
-  }
-
-  await db.from(OUTREACH_TABLE).insert({
-    user_id: user.id, lead_id: leadId, channel: "mail",
-    subject: "DealTrack postcard", body: message,
-    status: body.tracking_number ? "sent" : "created",
-    external_id: body.id || null
-  });
-  await db.from(TABLE).update({ status: "contacted", updated_at: new Date().toISOString() })
-    .eq("id", leadId).eq("user_id", user.id);
-
-  return {
-    ok: true, lobId: body.id,
-    expectedDeliveryDate: body.expected_delivery_date || null,
-    trackingUrl: body.url || null
-  };
-}
-
 /* ── Save / update BYOK integration keys ──────────────────────────────── */
 // Accepts any subset of { batchskip_api_key, lob_api_key, return_address }.
 // Returns only a "connected" map so keys never leak back to the client.
@@ -566,10 +475,6 @@ export default handler(async (req, res) => {
       if (req.method !== "POST") throw new ApiError(405, "method_not_allowed");
       payload = await handleEmail(body, user);
       break;
-    case "postcard":
-      if (req.method !== "POST") throw new ApiError(405, "method_not_allowed");
-      payload = await handlePostcard(body, user);
-      break;
     case "integrations":
       if (req.method === "GET") payload = await handleIntegrationStatus(user);
       else if (req.method === "POST") payload = await handleSaveIntegration(body, user);
@@ -577,7 +482,7 @@ export default handler(async (req, res) => {
       break;
     default:
       throw new ApiError(400, "unknown_action",
-        "action must be one of: search, skiptrace, leads, save, update, delete, email, postcard, integrations");
+        "action must be one of: search, skiptrace, leads, save, update, delete, email, integrations");
   }
 
   return res.status(200).json(payload);
