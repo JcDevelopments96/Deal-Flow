@@ -189,8 +189,9 @@ const EmailModal = ({ lead, onSend, onClose }) => {
 
 /** Full-detail modal — opened by clicking a lead card. Surfaces every
  * field ATTOM + skip-trace + Google gave us, with inline actions. */
-const WholesaleDetailModal = ({ lead, onClose, onSkipTrace, onEmail, onPostcard, onStatusChange, busy }) => {
+const WholesaleDetailModal = ({ lead, onClose, onSkipTrace, onEmail, onPostcard, onStatusChange, onSave, busy }) => {
   const status = STATUS_BY_KEY[lead.status] || STATUS_BY_KEY.new;
+  const isSearchResult = !!lead.__isSearchResult;
   const flags = [];
   if (lead.is_tax_delinquent) flags.push({ label: "Pre-foreclosure / tax distressed", color: THEME.red, icon: <DollarSign size={11} /> });
   if (lead.is_absentee) flags.push({ label: "Absentee owner", color: THEME.accent, icon: <Home size={11} /> });
@@ -325,11 +326,16 @@ const WholesaleDetailModal = ({ lead, onClose, onSkipTrace, onEmail, onPostcard,
                   <Mail size={14} /> {lead.owner_email}
                 </a>
               ) : null}
-              {!lead.owner_phone && !lead.owner_email && (
+              {!lead.owner_phone && !lead.owner_email && !isSearchResult && (
                 <button onClick={() => onSkipTrace(lead.id)} disabled={busy}
                   className="btn-primary" style={{ padding: "6px 12px", fontSize: 12 }}>
                   <Zap size={12} /> Run skip trace to find phone / email
                 </button>
+              )}
+              {!lead.owner_phone && !lead.owner_email && isSearchResult && (
+                <span style={{ fontSize: 11, color: THEME.textMuted }}>
+                  Save as lead first, then run skip trace to find phone/email.
+                </span>
               )}
             </div>
           </div>
@@ -354,40 +360,51 @@ const WholesaleDetailModal = ({ lead, onClose, onSkipTrace, onEmail, onPostcard,
             </div>
           </div>
 
-          {/* Status + notes */}
-          <div style={{ padding: 12, background: THEME.bgPanel, borderRadius: 8, border: `1px solid ${THEME.border}`, marginBottom: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginBottom: lead.notes ? 8 : 0 }}>
-              <span style={{ color: THEME.textMuted }}>Status:</span>
-              <select value={lead.status} onChange={(e) => onStatusChange(lead.id, e.target.value)}
-                style={{
-                  padding: "4px 8px", fontSize: 12, borderRadius: 4,
-                  border: `1px solid ${status.color}`, background: THEME.bg, color: status.color, fontWeight: 700
-                }}>
-                {STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-              </select>
-            </div>
-            {lead.notes && (
-              <div style={{ fontSize: 12, color: THEME.textMuted, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
-                <strong style={{ color: THEME.text }}>Notes:</strong> {lead.notes}
+          {/* Status + notes (only for saved leads) */}
+          {!isSearchResult && (
+            <div style={{ padding: 12, background: THEME.bgPanel, borderRadius: 8, border: `1px solid ${THEME.border}`, marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginBottom: lead.notes ? 8 : 0 }}>
+                <span style={{ color: THEME.textMuted }}>Status:</span>
+                <select value={lead.status} onChange={(e) => onStatusChange(lead.id, e.target.value)}
+                  style={{
+                    padding: "4px 8px", fontSize: 12, borderRadius: 4,
+                    border: `1px solid ${status.color}`, background: THEME.bg, color: status.color, fontWeight: 700
+                  }}>
+                  {STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </select>
               </div>
-            )}
-          </div>
+              {lead.notes && (
+                <div style={{ fontSize: 12, color: THEME.textMuted, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+                  <strong style={{ color: THEME.text }}>Notes:</strong> {lead.notes}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Action row */}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            <button onClick={() => onPostcard(lead)} className="btn-secondary" style={{ padding: "8px 14px", fontSize: 12 }}>
-              <Send size={13} /> Send postcard
-            </button>
-            {lead.owner_email && (
-              <button onClick={() => onEmail(lead)} className="btn-secondary" style={{ padding: "8px 14px", fontSize: 12 }}>
-                <Mail size={13} /> Email owner
+            {isSearchResult ? (
+              <button onClick={() => onSave && onSave(lead)} className="btn-primary"
+                style={{ padding: "8px 14px", fontSize: 12 }}>
+                <Star size={13} /> Save as lead
               </button>
-            )}
-            {!lead.skip_traced_at && (
-              <button onClick={() => onSkipTrace(lead.id)} disabled={busy}
-                className="btn-primary" style={{ padding: "8px 14px", fontSize: 12 }}>
-                <Zap size={13} /> Skip trace
-              </button>
+            ) : (
+              <>
+                <button onClick={() => onPostcard(lead)} className="btn-secondary" style={{ padding: "8px 14px", fontSize: 12 }}>
+                  <Send size={13} /> Send postcard
+                </button>
+                {lead.owner_email && (
+                  <button onClick={() => onEmail(lead)} className="btn-secondary" style={{ padding: "8px 14px", fontSize: 12 }}>
+                    <Mail size={13} /> Email owner
+                  </button>
+                )}
+                {!lead.skip_traced_at && (
+                  <button onClick={() => onSkipTrace(lead.id)} disabled={busy}
+                    className="btn-primary" style={{ padding: "8px 14px", fontSize: 12 }}>
+                    <Zap size={13} /> Skip trace
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -791,17 +808,22 @@ export const WholesaleView = () => {
             </select>
           </div>
           <div>
-            <div className="label-xs" style={{ marginBottom: 4 }}>City</div>
-            <select value={searchCity}
+            <div className="label-xs" style={{ marginBottom: 4 }}>
+              City <span style={{ color: THEME.textDim, fontWeight: 400 }}>(type any)</span>
+            </div>
+            <input
+              list="wholesale-city-suggestions"
+              value={searchCity}
               onChange={(e) => setSearchCity(e.target.value)}
               disabled={!searchState}
+              placeholder={searchState ? "Miami, Fort Myers, Naples…" : "Pick a state first"}
               style={{ width: "100%", padding: "9px 10px", fontSize: 14, background: THEME.bg,
-                opacity: searchState ? 1 : 0.5 }}>
-              <option value="">{searchState ? "Select city…" : "Pick a state first"}</option>
+                opacity: searchState ? 1 : 0.5 }} />
+            <datalist id="wholesale-city-suggestions">
               {(CITIES_BY_STATE[searchState] || []).map(c => (
-                <option key={c} value={c}>{c}</option>
+                <option key={c} value={c} />
               ))}
-            </select>
+            </datalist>
           </div>
           <div>
             <div className="label-xs" style={{ marginBottom: 4 }}>
@@ -838,7 +860,13 @@ export const WholesaleView = () => {
           }>
           <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "repeat(auto-fill, minmax(320px, 1fr))", gap: 10 }}>
             {searchResults.map((p, idx) => (
-              <div key={idx} style={{ border: `1px solid ${THEME.border}`, borderRadius: 8, padding: 12, background: THEME.bgPanel, display: "flex", flexDirection: "column", gap: 8 }}>
+              <div key={idx}
+                onClick={() => setDetailLead({ ...p, id: `search-${idx}`, status: "new", __isSearchResult: true })}
+                style={{
+                  border: `1px solid ${THEME.border}`, borderRadius: 8, padding: 12,
+                  background: THEME.bgPanel, display: "flex", flexDirection: "column", gap: 8,
+                  cursor: "pointer"
+                }}>
                 <PropertyPhoto streetSrc={p.streetview_url} satelliteSrc={p.satellite_url} alt={p.address} aspectRatio="16 / 9" />
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 700 }}>{p.address}</div>
@@ -862,7 +890,7 @@ export const WholesaleView = () => {
                   {p.is_absentee && <> · absentee</>}
                   {p.market_value && <> · {fmtUSD(p.market_value, { short: true })}</>}
                 </div>
-                <button onClick={() => onSaveSearchResult(p)} className="btn-primary"
+                <button onClick={(e) => { e.stopPropagation(); onSaveSearchResult(p); }} className="btn-primary"
                   style={{ padding: "6px 10px", fontSize: 11, width: "100%", justifyContent: "center", marginTop: "auto" }}>
                   <Star size={11} /> Save lead
                 </button>
@@ -931,13 +959,18 @@ export const WholesaleView = () => {
 
       {detailLead && (
         <WholesaleDetailModal
-          lead={leads.find(l => l.id === detailLead.id) || detailLead}
+          lead={detailLead.__isSearchResult ? detailLead : (leads.find(l => l.id === detailLead.id) || detailLead)}
           busy={busyIds.has(detailLead.id)}
           onClose={() => setDetailLead(null)}
           onSkipTrace={onSkipTrace}
           onStatusChange={onStatusChange}
           onEmail={(l) => { setEmailingLead(l); setDetailLead(null); }}
           onPostcard={(l) => { setPostcardLead(l); setDetailLead(null); }}
+          onSave={async (l) => {
+            const { __isSearchResult, id, ...property } = l;
+            await onSaveSearchResult(property);
+            setDetailLead(null);
+          }}
         />
       )}
 
