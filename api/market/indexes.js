@@ -43,8 +43,24 @@ export default handler(async (req, res) => {
   }
   await requireUserId(req);
 
-  const { regionType, regionId, state } = req.query || {};
+  const { regionType, regionId, state, all } = req.query || {};
   const db = adminDb();
+
+  /* ── Nationwide fetch — every county ZHVI/ZORI/Redfin snapshot ────── */
+  if (all) {
+    const { data, error } = await db
+      .from("market_indexes")
+      .select("*")
+      .eq("region_type", "county");
+    if (error) throw new ApiError(500, "db_read_failed", error.message);
+    const byFips = {};
+    for (const row of data || []) byFips[row.region_id] = shapeRow(row);
+    return res.status(200).json({
+      national: true,
+      count: Object.keys(byFips).length,
+      byFips
+    });
+  }
 
   /* ── Bulk per-state fetch ─────────────────────────────────────────── */
   if (state) {

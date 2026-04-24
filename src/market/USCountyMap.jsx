@@ -124,13 +124,13 @@ export const USCountyMap = ({
   // counties nationwide so the map doesn't read as "yellow everywhere"
   // when the user hasn't run a live search yet. Only used for price metric
   // since ZHVI is a home-value index.
-  const staticCountyHeat = useMemo(() => {
+  const { staticCountyHeat, staticMin, staticMax } = useMemo(() => {
     const out = new Map();
-    if (!staticCountyStats || metric !== "price") return out;
+    if (!staticCountyStats || metric !== "price") return { staticCountyHeat: out, staticMin: 0, staticMax: 0 };
     const values = Object.values(staticCountyStats)
       .map(s => Number(s?.zhvi_latest))
       .filter(v => Number.isFinite(v) && v > 0);
-    if (values.length === 0) return out;
+    if (values.length === 0) return { staticCountyHeat: out, staticMin: 0, staticMax: 0 };
     const sMin = Math.min(...values);
     const sMax = Math.max(...values);
     const range = sMax - sMin;
@@ -141,7 +141,7 @@ export const USCountyMap = ({
       const t = 1 - raw; // price inverted: lower = greener
       out.set(fips, { t, value: v, zhvi: v, zori: s?.zori_latest || null });
     }
-    return out;
+    return { staticCountyHeat: out, staticMin: sMin, staticMax: sMax };
   }, [staticCountyStats, metric]);
 
   const view = (selectedState && STATE_MAP_VIEW[selectedState])
@@ -194,10 +194,16 @@ export const USCountyMap = ({
 
                   // Fill priority (first match wins):
                   //   1. Highlighted active pin → accent
-                  //   2. Live county data from recent search → price heat
-                  //   3. Static ZHVI snapshot (Zillow) → price heat
+                  //   2. Live county data from recent search → metric heat
+                  //   3. Static ZHVI snapshot (Zillow home values) → price heat
                   //   4. Selected state tint → teal
                   //   5. Otherwise → neutral gray (no data — quiet, not yellow)
+                  // NOTE: we intentionally do NOT color un-searched counties
+                  // by the curated BRRRR "deal score". That metric only
+                  // covered ~60 cherry-picked markets and produced an
+                  // inconsistent, misleading map where a handful of
+                  // counties had strong color and everything else was gray.
+                  // Nationwide ZHVI coverage replaces it.
                   let fill = THEME.bgPanel;           // neutral gray, not yellow
                   let stroke = THEME.border;
                   let strokeWidth = 0.4;
@@ -218,13 +224,6 @@ export const USCountyMap = ({
                   if (liveHeat) {
                     fill = scoreToHeatFill(liveHeat.t);
                     stroke = scoreToHeatStroke(liveHeat.t);
-                    strokeWidth = 0.6;
-                    opacity = 1;
-                  } else if (isMarket && !usingLiveData && !staticHeat) {
-                    const score = getScore(market);
-                    const t = scoreToT(score);
-                    fill = scoreToHeatFill(t);
-                    stroke = scoreToHeatStroke(t);
                     strokeWidth = 0.6;
                     opacity = 1;
                   }
@@ -434,19 +433,27 @@ export const USCountyMap = ({
           marginBottom: 6
         }}>
           <span className="label-xs">
-            {usingLiveData ? `County ${metricDef.label} (Live)` : "Deal Score Heatmap"}
+            {usingLiveData
+              ? `County ${metricDef.label} (Live)`
+              : staticCountyHeat.size > 0
+                ? "Median Home Value (Zillow ZHVI)"
+                : "Median Home Value"}
           </span>
           <span style={{ fontSize: 10, color: THEME.textDim }}>
             {usingLiveData
               ? `${Object.keys(liveCountyStats || {}).length} counties · range ${metricDef.rangeLabel(minScore)} – ${metricDef.rangeLabel(maxScore)}`
-              : `${allMarkets.length} markets · your range ${minScore}-${maxScore}`}
+              : staticCountyHeat.size > 0
+                ? `${staticCountyHeat.size} counties · $${Math.round(staticMin/1000)}k – $${Math.round(staticMax/1000)}k`
+                : "Loading nationwide data…"}
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span className="mono" style={{ fontSize: 11, color: "#15803D", minWidth: 56, fontWeight: 700 }}>
             {usingLiveData
               ? (metricDef.invert ? metricDef.rangeLabel(minScore) : metricDef.rangeLabel(maxScore))
-              : HEAT_SCALE_MIN}
+              : staticCountyHeat.size > 0
+                ? `$${Math.round(staticMin/1000)}k`
+                : HEAT_SCALE_MIN}
           </span>
           <div style={{
             flex: 1,
@@ -462,7 +469,9 @@ export const USCountyMap = ({
           <span className="mono" style={{ fontSize: 11, color: "#B91C1C", minWidth: 56, textAlign: "right", fontWeight: 700 }}>
             {usingLiveData
               ? (metricDef.invert ? metricDef.rangeLabel(maxScore) : metricDef.rangeLabel(minScore))
-              : HEAT_SCALE_MAX}
+              : staticCountyHeat.size > 0
+                ? `$${Math.round(staticMax/1000)}k`
+                : HEAT_SCALE_MAX}
           </span>
         </div>
         <div style={{

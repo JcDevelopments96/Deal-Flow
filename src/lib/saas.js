@@ -291,6 +291,13 @@ export async function fetchStateMarketIndexes(getToken, stateCode) {
   return fetchMetered(getToken, `/api/market/indexes?${qs.toString()}`);
 }
 
+// Nationwide county snapshot — every county keyed by 5-char FIPS. Loaded
+// once on mount so the map is gradient-colored everywhere regardless of
+// which state (if any) the user has selected.
+export async function fetchNationalMarketIndexes(getToken) {
+  return fetchMetered(getToken, `/api/market/indexes?all=1`);
+}
+
 // Full-gallery + long-description lookup for a single Realtor listing.
 // Unmetered, cached 24h server-side — fired on-demand when the user opens
 // the detail modal.

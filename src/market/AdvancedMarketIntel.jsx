@@ -14,7 +14,7 @@ import { Panel, CalcTooltip } from "../primitives.jsx";
 import { USCountyMap, MAP_METRICS } from "./USCountyMap.jsx";
 import { LiveListingsPanel } from "./LiveListingsPanel.jsx";
 import { STATE_NAMES, STATE_DEFAULT_CITIES } from "./mapUtils.js";
-import { isSaasMode, useSaasUser, fetchCountyCensus, fetchCountyFMR, fetchMarketIndexes, fetchStateMarketIndexes, fetchCountyUnemployment, fetchMortgageRate } from "../lib/saas.js";
+import { isSaasMode, useSaasUser, fetchCountyCensus, fetchCountyFMR, fetchMarketIndexes, fetchStateMarketIndexes, fetchNationalMarketIndexes, fetchCountyUnemployment, fetchMortgageRate } from "../lib/saas.js";
 
 const RepeatIcon = RotateCcw;
 
@@ -1085,9 +1085,24 @@ export const AdvancedMarketIntel = () => {
   const saas = useSaasUser();
   const saasOn = isSaasMode();
 
-  // Pre-ingested Zillow+Redfin snapshot for every county in the selected
-  // state, keyed by FIPS. Populates the map heat layer even before any
-  // live search — so un-searched counties aren't all yellow.
+  // Pre-ingested Zillow ZHVI + Redfin snapshot for every county in the
+  // country, keyed by 5-char FIPS. Loaded once on mount so the map gets
+  // a nationwide home-price gradient immediately — no need for the user
+  // to pick a state first.
+  const [nationalCountyIndexes, setNationalCountyIndexes] = useState(null);
+  useEffect(() => {
+    if (!saasOn || !saas.user) return;
+    let cancelled = false;
+    fetchNationalMarketIndexes(saas.getToken)
+      .then(body => { if (!cancelled && body?.byFips) setNationalCountyIndexes(body.byFips); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saasOn, saas.user]);
+
+  // When a state is selected, also pull the per-state slice as a fallback
+  // for any county that's missing from the national dump (rare, but cheap
+  // insurance against edge cases in the ingest).
   const [stateCountyIndexes, setStateCountyIndexes] = useState(null);
   useEffect(() => {
     if (!saasOn || !saas.user || !selectedState) {
@@ -1101,6 +1116,13 @@ export const AdvancedMarketIntel = () => {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saasOn, saas.user, selectedState]);
+
+  // Merge national + state-specific. State wins on overlap so any fresher
+  // slice replaces the stale nationwide snapshot.
+  const mapCountyIndexes = useMemo(() => {
+    if (!nationalCountyIndexes && !stateCountyIndexes) return null;
+    return { ...(nationalCountyIndexes || {}), ...(stateCountyIndexes || {}) };
+  }, [nationalCountyIndexes, stateCountyIndexes]);
 
   // Live 30-year mortgage rate — fetched once per session (12h cache server-side)
   // and passed to the listing cards for quick-cashflow estimates.
@@ -1606,7 +1628,7 @@ export const AdvancedMarketIntel = () => {
                 highlightedMarket={mapHighlight}
                 onCountyClick={handleMapCountyClick}
                 liveCountyStats={liveCityStats?.byCounty || null}
-                staticCountyStats={stateCountyIndexes}
+                staticCountyStats={mapCountyIndexes}
                 metric={mapMetric}
                 listings={liveListings}
                 onListingClick={(l) => setPinnedListingId(l.id)}
@@ -1839,7 +1861,7 @@ export const AdvancedMarketIntel = () => {
             highlightedMarket={mapHighlight}
             onCountyClick={handleMapCountyClick}
             liveCountyStats={liveCityStats?.byCounty || null}
-                staticCountyStats={stateCountyIndexes}
+                staticCountyStats={mapCountyIndexes}
             metric={mapMetric}
             listings={liveListings}
             onListingClick={(l) => setPinnedListingId(l.id)}
