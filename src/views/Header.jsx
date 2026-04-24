@@ -3,7 +3,7 @@
    ============================================================================ */
 import React from "react";
 import {
-  Building2, Layout, Calculator, MapPin, Star, GraduationCap, Plus, Lock, Users
+  Building2, Layout, Calculator, MapPin, Star, GraduationCap, Plus, Lock, Users, CreditCard
 } from "lucide-react";
 import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/react";
 import { THEME } from "../theme.js";
@@ -87,7 +87,8 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
           { key: "market", label: "Market Intel", icon: <MapPin size={14} />, locked: marketLocked },
           { key: "watchlist", label: "Watchlist", icon: <Star size={14} />, badge: watchlistCount || null },
           { key: "team", label: "Team", icon: <Users size={14} /> },
-          { key: "education", label: "Learn", icon: <GraduationCap size={14} /> }
+          { key: "education", label: "Learn", icon: <GraduationCap size={14} /> },
+          { key: "plans", label: "Plans", icon: <CreditCard size={14} /> }
         ].map(tab => (
           <button
             key={tab.key}

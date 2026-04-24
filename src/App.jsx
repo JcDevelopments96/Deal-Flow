@@ -27,6 +27,7 @@ import { Dashboard } from "./views/Dashboard.jsx";
 import { WatchlistView } from "./views/WatchlistView.jsx";
 import { EducationCenter } from "./views/EducationCenter.jsx";
 import { TeamView } from "./views/TeamView.jsx";
+import { PlansView } from "./views/PlansView.jsx";
 import { Analyzer } from "./analyzer/Analyzer.jsx";
 import { AdvancedMarketIntel } from "./market/AdvancedMarketIntel.jsx";
 import { ErrorBoundary } from "./ErrorBoundary.jsx";
@@ -477,6 +478,8 @@ function BRRRRTrackerInner() {
       {view === "watchlist" && <WatchlistView />}
 
       {view === "team" && <TeamView />}
+
+      {view === "plans" && <PlansView />}
 
       {view === "education" && <EducationCenter />}
 
