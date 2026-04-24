@@ -146,10 +146,10 @@ export async function removeWatchlistItem(getToken, listingId) {
 
 /* ── Wholesaling (ATTOM + BatchSkipTracing + Resend) ─────────────────── */
 
-export async function searchWholesaleLeads(getToken, { zip, minYearsOwned, absenteeOnly, limit }) {
+export async function searchWholesaleLeads(getToken, { zip, minYearsOwned, absenteeOnly, taxDelinquentOnly, limit }) {
   return fetchMetered(getToken, "/api/wholesale?action=search", {
     method: "POST",
-    body: JSON.stringify({ zip, minYearsOwned, absenteeOnly, limit })
+    body: JSON.stringify({ zip, minYearsOwned, absenteeOnly, taxDelinquentOnly, limit })
   });
 }
 

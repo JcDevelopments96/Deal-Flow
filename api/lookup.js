@@ -241,7 +241,9 @@ async function handleFlood(lat, lng) {
   if (cached && Date.now() - cached.at < FLOOD_TTL) return { ...cached.payload, cached: true };
 
   const geometry = encodeURIComponent(JSON.stringify({ x: lng, y: lat, spatialReference: { wkid: 4326 }}));
-  const url = `https://hazards.fema.gov/gis/nfhl/rest/services/public/NFHL/MapServer/28/query`
+  // FEMA renamed the public NFHL endpoint path from /gis/nfhl/rest/services
+  // to /arcgis/rest/services in 2026 — the old path now 404s silently.
+  const url = `https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28/query`
     + `?geometry=${geometry}&geometryType=esriGeometryPoint&inSR=4326`
     + `&spatialRel=esriSpatialRelIntersects&outFields=FLD_ZONE,ZONE_SUBTY,SFHA_TF`
     + `&returnGeometry=false&f=json`;

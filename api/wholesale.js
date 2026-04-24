@@ -81,24 +81,44 @@ async function handleSearch(body, user) {
   if (!apiKey) throw new ApiError(503, "attom_not_configured",
     "Set ATTOM_API_KEY in Vercel env (sign up at api.developer.attomdata.com).");
 
-  const { zip, minYearsOwned, absenteeOnly, limit = 25 } = body || {};
+  const { zip, minYearsOwned, absenteeOnly, taxDelinquentOnly, limit = 25 } = body || {};
   if (!zip || !/^\d{5}$/.test(String(zip))) {
     throw new ApiError(400, "bad_zip", "zip code (5 digits) required");
   }
 
-  // ATTOM /property/snapshot by postal code. Returns up to 100 properties
-  // with identifier / address / summary / owner / sale / assessment blocks.
-  const url = `https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/snapshot`
-    + `?postalcode=${encodeURIComponent(zip)}&pagesize=${Math.min(100, Number(limit) || 25)}`;
-  const res = await fetch(url, {
-    headers: { "apikey": apiKey, accept: "application/json" }
-  });
-  if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new ApiError(502, "attom_error", `ATTOM ${res.status}: ${t.slice(0, 300)}`);
+  const headers = { "apikey": apiKey, accept: "application/json" };
+  const pagesize = Math.min(100, Number(limit) || 25);
+
+  // Fan out three parallel calls:
+  //   1. /property/snapshot     — base property + owner + sale + assessment
+  //   2. /foreclosure/snapshot  — pre-foreclosure list (tax / mortgage default)
+  //   3. /preforeclosure/snapshot — alternative NOD/NOS events (some regions)
+  // Cross-reference by property_id so we can flag tax-delinquent properties.
+  const [snapshotRes, foreclosureRes, preforeRes] = await Promise.all([
+    fetch(`https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/snapshot?postalcode=${encodeURIComponent(zip)}&pagesize=${pagesize}`, { headers }),
+    fetch(`https://api.gateway.attomdata.com/propertyapi/v1.0.0/foreclosure/snapshot?postalcode=${encodeURIComponent(zip)}&pagesize=${pagesize}`, { headers }).catch(() => null),
+    fetch(`https://api.gateway.attomdata.com/propertyapi/v1.0.0/preforeclosure/snapshot?postalcode=${encodeURIComponent(zip)}&pagesize=${pagesize}`, { headers }).catch(() => null)
+  ]);
+
+  if (!snapshotRes.ok) {
+    const t = await snapshotRes.text().catch(() => "");
+    throw new ApiError(502, "attom_error", `ATTOM ${snapshotRes.status}: ${t.slice(0, 300)}`);
   }
-  const data = await res.json();
+  const data = await snapshotRes.json();
   const properties = Array.isArray(data?.property) ? data.property : [];
+
+  // Build a Set of ATTOM IDs that appear in either foreclosure feed. Many
+  // accounts don't have access to these endpoints, which returns non-ok —
+  // in that case we silently degrade (no tax-delinquent flag, rest works).
+  const distressedIds = new Set();
+  for (const r of [foreclosureRes, preforeRes]) {
+    if (!r || !r.ok) continue;
+    const j = await r.json().catch(() => null);
+    for (const p of (j?.property || [])) {
+      const id = p.identifier?.attomId?.toString() || p.identifier?.Id?.toString();
+      if (id) distressedIds.add(id);
+    }
+  }
 
   const now = new Date();
   const leads = properties.map(p => {
@@ -109,6 +129,7 @@ async function handleSearch(body, user) {
     const building = p.building || {};
     const loc = p.location || {};
     const summary = p.summary || {};
+    const lead_attom_id = p.identifier?.attomId?.toString() || p.identifier?.Id?.toString() || null;
 
     // Derive years_owned from saletransdate
     const saleDate = sale.saleTransDate || sale.salesearchdate || sale.saleTranDate;
@@ -128,7 +149,7 @@ async function handleSearch(body, user) {
     const is_long_time_owner = years_owned != null && years_owned >= (minYearsOwned || 20);
 
     const lead = {
-      attom_id: p.identifier?.attomId?.toString() || p.identifier?.Id?.toString() || null,
+      attom_id: lead_attom_id,
       address: addr.line1 || addr.line || "",
       city: addr.locality || null,
       state: addr.countrySubd || addr.state || null,
@@ -153,7 +174,7 @@ async function handleSearch(body, user) {
       owner_mailing_zip: ownerMail.postal1 || null,
       is_absentee: !!is_absentee,
       is_long_time_owner,
-      is_tax_delinquent: false, // ATTOM snapshot doesn't have this; would need foreclosure endpoint
+      is_tax_delinquent: lead_attom_id ? distressedIds.has(lead_attom_id) : false,
       lead_score: 0
     };
     lead.lead_score = computeLeadScore(lead);
@@ -161,9 +182,10 @@ async function handleSearch(body, user) {
     return lead;
   });
 
-  // Client-side filters
+  // Server-side filters
   let filtered = leads;
   if (absenteeOnly) filtered = filtered.filter(l => l.is_absentee);
+  if (taxDelinquentOnly) filtered = filtered.filter(l => l.is_tax_delinquent);
   if (minYearsOwned) filtered = filtered.filter(l => l.years_owned != null && l.years_owned >= minYearsOwned);
 
   // Sort by lead_score desc so the best hits surface first

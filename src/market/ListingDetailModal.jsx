@@ -537,10 +537,7 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
                     </div>
                   </div>
                   <div style={{ fontSize: 12, color: THEME.textDim, lineHeight: 1.4 }}>
-                    {intelLoading ? "Checking Walk Score…" :
-                      typeof walkErr === "string" && walkErr.includes("walkscore_not_configured")
-                        ? "Walk Score API key not configured (free at walkscore.com)."
-                        : walkErr || "Not available"}
+                    {intelLoading ? "Checking Walk Score…" : "Not available for this listing"}
                   </div>
                 </div>
               )}

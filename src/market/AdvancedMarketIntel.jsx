@@ -1375,7 +1375,7 @@ export const AdvancedMarketIntel = () => {
           Start by picking a state to narrow the map, then browse the live listings and comparables for that area.
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr 1fr", gap: 12, marginBottom: 14 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 14 }}>
           {/* STATE — just names; picking one triggers a state-wide fetch. */}
           <div>
             <div className="label-xs" style={{ marginBottom: 8 }}>State</div>
@@ -1400,36 +1400,6 @@ export const AdvancedMarketIntel = () => {
                 </button>
               )}
             </div>
-          </div>
-
-          {/* COUNTY — populated from the live listings' counties. Acts as a
-              filter: picking one narrows the listings + map focus without
-              triggering a new upstream call. */}
-          <div>
-            <div className="label-xs" style={{ marginBottom: 8 }}>County</div>
-            <select
-              value={(clickedArea?.county || "").toLowerCase().replace(/\s+county$/i, "")}
-              onChange={(e) => {
-                const norm = e.target.value;
-                if (!norm) {
-                  setClickedArea(prev => prev ? { ...prev, county: null, countyFips: null, city: null } : null);
-                  return;
-                }
-                // Find the canonical county name (preserve capitalization from listings)
-                const raw = liveCountyList.find(c => c.toLowerCase().replace(/\s+county$/i, "") === norm) || norm;
-                setClickedArea(prev => ({ ...(prev || {}), state: selectedState, county: raw, city: null }));
-              }}
-              disabled={liveCountyList.length === 0}
-              style={{ width: "100%", padding: "10px 12px", fontSize: 14, opacity: liveCountyList.length === 0 ? 0.5 : 1 }}
-            >
-              <option value="">
-                {liveCountyList.length === 0 ? "Load listings first…" : "All counties"}
-              </option>
-              {liveCountyList.map(c => {
-                const norm = c.toLowerCase().replace(/\s+county$/i, "");
-                return <option key={norm} value={norm}>{c}</option>;
-              })}
-            </select>
           </div>
 
           {/* CITY — populated from live listings. Picking one filters the

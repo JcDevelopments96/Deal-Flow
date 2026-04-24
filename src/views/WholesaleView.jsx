@@ -480,6 +480,7 @@ export const WholesaleView = () => {
   const [zip, setZip] = useState("");
   const [minYearsOwned, setMinYearsOwned] = useState(20);
   const [absenteeOnly, setAbsenteeOnly] = useState(false);
+  const [taxDelinquentOnly, setTaxDelinquentOnly] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState(null);
@@ -534,7 +535,7 @@ export const WholesaleView = () => {
     if (!/^\d{5}$/.test(zip)) { setSearchError("Enter a 5-digit ZIP code"); return; }
     setSearching(true); setSearchError(null);
     try {
-      const { results } = await searchWholesaleLeads(saas.getToken, { zip, minYearsOwned: Number(minYearsOwned), absenteeOnly });
+      const { results } = await searchWholesaleLeads(saas.getToken, { zip, minYearsOwned: Number(minYearsOwned), absenteeOnly, taxDelinquentOnly });
       setSearchResults(results || []);
       if (!results || results.length === 0) setSearchError("No matching properties in that ZIP.");
     } catch (e) {
@@ -664,10 +665,16 @@ export const WholesaleView = () => {
               <option value={30}>30+ years</option>
             </select>
           </div>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-            <input type="checkbox" checked={absenteeOnly} onChange={(e) => setAbsenteeOnly(e.target.checked)} />
-            <span>Absentee only</span>
-          </label>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+              <input type="checkbox" checked={absenteeOnly} onChange={(e) => setAbsenteeOnly(e.target.checked)} />
+              <span>Absentee only</span>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }} title="Cross-references ATTOM's foreclosure + pre-foreclosure feeds">
+              <input type="checkbox" checked={taxDelinquentOnly} onChange={(e) => setTaxDelinquentOnly(e.target.checked)} />
+              <span>Pre-foreclosure / tax-distressed only</span>
+            </label>
+          </div>
           <button onClick={onSearch} disabled={searching || !zip} className="btn-primary"
             style={{ padding: "10px 16px", fontSize: 13 }}>
             <Search size={14} /> {searching ? "Searching…" : "Search"}
