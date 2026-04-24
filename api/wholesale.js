@@ -23,6 +23,7 @@ import { handler, ApiError } from "./_lib/errors.js";
 import { requireUserId } from "./_lib/auth.js";
 import { adminDb, ensureUser } from "./_lib/db.js";
 import { planFor } from "./_lib/plans.js";
+import { streetViewUrl as sharedStreetViewUrl, satelliteUrl as sharedSatelliteUrl } from "./_lib/googlePhotos.js";
 
 const TABLE = "wholesale_leads";
 const OUTREACH_TABLE = "wholesale_outreach";
@@ -43,40 +44,10 @@ function requirePaidPlan(user) {
   }
 }
 
-/* ── Google Maps photo URLs (street view + satellite) ─────────────────── */
-// The raw URLs with the API key are sent to the client. The key MUST be
-// referrer-restricted in Google Cloud Console — otherwise it's scrape-able.
-
-function resolveLocation({ address, city, state, zip, latitude, longitude }) {
-  if (Number.isFinite(Number(latitude)) && Number.isFinite(Number(longitude))) {
-    return `${latitude},${longitude}`;
-  }
-  const loc = [address, city, state, zip].filter(Boolean).join(", ");
-  return loc || null;
-}
-
-function streetViewUrl(lead) {
-  const key = process.env.GOOGLE_MAPS_API_KEY;
-  if (!key) return null;
-  const loc = resolveLocation(lead);
-  if (!loc) return null;
-  const qs = new URLSearchParams({ size: "400x260", key, fov: "80", pitch: "0", location: loc });
-  return `https://maps.googleapis.com/maps/api/streetview?${qs.toString()}`;
-}
-
-function satelliteUrl(lead) {
-  const key = process.env.GOOGLE_MAPS_API_KEY;
-  if (!key) return null;
-  const loc = resolveLocation(lead);
-  if (!loc) return null;
-  // zoom=19 is tight enough to see roof + yard, wide enough to read the lot.
-  // A red marker anchors the property inside the frame.
-  const qs = new URLSearchParams({
-    size: "400x260", key, zoom: "19", maptype: "satellite",
-    center: loc, markers: `color:red|${loc}`
-  });
-  return `https://maps.googleapis.com/maps/api/staticmap?${qs.toString()}`;
-}
+// Shared server-side Google Maps URL builders — larger size here than the
+// default since wholesale cards/modal render them as the primary image.
+const streetViewUrl = (lead) => sharedStreetViewUrl(lead, { size: "400x260" });
+const satelliteUrl  = (lead) => sharedSatelliteUrl(lead, { size: "400x260" });
 
 /* ── Heuristic lead scoring (0-100) ──────────────────────────────────── */
 function computeLeadScore({ years_owned, is_absentee, is_tax_delinquent, assessed_value, market_value }) {
@@ -322,10 +293,23 @@ async function handleList(user) {
 async function handleSave({ property }, user) {
   if (!property || !property.address) throw new ApiError(400, "missing_property");
   const db = adminDb();
-  const row = { ...property, user_id: user.id, raw_data: property.raw_data || null };
-  delete row.id; // let Postgres generate
-  delete row.created_at;
-  delete row.updated_at;
+  // Whitelist columns that exist on public.wholesale_leads. The search
+  // payload also carries derived fields (streetview_url, satellite_url,
+  // __isSearchResult, etc.) that Postgres doesn't know about — including
+  // them triggers a PGRST204 "column not found" error from Supabase.
+  const ALLOWED = [
+    "address","city","state","zip","county","latitude","longitude",
+    "property_type","bedrooms","bathrooms","sqft","year_built",
+    "assessed_value","market_value","last_sale_date","last_sale_price","years_owned",
+    "owner_name","owner_mailing_address","owner_mailing_city","owner_mailing_state","owner_mailing_zip",
+    "owner_phone","owner_email","skip_traced_at",
+    "is_absentee","is_long_time_owner","is_tax_delinquent","lead_score",
+    "status","notes","attom_id","raw_data"
+  ];
+  const row = { user_id: user.id };
+  for (const k of ALLOWED) if (property[k] !== undefined) row[k] = property[k];
+  if (!row.raw_data) row.raw_data = null;
+
   const { data, error } = await db
     .from(TABLE)
     .upsert(row, { onConflict: "user_id,address,zip" })
