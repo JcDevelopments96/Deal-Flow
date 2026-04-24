@@ -1,6 +1,6 @@
 /**
  * POST /api/stripe/checkout
- * Body: { planKey: "starter" | "pro" | "scale" }
+ * Body: { planKey: "starter" | "pro" | "scale", cadence?: "monthly" | "annual" }
  *
  * Returns { url } for a Stripe Checkout session. Frontend redirects the
  * user there. On success they come back to /?billing=success; on cancel
@@ -25,14 +25,16 @@ export default handler(async (req, res) => {
   const user = await ensureUser({ clerkUserId, email });
 
   const planKey = (req.body && req.body.planKey) || "starter";
+  const cadence = (req.body && req.body.cadence) === "annual" ? "annual" : "monthly";
   const plan = planFor(planKey);
   if (plan.key === "free") {
     throw new ApiError(400, "invalid_plan", "Free plan doesn't need checkout.");
   }
-  const priceId = resolveStripePriceId(plan.key);
+  const priceId = resolveStripePriceId(plan.key, cadence);
   if (!priceId) {
+    const envKey = cadence === "annual" ? plan.priceIdEnvAnnual : plan.priceIdEnv;
     throw new ApiError(503, "plan_not_configured",
-      `Set ${plan.priceIdEnv} in Vercel env.`);
+      `Set ${envKey} in Vercel env.`);
   }
 
   const customerId = await ensureStripeCustomer(user);
@@ -55,7 +57,8 @@ export default handler(async (req, res) => {
       metadata: {
         supabase_user_id: user.id,
         clerk_user_id: user.clerk_user_id,
-        plan_key: plan.key
+        plan_key: plan.key,
+        cadence
       }
     }
   });

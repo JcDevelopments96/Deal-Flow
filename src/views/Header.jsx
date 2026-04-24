@@ -35,12 +35,17 @@ const AuthSlot = () => (
 );
 
 export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchlistCount = 0 }) => {
-  // Plan-aware lock on Market Intel: anyone who can't actually use Market
-  // Intel (signed-out, or signed-in on the free plan) sees a lock icon.
-  // Signed-in users on any paid plan (starter/pro/scale) see no lock.
+  // Lock icon on Market Intel only when we're sure the user can't use it:
+  //   - signed out, OR
+  //   - signed in on the free plan AND already used their 5 free clicks.
+  // Free users with remaining clicks see no lock so they can sample the
+  // feature before being asked to pay.
   const saas = useSaasUser();
-  const marketLocked =
-    isSaasMode() && (!saas.user || saas.usage?.plan === "free");
+  const usage = saas.usage;
+  const marketLocked = isSaasMode() && (
+    !saas.user ||
+    (usage?.plan === "free" && (usage?.remaining ?? 0) === 0)
+  );
 
   return (
   <div style={{
