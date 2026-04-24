@@ -303,3 +303,17 @@ export async function fetchWalkScore(getToken, { lat, lng, address }) {
   if (address) qs.set("address", address);
   return fetchMetered(getToken, `/api/lookup?${qs.toString()}`);
 }
+
+// Google Maps static photos (street view + satellite) for a lat/lng —
+// returned as already-signed URLs the client can drop into <img src>.
+export async function fetchPropertyPhotos(getToken, { lat, lng, address }) {
+  const qs = new URLSearchParams({ source: "photos", lat: String(lat), lng: String(lng) });
+  if (address) qs.set("address", address);
+  return fetchMetered(getToken, `/api/lookup?${qs.toString()}`);
+}
+
+// Google Places Nearby — top 3 schools + amenity counts within 1 mile.
+export async function fetchNearby(getToken, { lat, lng }) {
+  const qs = new URLSearchParams({ source: "nearby", lat: String(lat), lng: String(lng) });
+  return fetchMetered(getToken, `/api/lookup?${qs.toString()}`);
+}

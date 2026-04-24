@@ -43,22 +43,39 @@ function requirePaidPlan(user) {
   }
 }
 
-/* ── Google Street View static image URL for a property ─────────────── */
-// Caller includes the raw URL on each result. The Google Maps key MUST be
-// restricted by HTTP-referrer in Google Cloud Console to the app's domain
-// — otherwise the URL is scrape-able and the key quota can be abused.
-function streetViewUrl({ address, city, state, zip, latitude, longitude }) {
+/* ── Google Maps photo URLs (street view + satellite) ─────────────────── */
+// The raw URLs with the API key are sent to the client. The key MUST be
+// referrer-restricted in Google Cloud Console — otherwise it's scrape-able.
+
+function resolveLocation({ address, city, state, zip, latitude, longitude }) {
+  if (Number.isFinite(Number(latitude)) && Number.isFinite(Number(longitude))) {
+    return `${latitude},${longitude}`;
+  }
+  const loc = [address, city, state, zip].filter(Boolean).join(", ");
+  return loc || null;
+}
+
+function streetViewUrl(lead) {
   const key = process.env.GOOGLE_MAPS_API_KEY;
   if (!key) return null;
-  const qs = new URLSearchParams({ size: "400x260", key, fov: "80", pitch: "0" });
-  if (Number.isFinite(Number(latitude)) && Number.isFinite(Number(longitude))) {
-    qs.set("location", `${latitude},${longitude}`);
-  } else {
-    const loc = [address, city, state, zip].filter(Boolean).join(", ");
-    if (!loc) return null;
-    qs.set("location", loc);
-  }
+  const loc = resolveLocation(lead);
+  if (!loc) return null;
+  const qs = new URLSearchParams({ size: "400x260", key, fov: "80", pitch: "0", location: loc });
   return `https://maps.googleapis.com/maps/api/streetview?${qs.toString()}`;
+}
+
+function satelliteUrl(lead) {
+  const key = process.env.GOOGLE_MAPS_API_KEY;
+  if (!key) return null;
+  const loc = resolveLocation(lead);
+  if (!loc) return null;
+  // zoom=19 is tight enough to see roof + yard, wide enough to read the lot.
+  // A red marker anchors the property inside the frame.
+  const qs = new URLSearchParams({
+    size: "400x260", key, zoom: "19", maptype: "satellite",
+    center: loc, markers: `color:red|${loc}`
+  });
+  return `https://maps.googleapis.com/maps/api/staticmap?${qs.toString()}`;
 }
 
 /* ── Heuristic lead scoring (0-100) ──────────────────────────────────── */
@@ -179,6 +196,7 @@ async function handleSearch(body, user) {
     };
     lead.lead_score = computeLeadScore(lead);
     lead.streetview_url = streetViewUrl(lead);
+    lead.satellite_url = satelliteUrl(lead);
     return lead;
   });
 
@@ -246,7 +264,7 @@ async function handleSkipTrace({ leadId }, user) {
     .select().single();
   if (uErr) throw new ApiError(500, "db_update_failed", uErr.message);
 
-  return { lead: { ...updated, streetview_url: streetViewUrl(updated) }, phoneFound: !!phone, emailFound: !!email };
+  return { lead: { ...updated, streetview_url: streetViewUrl(updated), satellite_url: satelliteUrl(updated) }, phoneFound: !!phone, emailFound: !!email };
 }
 
 /* ── CRUD ─────────────────────────────────────────────────────────────── */
@@ -261,7 +279,7 @@ async function handleList(user) {
   if (error) throw new ApiError(500, "db_read_failed", error.message);
   // Attach a fresh Street View URL per lead — stored nowhere since the
   // Google key shouldn't be persisted in user-readable columns.
-  const leads = (data || []).map(l => ({ ...l, streetview_url: streetViewUrl(l) }));
+  const leads = (data || []).map(l => ({ ...l, streetview_url: streetViewUrl(l), satellite_url: satelliteUrl(l) }));
   return { leads };
 }
 
@@ -277,7 +295,7 @@ async function handleSave({ property }, user) {
     .upsert(row, { onConflict: "user_id,address,zip" })
     .select().single();
   if (error) throw new ApiError(500, "db_insert_failed", error.message);
-  return { lead: { ...data, streetview_url: streetViewUrl(data) } };
+  return { lead: { ...data, streetview_url: streetViewUrl(data), satellite_url: satelliteUrl(data) } };
 }
 
 async function handleUpdate(id, { updates }, user) {
@@ -293,7 +311,7 @@ async function handleUpdate(id, { updates }, user) {
     .select().single();
   if (error) throw new ApiError(500, "db_update_failed", error.message);
   if (!data) throw new ApiError(404, "not_found");
-  return { lead: { ...data, streetview_url: streetViewUrl(data) } };
+  return { lead: { ...data, streetview_url: streetViewUrl(data), satellite_url: satelliteUrl(data) } };
 }
 
 async function handleDelete(id, user) {

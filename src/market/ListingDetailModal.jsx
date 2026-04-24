@@ -3,11 +3,11 @@
    Save to Watchlist / Full Listing actions.
    ============================================================================ */
 import React, { useEffect, useState, useMemo } from "react";
-import { X, Star, Calculator, ExternalLink, AlertTriangle, Building2, Droplets, Footprints, TrendingUp, TrendingDown, Minus, ChevronLeft, ChevronRight, Camera } from "lucide-react";
+import { X, Star, Calculator, ExternalLink, AlertTriangle, Building2, Droplets, Footprints, TrendingUp, TrendingDown, Minus, ChevronLeft, ChevronRight, Camera, GraduationCap, MapPin } from "lucide-react";
 import { THEME } from "../theme.js";
 import { fmtUSD } from "../utils.js";
 import { useAppActions } from "../contexts.jsx";
-import { isSaasMode, useSaasUser, fetchFloodZone, fetchWalkScore, fetchListingDetail } from "../lib/saas.js";
+import { isSaasMode, useSaasUser, fetchFloodZone, fetchWalkScore, fetchListingDetail, fetchPropertyPhotos, fetchNearby } from "../lib/saas.js";
 import { estimateCashflow } from "./cashflow.js";
 
 export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr, mortgageRate, countyStats }) => {
@@ -60,6 +60,8 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
   const [floodErr, setFloodErr] = useState(null);
   const [walk, setWalk] = useState(null);
   const [walkErr, setWalkErr] = useState(null);
+  const [photos, setPhotos] = useState(null);        // { streetview_url, satellite_url }
+  const [nearby, setNearby] = useState(null);        // { schools: [...], amenityCounts: {...} }
   const [intelLoading, setIntelLoading] = useState(false);
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -98,7 +100,8 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
     if (!saasOn || !saas.user) return;
     const lat = Number(listing.latitude);
     const lng = Number(listing.longitude);
-    setFlood(null); setWalk(null); setFloodErr(null); setWalkErr(null);
+    setFlood(null); setWalk(null); setPhotos(null); setNearby(null);
+    setFloodErr(null); setWalkErr(null);
     if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) {
       setFloodErr("This listing has no geocode (lat/lng) — Realtor didn't return coordinates for it.");
       setWalkErr("This listing has no geocode.");
@@ -108,13 +111,17 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
     setIntelLoading(true);
     Promise.allSettled([
       fetchFloodZone(saas.getToken, { lat, lng }),
-      fetchWalkScore(saas.getToken, { lat, lng, address: listing.formattedAddress })
-    ]).then(([floodRes, walkRes]) => {
+      fetchWalkScore(saas.getToken, { lat, lng, address: listing.formattedAddress }),
+      fetchPropertyPhotos(saas.getToken, { lat, lng, address: listing.formattedAddress }),
+      fetchNearby(saas.getToken, { lat, lng })
+    ]).then(([floodRes, walkRes, photosRes, nearbyRes]) => {
       if (cancelled) return;
       if (floodRes.status === "fulfilled") setFlood(floodRes.value);
       else setFloodErr(floodRes.reason?.message || "Flood lookup failed");
       if (walkRes.status === "fulfilled") setWalk(walkRes.value);
-      else setWalkErr(walkRes.reason?.detail || walkRes.reason?.message || "Walk Score not configured");
+      else setWalkErr(walkRes.reason?.detail || walkRes.reason?.message || null);
+      if (photosRes.status === "fulfilled") setPhotos(photosRes.value);
+      if (nearbyRes.status === "fulfilled") setNearby(nearbyRes.value);
     }).finally(() => { if (!cancelled) setIntelLoading(false); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -542,6 +549,75 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
                 </div>
               )}
             </div>
+
+            {/* Satellite view (Google Maps Static) + nearby (Places Nearby).
+                Render below the flood/walk row so the 2-up pairing stays tight. */}
+            {photos?.satellite_url && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: THEME.textMuted, marginBottom: 6 }}>
+                  Aerial view
+                </div>
+                <img
+                  src={photos.satellite_url}
+                  alt="Aerial view of property"
+                  loading="lazy"
+                  style={{ width: "100%", aspectRatio: "640 / 400", objectFit: "cover", borderRadius: 8, background: THEME.bgPanel, border: `1px solid ${THEME.border}` }}
+                />
+              </div>
+            )}
+
+            {nearby && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: THEME.textMuted, marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                  <MapPin size={11} /> Within 1 mile
+                </div>
+                {/* Amenity count strip */}
+                <div style={{
+                  display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8,
+                  padding: 10, background: THEME.bgPanel, borderRadius: 8,
+                  border: `1px solid ${THEME.border}`, marginBottom: nearby.schools?.length ? 10 : 0
+                }}>
+                  {[
+                    ["Schools", nearby.amenityCounts.schools],
+                    ["Groceries", nearby.amenityCounts.groceries],
+                    ["Parks", nearby.amenityCounts.parks],
+                    ["Restaurants", nearby.amenityCounts.restaurants]
+                  ].map(([label, n]) => (
+                    <div key={label} style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: THEME.text }}>{n}</div>
+                      <div style={{ fontSize: 10, color: THEME.textMuted }}>{label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Top 3 schools with ratings */}
+                {nearby.schools?.length > 0 && (
+                  <div style={{
+                    padding: 12, background: THEME.bgPanel, borderRadius: 8,
+                    border: `1px solid ${THEME.border}`
+                  }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: THEME.textMuted, marginBottom: 8, display: "inline-flex", alignItems: "center", gap: 5 }}>
+                      <GraduationCap size={12} /> Top-rated schools
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {nearby.schools.map((s, i) => (
+                        <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontSize: 12 }}>
+                          <div style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            <span style={{ fontWeight: 600 }}>{s.name}</span>
+                            {s.vicinity && <span style={{ color: THEME.textMuted }}> · {s.vicinity}</span>}
+                          </div>
+                          {s.rating != null && (
+                            <span style={{ fontSize: 11, fontWeight: 700, color: "#F59E0B", flexShrink: 0 }}>
+                              ★ {s.rating}{s.ratingCount > 0 && <span style={{ color: THEME.textDim, fontWeight: 400 }}> ({s.ratingCount})</span>}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Actions */}

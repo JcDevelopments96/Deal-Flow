@@ -293,9 +293,14 @@ const EmailModal = ({ lead, onSend, onClose }) => {
   );
 };
 
-const PropertyPhoto = ({ src, alt, aspectRatio = "4 / 3" }) => {
-  const [errored, setErrored] = useState(false);
-  if (!src || errored) {
+const PropertyPhoto = ({ streetSrc, satelliteSrc, alt, aspectRatio = "4 / 3" }) => {
+  const [view, setView] = useState("street");        // "street" | "satellite"
+  const [errored, setErrored] = useState({ street: false, satellite: false });
+  const src = view === "satellite" ? satelliteSrc : streetSrc;
+  const thisErrored = errored[view];
+  const hasBoth = !!streetSrc && !!satelliteSrc;
+
+  if ((!src || thisErrored) && (!streetSrc && !satelliteSrc)) {
     return (
       <div style={{
         width: "100%", aspectRatio,
@@ -307,18 +312,52 @@ const PropertyPhoto = ({ src, alt, aspectRatio = "4 / 3" }) => {
       </div>
     );
   }
+
   return (
-    <img
-      src={src}
-      alt={alt}
-      onError={() => setErrored(true)}
-      loading="lazy"
-      style={{
-        width: "100%", aspectRatio,
-        objectFit: "cover", borderRadius: 6,
-        background: THEME.bgPanel, display: "block"
-      }}
-    />
+    <div style={{ position: "relative", width: "100%", aspectRatio, borderRadius: 6, overflow: "hidden" }}>
+      {src && !thisErrored ? (
+        <img
+          src={src} alt={alt}
+          onError={() => setErrored(e => ({ ...e, [view]: true }))}
+          loading="lazy"
+          style={{ width: "100%", height: "100%", objectFit: "cover", background: THEME.bgPanel, display: "block" }}
+        />
+      ) : (
+        <div style={{
+          width: "100%", height: "100%", background: THEME.bgPanel,
+          display: "flex", alignItems: "center", justifyContent: "center", color: THEME.textDim
+        }}>
+          <Home size={24} />
+        </div>
+      )}
+
+      {hasBoth && (
+        <div style={{
+          position: "absolute", top: 8, right: 8,
+          display: "flex", background: "rgba(15, 23, 42, 0.78)",
+          borderRadius: 999, padding: 2, fontSize: 10, fontWeight: 700
+        }}>
+          {[
+            { key: "street", label: "Street" },
+            { key: "satellite", label: "Aerial" }
+          ].map(opt => (
+            <button
+              key={opt.key}
+              onClick={(e) => { e.stopPropagation(); setView(opt.key); }}
+              style={{
+                padding: "3px 8px", border: "none", cursor: "pointer",
+                background: view === opt.key ? "#FFFFFF" : "transparent",
+                color: view === opt.key ? THEME.navy : "#FFFFFF",
+                borderRadius: 999,
+                letterSpacing: "0.04em", textTransform: "uppercase"
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -334,7 +373,7 @@ const LeadCard = ({ lead, onSkipTrace, onStatusChange, onDelete, onEmail, onPost
       border: `1px solid ${THEME.border}`, borderRadius: 8, padding: 14,
       background: THEME.bg, display: "flex", flexDirection: "column", gap: 10
     }}>
-      <PropertyPhoto src={lead.streetview_url} alt={lead.address} />
+      <PropertyPhoto streetSrc={lead.streetview_url} satelliteSrc={lead.satellite_url} alt={lead.address} />
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -698,7 +737,7 @@ export const WholesaleView = () => {
           <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "repeat(auto-fill, minmax(320px, 1fr))", gap: 10 }}>
             {searchResults.map((p, idx) => (
               <div key={idx} style={{ border: `1px solid ${THEME.border}`, borderRadius: 8, padding: 12, background: THEME.bgPanel, display: "flex", flexDirection: "column", gap: 8 }}>
-                <PropertyPhoto src={p.streetview_url} alt={p.address} aspectRatio="16 / 9" />
+                <PropertyPhoto streetSrc={p.streetview_url} satelliteSrc={p.satellite_url} alt={p.address} aspectRatio="16 / 9" />
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 700 }}>{p.address}</div>
                   <div style={{ fontSize: 10, color: THEME.textMuted }}>

@@ -303,6 +303,91 @@ async function handleWalkscore(lat, lng, address) {
   return { ...payload, cached: false };
 }
 
+/* ── Google Maps static photo URLs for a given lat/lng ───────────────── */
+function handlePhotos(lat, lng, address) {
+  const key = process.env.GOOGLE_MAPS_API_KEY;
+  if (!key) throw new ApiError(503, "google_maps_not_configured",
+    "Set GOOGLE_MAPS_API_KEY in Vercel env.");
+  const loc = `${lat},${lng}`;
+  const streetQs = new URLSearchParams({
+    size: "640x400", key, fov: "80", pitch: "0", location: loc
+  });
+  const satelliteQs = new URLSearchParams({
+    size: "640x400", key, zoom: "19", maptype: "satellite",
+    center: loc, markers: `color:red|${loc}`
+  });
+  return {
+    streetview_url: `https://maps.googleapis.com/maps/api/streetview?${streetQs.toString()}`,
+    satellite_url: `https://maps.googleapis.com/maps/api/staticmap?${satelliteQs.toString()}`,
+    address: address || null,
+    cached: false
+  };
+}
+
+/* ── Google Places Nearby (schools + amenities) ──────────────────────── */
+const NEARBY_TTL = 7 * 24 * 60 * 60 * 1000;
+const _nearbyCache = new Map();
+
+async function placesNearby(lat, lng, type, key, radius = 1609) {
+  const qs = new URLSearchParams({
+    location: `${lat},${lng}`,
+    radius: String(radius),
+    type,
+    key
+  });
+  const res = await fetch(`https://maps.googleapis.com/maps/api/place/nearbysearch/json?${qs.toString()}`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  if (data.status !== "OK" && data.status !== "ZERO_RESULTS") return [];
+  return Array.isArray(data.results) ? data.results : [];
+}
+
+async function handleNearby(lat, lng) {
+  const key = process.env.GOOGLE_MAPS_API_KEY;
+  if (!key) throw new ApiError(503, "google_maps_not_configured",
+    "Set GOOGLE_MAPS_API_KEY in Vercel env.");
+
+  const cacheKey = `${lat.toFixed(4)}:${lng.toFixed(4)}`;
+  const cached = _nearbyCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < NEARBY_TTL) {
+    return { ...cached.payload, cached: true };
+  }
+
+  // Fire 4 parallel Places Nearby calls — one per category we care about.
+  // Schools get their own call so we can surface a top-3 list with ratings;
+  // amenities only need counts for the neighborhood-score proxy.
+  const [schools, groceries, parks, restaurants] = await Promise.all([
+    placesNearby(lat, lng, "school", key),
+    placesNearby(lat, lng, "grocery_or_supermarket", key),
+    placesNearby(lat, lng, "park", key),
+    placesNearby(lat, lng, "restaurant", key)
+  ]);
+
+  // Top 3 schools by rating (when rated), else by proximity (Google's default order)
+  const schoolsTop = [...schools]
+    .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+    .slice(0, 3)
+    .map(s => ({
+      name: s.name,
+      rating: typeof s.rating === "number" ? +s.rating.toFixed(1) : null,
+      ratingCount: s.user_ratings_total || 0,
+      vicinity: s.vicinity || null
+    }));
+
+  const payload = {
+    schools: schoolsTop,
+    amenityCounts: {
+      schools: schools.length,
+      groceries: groceries.length,
+      parks: parks.length,
+      restaurants: restaurants.length
+    },
+    radiusMiles: 1.0
+  };
+  _nearbyCache.set(cacheKey, { at: Date.now(), payload });
+  return { ...payload, cached: false };
+}
+
 /* ── Router ────────────────────────────────────────────────────────── */
 export default handler(async (req, res) => {
   if (req.method !== "GET") {
@@ -343,9 +428,21 @@ export default handler(async (req, res) => {
       payload = await handleWalkscore(latN, lngN, address);
       break;
     }
+    case "photos": {
+      const latN = Number(lat), lngN = Number(lng);
+      if (!Number.isFinite(latN) || !Number.isFinite(lngN)) throw new ApiError(400, "missing_params", "lat + lng required");
+      payload = handlePhotos(latN, lngN, address);
+      break;
+    }
+    case "nearby": {
+      const latN = Number(lat), lngN = Number(lng);
+      if (!Number.isFinite(latN) || !Number.isFinite(lngN)) throw new ApiError(400, "missing_params", "lat + lng required");
+      payload = await handleNearby(latN, lngN);
+      break;
+    }
     default:
       throw new ApiError(400, "unknown_source",
-        "source must be one of: census, fmr, unemployment, mortgage, flood, walkscore");
+        "source must be one of: census, fmr, unemployment, mortgage, flood, walkscore, photos, nearby");
   }
 
   return res.status(200).json(payload);
