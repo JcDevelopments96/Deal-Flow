@@ -338,9 +338,11 @@ function FindProsPanel({ getToken, onAdd, savedNames }) {
         <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "repeat(auto-fill, minmax(300px, 1fr))", gap: 10 }}>
           {results.map(r => {
             const alreadyAdded = savedNames.has(r.name.toLowerCase());
+            const sources = r.sources || ["google"];
+            const isVerified = sources.length > 1; // appears in both Google + Yelp
             return (
               <div key={r.placeId} style={{
-                border: `1px solid ${THEME.border}`, borderRadius: 8, padding: 12,
+                border: `1px solid ${isVerified ? THEME.green : THEME.border}`, borderRadius: 8, padding: 12,
                 background: THEME.bg, display: "flex", flexDirection: "column", gap: 6
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
@@ -351,6 +353,35 @@ function FindProsPanel({ getToken, onAdd, savedNames }) {
                     </span>
                   )}
                 </div>
+
+                {/* Source badges — green "Verified" when both Google + Yelp matched */}
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  {isVerified && (
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
+                      padding: "2px 6px", background: THEME.greenDim, color: THEME.green, borderRadius: 3
+                    }}>
+                      ✓ Verified · Google + Yelp
+                    </span>
+                  )}
+                  {!isVerified && sources.includes("yelp") && (
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
+                      padding: "2px 6px", background: THEME.bgRaised, color: THEME.textMuted, borderRadius: 3
+                    }}>
+                      Yelp
+                    </span>
+                  )}
+                  {!isVerified && sources.includes("google") && !sources.includes("yelp") && (
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
+                      padding: "2px 6px", background: THEME.bgRaised, color: THEME.textMuted, borderRadius: 3
+                    }}>
+                      Google
+                    </span>
+                  )}
+                </div>
+
                 {r.address && (
                   <div style={{ fontSize: 11, color: THEME.textMuted, lineHeight: 1.4 }}>{r.address}</div>
                 )}
@@ -365,10 +396,34 @@ function FindProsPanel({ getToken, onAdd, savedNames }) {
                       <Globe size={11} /> Site
                     </a>
                   )}
-                  <a href={r.mapsUrl} target="_blank" rel="noopener noreferrer" style={{ color: THEME.accent, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 3 }}>
-                    <ExternalLink size={11} /> Maps
-                  </a>
+                  {r.mapsUrl && (
+                    <a href={r.mapsUrl} target="_blank" rel="noopener noreferrer" style={{ color: THEME.accent, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 3 }}>
+                      <ExternalLink size={11} /> Maps
+                    </a>
+                  )}
+                  {r.yelpUrl && (
+                    <a href={r.yelpUrl} target="_blank" rel="noopener noreferrer" style={{ color: THEME.accent, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 3 }}>
+                      <ExternalLink size={11} /> Yelp
+                    </a>
+                  )}
                 </div>
+
+                {/* NMLS verify link — only on lender results. Opens a Google
+                    site-search of nmlsconsumeraccess.org so the user can
+                    confirm the license. */}
+                {r.nmlsVerifyUrl && (
+                  <a href={r.nmlsVerifyUrl} target="_blank" rel="noopener noreferrer"
+                    style={{
+                      display: "inline-flex", alignItems: "center", gap: 4,
+                      padding: "4px 8px", fontSize: 10, fontWeight: 700,
+                      background: THEME.bgTeal, color: THEME.teal,
+                      border: `1px solid ${THEME.teal}`, borderRadius: 4,
+                      textDecoration: "none", alignSelf: "flex-start"
+                    }}>
+                    🔒 Verify NMLS license →
+                  </a>
+                )}
+
                 <button
                   onClick={() => onAdd(r)}
                   disabled={alreadyAdded}
@@ -379,6 +434,13 @@ function FindProsPanel({ getToken, onAdd, savedNames }) {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {meta && results.length > 0 && (
+        <div style={{ marginTop: 10, fontSize: 10, color: THEME.textDim }}>
+          Sources: Google Places{process.env.YELP_PUBLIC === "1" || results.some(r => r.sources?.includes("yelp")) ? " + Yelp Fusion" : ""}
+          {category === "lender" && " · NMLS verify links open the federal Consumer Access registry"}
         </div>
       )}
     </Panel>

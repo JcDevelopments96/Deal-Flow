@@ -397,23 +397,56 @@ async function handleNearby(lat, lng) {
 const _findprosCache = new Map();
 const FINDPROS_TTL = 12 * 60 * 60 * 1000;
 
-// Each category maps to (a) a Google Places query string, (b) the
-// team_contacts.role enum value the user can save the result under.
+// Each category maps to (a) a Google Places query string, (b) a Yelp
+// `categories` filter (Yelp's category aliases), (c) the team_contacts.role
+// enum value the user can save the result under.
 const PRO_CATEGORIES = {
-  lender:      { query: "hard money lender", role: "lender" },
-  contractor:  { query: "general contractor", role: "contractor" },
-  plumber:     { query: "plumber",            role: "contractor" },
-  electrician: { query: "electrician",        role: "contractor" },
-  roofer:      { query: "roofing contractor", role: "contractor" },
-  hvac:        { query: "HVAC contractor",    role: "contractor" },
-  cleaner:     { query: "house cleaning",     role: "other" },
-  pm:          { query: "property management company", role: "property_manager" },
-  title:       { query: "title insurance company",     role: "title" },
-  agent:       { query: "real estate agent",  role: "agent" },
-  inspector:   { query: "home inspector",     role: "inspector" },
-  insurance:   { query: "homeowners insurance agent",   role: "insurance" },
-  attorney:    { query: "real estate attorney",         role: "attorney" }
+  lender:      { query: "hard money lender",            yelp: "mortgagebrokers,financialservices", role: "lender" },
+  contractor:  { query: "general contractor",           yelp: "contractors",                       role: "contractor" },
+  plumber:     { query: "plumber",                       yelp: "plumbing",                          role: "contractor" },
+  electrician: { query: "electrician",                   yelp: "electricians",                      role: "contractor" },
+  roofer:      { query: "roofing contractor",            yelp: "roofing",                           role: "contractor" },
+  hvac:        { query: "HVAC contractor",               yelp: "hvac",                              role: "contractor" },
+  cleaner:     { query: "house cleaning",                yelp: "homecleaning",                      role: "other" },
+  pm:          { query: "property management company",   yelp: "propertymgmt",                      role: "property_manager" },
+  title:       { query: "title insurance company",       yelp: "real_estate_services",              role: "title" },
+  agent:       { query: "real estate agent",             yelp: "realestateagents",                  role: "agent" },
+  inspector:   { query: "home inspector",                yelp: "homeinspectors",                    role: "inspector" },
+  insurance:   { query: "homeowners insurance agent",    yelp: "insurance",                         role: "insurance" },
+  attorney:    { query: "real estate attorney",          yelp: "lawyers",                           role: "attorney" }
 };
+
+// ZIP-centroid cache so the Yelp call has a (lat,lng) — Yelp's location
+// param accepts ZIPs natively, but keeping the centroid helps us measure
+// "near" later if needed.
+async function fetchYelpForCategory(yelpCat, zip) {
+  const key = process.env.YELP_API_KEY;
+  if (!key) return [];
+  const qs = new URLSearchParams({
+    location: zip,
+    categories: yelpCat,
+    radius: "16093",   // 10mi in meters (Yelp max is 40k)
+    sort_by: "rating",
+    limit: "10"
+  });
+  try {
+    const res = await fetch(`https://api.yelp.com/v3/businesses/search?${qs.toString()}`, {
+      headers: { Authorization: `Bearer ${key}`, accept: "application/json" }
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data?.businesses) ? data.businesses : [];
+  } catch { return []; }
+}
+
+// Loose name dedupe — strip punctuation + trailing LLC/Inc/Corp/etc and lowercase.
+function nameKey(name) {
+  return String(name || "").toLowerCase()
+    .replace(/[^a-z0-9 ]/g, "")
+    .replace(/\b(llc|inc|incorporated|corp|company|co|ltd|llp|pllc)\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 async function handleFindPros(category, zip) {
   const key = process.env.GOOGLE_MAPS_API_KEY;
@@ -430,35 +463,99 @@ async function handleFindPros(category, zip) {
     return { ...cached.payload, cached: true };
   }
 
-  // Text Search returns 20 max, ordered by Google's relevance/proximity.
-  const qs = new URLSearchParams({
+  // Fan out Google Places + Yelp Fusion in parallel. Yelp may return
+  // empty (no key configured, or the category alias didn't match) — that's
+  // fine, we still always get Google results.
+  const googleQs = new URLSearchParams({
     query: `${cat.query} near ${zip}`,
     key,
     fields: "name,place_id,formatted_address,formatted_phone_number,rating,user_ratings_total,website"
   });
-  const res = await fetch(
-    `https://maps.googleapis.com/maps/api/place/textsearch/json?${qs.toString()}`
-  );
-  if (!res.ok) throw new ApiError(502, "places_error", `Google ${res.status}`);
-  const data = await res.json();
-  if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
-    throw new ApiError(502, "places_error", data.error_message || data.status);
+  const [googleRes, yelpBusinesses] = await Promise.all([
+    fetch(`https://maps.googleapis.com/maps/api/place/textsearch/json?${googleQs.toString()}`),
+    fetchYelpForCategory(cat.yelp, zip)
+  ]);
+
+  if (!googleRes.ok) throw new ApiError(502, "places_error", `Google ${googleRes.status}`);
+  const googleJson = await googleRes.json();
+  if (googleJson.status !== "OK" && googleJson.status !== "ZERO_RESULTS") {
+    throw new ApiError(502, "places_error", googleJson.error_message || googleJson.status);
   }
-  const results = (Array.isArray(data.results) ? data.results : [])
+
+  // Normalize Google results
+  const googleResults = (Array.isArray(googleJson.results) ? googleJson.results : [])
     .slice(0, 10)
     .map(r => ({
       placeId: r.place_id,
       name: r.name,
       address: r.formatted_address || r.vicinity || null,
-      phone: r.formatted_phone_number || null, // often null on textsearch — needs Place Details for guaranteed
+      phone: r.formatted_phone_number || null,
       rating: typeof r.rating === "number" ? +r.rating.toFixed(1) : null,
       ratingCount: r.user_ratings_total || 0,
       website: r.website || null,
       mapsUrl: `https://www.google.com/maps/place/?q=place_id:${r.place_id}`,
-      role: cat.role
+      role: cat.role,
+      sources: ["google"]
     }));
 
-  const payload = { category, zip: String(zip), results };
+  // Index Google results by name-key for dedupe with Yelp
+  const byKey = new Map();
+  for (const r of googleResults) byKey.set(nameKey(r.name), r);
+
+  // Merge in Yelp — when names match, layer Yelp's review count + url onto
+  // the Google entry; mark sources=["google","yelp"]. Otherwise add the
+  // Yelp result as a new entry with sources=["yelp"].
+  for (const y of yelpBusinesses) {
+    const k = nameKey(y.name);
+    if (!k) continue;
+    const existing = byKey.get(k);
+    if (existing) {
+      // Prefer the higher review count source for the rating
+      const yelpReviews = y.review_count || 0;
+      if (yelpReviews > (existing.ratingCount || 0)) {
+        existing.rating = typeof y.rating === "number" ? +y.rating.toFixed(1) : existing.rating;
+        existing.ratingCount = yelpReviews;
+      }
+      if (!existing.phone && y.phone) existing.phone = y.display_phone || y.phone;
+      if (!existing.website && y.url) existing.website = y.url;
+      existing.yelpUrl = y.url || null;
+      existing.sources = Array.from(new Set([...(existing.sources || []), "yelp"]));
+    } else {
+      byKey.set(k, {
+        placeId: `yelp:${y.id}`,
+        name: y.name,
+        address: y.location?.display_address?.join(", ") || null,
+        phone: y.display_phone || y.phone || null,
+        rating: typeof y.rating === "number" ? +y.rating.toFixed(1) : null,
+        ratingCount: y.review_count || 0,
+        website: y.url || null,
+        yelpUrl: y.url || null,
+        mapsUrl: y.location?.address1
+          ? `https://www.google.com/maps/search/${encodeURIComponent(y.name + " " + y.location.address1)}`
+          : null,
+        role: cat.role,
+        sources: ["yelp"]
+      });
+    }
+  }
+
+  // Lender results get an NMLS verify link — points at a site-search of
+  // nmlsconsumeraccess.org so the user can confirm the license in 1 click.
+  const merged = Array.from(byKey.values()).map(r => {
+    if (cat.role === "lender") {
+      r.nmlsVerifyUrl = `https://www.google.com/search?q=${encodeURIComponent(`site:nmlsconsumeraccess.org "${r.name}"`)}`;
+    }
+    return r;
+  });
+
+  // Sort by review count (signal of activity), then by rating
+  merged.sort((a, b) => (b.ratingCount || 0) - (a.ratingCount || 0) || (b.rating || 0) - (a.rating || 0));
+  const results = merged.slice(0, 12);
+
+  const payload = {
+    category, zip: String(zip), results,
+    yelpAvailable: !!process.env.YELP_API_KEY
+  };
   _findprosCache.set(cacheKey, { at: Date.now(), payload });
   return { ...payload, cached: false };
 }
