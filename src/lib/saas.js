@@ -331,3 +331,12 @@ export async function fetchLocalPros(getToken, { category, zip }) {
   const qs = new URLSearchParams({ source: "findpros", category, zip: String(zip) });
   return fetchMetered(getToken, `/api/lookup?${qs.toString()}`);
 }
+
+// Reviews for a single business — fanned out across Google Place Details
+// + Yelp Reviews server-side, returned as one merged list newest-first.
+export async function fetchProReviews(getToken, { placeId, yelpId }) {
+  const qs = new URLSearchParams({ source: "proreviews" });
+  if (placeId) qs.set("placeId", String(placeId));
+  if (yelpId)  qs.set("yelpId",  String(yelpId));
+  return fetchMetered(getToken, `/api/lookup?${qs.toString()}`);
+}
