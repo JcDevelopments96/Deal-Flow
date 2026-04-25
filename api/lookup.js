@@ -704,6 +704,96 @@ async function handleProReviews(placeId, yelpId) {
   return { ...payload, cached: false };
 }
 
+/* ── SHORT-TERM RENTAL POTENTIAL (Rabbu) ─────────────────────────────────
+   Hits Rabbu's public estimate API to project Airbnb/VRBO performance for
+   a given property. Returns annual revenue, average occupancy, average
+   daily rate, and a per-month seasonal breakdown. Cached 7d server-side
+   because STR estimates don't move daily.
+
+   Note: Rabbu's API is publicly accessible but undocumented — they use it
+   to power their own landing-page calculator. We assume a stable response
+   shape and degrade gracefully (return null) if the upstream changes.
+─────────────────────────────────────────────────────────────────────────*/
+const _strCache = new Map();
+const STR_TTL = 7 * 24 * 60 * 60 * 1000;
+
+async function handleStr(address, lat, lng) {
+  if (!address) throw new ApiError(400, "missing_params", "address required (lat/lng optional)");
+  const cacheKey = `${address}|${lat || ""}|${lng || ""}`;
+  const cached = _strCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < STR_TTL) {
+    return { ...cached.payload, cached: true };
+  }
+
+  let body = null;
+  try {
+    const res = await fetch("https://api.rabbu.com/v1/property_searches", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "accept": "application/json",
+        // Rabbu's calculator sends a generic browser UA; mirror that to
+        // avoid being filtered as a bot.
+        "User-Agent": "Mozilla/5.0 (DealTrack STR estimate)"
+      },
+      body: JSON.stringify({
+        address,
+        ...(Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))
+          ? { latitude: Number(lat), longitude: Number(lng) }
+          : {})
+      })
+    });
+    if (res.ok) body = await res.json().catch(() => null);
+  } catch { /* network blip — fall through to "not available" */ }
+
+  // Rabbu's public response has historically nested estimates under .data
+  // .estimates with monthly_revenue / monthly_occupancy / adr / revenue
+  // fields. Guard every access so a schema drift produces a clean
+  // "estimate not available" instead of a 500.
+  const est = body?.data?.estimates || body?.estimates || body?.estimate || null;
+  if (!est) {
+    const payload = { available: false };
+    _strCache.set(cacheKey, { at: Date.now(), payload });
+    return { ...payload, cached: false };
+  }
+
+  const num = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  // Normalize monthly array — Rabbu uses different keys across docs/UI
+  const rawMonthly = Array.isArray(est.monthly) ? est.monthly
+    : Array.isArray(est.monthly_estimates) ? est.monthly_estimates
+    : Array.isArray(est.months) ? est.months
+    : [];
+
+  const monthly = rawMonthly.map((m, i) => ({
+    month: num(m.month) ?? (i + 1),
+    revenue: num(m.revenue) ?? num(m.monthly_revenue),
+    occupancy: num(m.occupancy) ?? num(m.occupancy_rate),
+    adr: num(m.adr) ?? num(m.daily_rate) ?? num(m.average_daily_rate)
+  })).filter(m => m.month >= 1 && m.month <= 12);
+
+  // ADR range across months (low season → high season)
+  const adrs = monthly.map(m => m.adr).filter(v => typeof v === "number" && v > 0);
+  const adrLow  = adrs.length ? Math.min(...adrs) : num(est.adr) ?? num(est.daily_rate);
+  const adrHigh = adrs.length ? Math.max(...adrs) : num(est.adr) ?? num(est.daily_rate);
+
+  const payload = {
+    available: true,
+    revenue:   num(est.revenue) ?? num(est.annual_revenue),
+    occupancy: num(est.occupancy) ?? num(est.occupancy_rate),
+    adr:       num(est.adr) ?? num(est.daily_rate) ?? num(est.average_daily_rate),
+    adrLow,
+    adrHigh,
+    monthly,
+    source: "rabbu"
+  };
+  _strCache.set(cacheKey, { at: Date.now(), payload });
+  return { ...payload, cached: false };
+}
+
 /* ── Router ────────────────────────────────────────────────────────── */
 export default handler(async (req, res) => {
   if (req.method !== "GET") {
@@ -773,9 +863,14 @@ export default handler(async (req, res) => {
       );
       break;
     }
+    case "str": {
+      if (!address) throw new ApiError(400, "missing_params", "address required");
+      payload = await handleStr(String(address), lat, lng);
+      break;
+    }
     default:
       throw new ApiError(400, "unknown_source",
-        "source must be one of: census, fmr, unemployment, mortgage, flood, walkscore, photos, nearby, findpros, proreviews");
+        "source must be one of: census, fmr, unemployment, mortgage, flood, walkscore, photos, nearby, findpros, proreviews, str");
   }
 
   return res.status(200).json(payload);

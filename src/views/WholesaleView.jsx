@@ -14,7 +14,8 @@ import { useToast, useAppActions } from "../contexts.jsx";
 import {
   isSaasMode, useSaasUser,
   searchWholesaleLeads, listWholesaleLeads, saveWholesaleLead,
-  skipTraceLead, updateWholesaleLead, deleteWholesaleLead, emailWholesaleLead
+  skipTraceLead, updateWholesaleLead, deleteWholesaleLead, emailWholesaleLead,
+  fetchStrEstimate
 } from "../lib/saas.js";
 import { STATE_NAMES } from "../market/mapUtils.js";
 import { CITIES_BY_STATE } from "../lib/usCities.js";
@@ -117,7 +118,7 @@ const EmailModal = ({ lead, onSend, onClose }) => {
 
 /** Full-detail modal — opened by clicking a lead card. Surfaces every
  * field ATTOM + skip-trace + Google gave us, with inline actions. */
-const WholesaleDetailModal = ({ lead, onClose, onSkipTrace, onEmail, onStatusChange, onSave, busy }) => {
+const WholesaleDetailModal = ({ lead, getToken, onClose, onSkipTrace, onEmail, onStatusChange, onSave, busy }) => {
   const status = STATUS_BY_KEY[lead.status] || STATUS_BY_KEY.new;
   const isSearchResult = !!lead.__isSearchResult;
   const flags = [];
@@ -127,6 +128,27 @@ const WholesaleDetailModal = ({ lead, onClose, onSkipTrace, onEmail, onStatusCha
 
   const [view, setView] = useState("street");
   const activeSrc = view === "satellite" ? lead.satellite_url : lead.streetview_url;
+
+  // Fetch Airbnb/VRBO performance estimate (Rabbu) on open. Stays null
+  // until the upstream returns a usable response — graceful no-render
+  // when the address isn't recognized or the API is unreachable.
+  const [str, setStr] = useState(null);
+  useEffect(() => {
+    if (!getToken || !lead.address) return;
+    let cancelled = false;
+    const fullAddress = [
+      lead.address,
+      [lead.city, lead.state, lead.zip].filter(Boolean).join(", ")
+    ].filter(Boolean).join(", ");
+    fetchStrEstimate(getToken, {
+      address: fullAddress,
+      lat: lead.latitude || undefined,
+      lng: lead.longitude || undefined
+    })
+      .then(body => { if (!cancelled) setStr(body); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [getToken, lead.address, lead.city, lead.state, lead.zip, lead.latitude, lead.longitude]);
 
   const kv = (label, value, opts = {}) => value ? (
     <div style={{ padding: "6px 0", borderBottom: `1px solid ${THEME.borderLight}` }}>
@@ -287,6 +309,64 @@ const WholesaleDetailModal = ({ lead, onClose, onSkipTrace, onEmail, onStatusCha
               {kv("Years owned", lead.years_owned != null ? `${lead.years_owned} years` : null)}
             </div>
           </div>
+
+          {/* STR (Airbnb / VRBO) potential — Rabbu estimate when available */}
+          {str?.available && (
+            <div style={{ marginBottom: 16, padding: 12, background: THEME.bgPanel, borderRadius: 8, border: `1px solid ${THEME.border}` }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 6 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: THEME.textMuted, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                  Short-Term Rental Potential (Airbnb / VRBO)
+                </div>
+                <span style={{ fontSize: 9, color: THEME.textDim }}>Estimates by Rabbu</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: str.monthly?.length ? 12 : 0 }}>
+                <div style={{ padding: "8px 10px", background: THEME.bg, border: `1px solid ${THEME.borderLight}`, borderRadius: 6 }}>
+                  <div style={{ fontSize: 10, color: THEME.textMuted }}>Annual revenue</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: THEME.green, marginTop: 2 }}>
+                    {str.revenue ? fmtUSD(str.revenue) : "—"}
+                  </div>
+                </div>
+                <div style={{ padding: "8px 10px", background: THEME.bg, border: `1px solid ${THEME.borderLight}`, borderRadius: 6 }}>
+                  <div style={{ fontSize: 10, color: THEME.textMuted }}>Avg occupancy</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, marginTop: 2 }}>
+                    {str.occupancy != null
+                      ? `${Math.round(str.occupancy * (str.occupancy <= 1 ? 100 : 1))}%`
+                      : "—"}
+                  </div>
+                </div>
+                <div style={{ padding: "8px 10px", background: THEME.bg, border: `1px solid ${THEME.borderLight}`, borderRadius: 6 }}>
+                  <div style={{ fontSize: 10, color: THEME.textMuted }}>Nightly rate</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>
+                    {str.adrLow && str.adrHigh && str.adrLow !== str.adrHigh
+                      ? <>${Math.round(str.adrLow)}<span style={{ color: THEME.textDim }}> – </span>${Math.round(str.adrHigh)}</>
+                      : str.adr ? <>${Math.round(str.adr)}</>
+                      : "—"}
+                  </div>
+                </div>
+              </div>
+              {str.monthly?.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 6 }}>
+                    Occupancy by month (Jan → Dec) — hover for nightly rate
+                  </div>
+                  <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 60, padding: "0 2px" }}>
+                    {str.monthly.map((m) => {
+                      const occ = (m.occupancy ?? 0) <= 1 ? (m.occupancy ?? 0) : (m.occupancy / 100);
+                      const pct = Math.max(0.05, Math.min(1, occ));
+                      const adrLabel = m.adr ? ` · $${Math.round(m.adr)}/night` : "";
+                      return (
+                        <div key={m.month} title={`${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m.month-1]}: ${Math.round(occ * 100)}%${adrLabel}`}
+                          style={{ flex: 1, height: `${pct * 100}%`, background: THEME.accent, opacity: 0.4 + pct * 0.6, borderRadius: "2px 2px 0 0", cursor: "default" }} />
+                      );
+                    })}
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 9, color: THEME.textDim }}>
+                    <span>Jan</span><span>Apr</span><span>Jul</span><span>Oct</span><span>Dec</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Status + notes (only for saved leads) */}
           {!isSearchResult && (
@@ -915,6 +995,7 @@ export const WholesaleView = () => {
       {detailLead && (
         <WholesaleDetailModal
           lead={detailLead.__isSearchResult ? detailLead : (leads.find(l => l.id === detailLead.id) || detailLead)}
+          getToken={saas.getToken}
           busy={busyIds.has(detailLead.id)}
           onClose={() => setDetailLead(null)}
           onSkipTrace={onSkipTrace}
