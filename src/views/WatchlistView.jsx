@@ -89,14 +89,17 @@ export const WatchlistView = () => {
                 title="Remove"
                 className="btn-ghost"
                 style={{
-                  position: "absolute", top: 18, right: 18,
-                  width: 30, height: 30, padding: 0,
+                  // 44px hits the WCAG 2.1 AAA touch-target spec — fingers
+                  // can reliably hit it on a phone without zooming.
+                  position: "absolute", top: 12, right: 12,
+                  width: 44, height: 44, padding: 0,
                   background: "rgba(255,255,255,0.92)",
                   borderRadius: "50%", border: `1px solid ${THEME.border}`,
-                  display: "flex", alignItems: "center", justifyContent: "center"
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  boxShadow: "0 2px 6px rgba(15,23,42,0.10)"
                 }}
               >
-                <X size={13} />
+                <X size={16} />
               </button>
             </div>
           ))}

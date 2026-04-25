@@ -65,6 +65,27 @@ export const PlansView = () => {
     }
   };
 
+  // Sends current subscriber to the Stripe Customer Portal to update card,
+  // change plan, or cancel — closes the gap where users could subscribe but
+  // had no in-app way to manage billing afterwards.
+  const handleManageBilling = async () => {
+    if (!saasOn || !saas.user) return;
+    setWorking("portal");
+    setError(null);
+    try {
+      const body = await fetchMetered(saas.getToken, "/api/stripe/portal", { method: "POST" });
+      if (body.url) window.location.href = body.url;
+      else throw new Error("No portal URL returned.");
+    } catch (err) {
+      const msg = err instanceof ApiRequestError && err.status === 404
+        ? "You don't have an active subscription yet — pick a plan below."
+        : err.message || "Couldn't open billing portal.";
+      setError(msg);
+      setWorking(null);
+    }
+  };
+  const isPaidUser = currentPlan && currentPlan !== "free";
+
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: isMobile() ? 16 : "32px 28px" }}>
       {/* Hero */}
@@ -76,6 +97,30 @@ export const PlansView = () => {
           Every plan includes the full Deal Analyzer, Watchlist, Team CRM, Ari AI assistant, and the free data stack (FRED + HUD + Census + BLS + FEMA + Zillow + Redfin).
         </p>
       </div>
+
+      {/* Existing subscriber → drop into the Stripe Customer Portal to
+          update card, switch plans, or cancel. Hidden for free users. */}
+      {isPaidUser && (
+        <div style={{
+          maxWidth: 680, margin: "0 auto 20px", padding: "12px 16px",
+          background: THEME.bgTeal, border: `1px solid ${THEME.teal}`,
+          borderRadius: 8, fontSize: 13,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          gap: 12, flexWrap: "wrap"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, color: THEME.teal }}>
+            <CreditCard size={14} />
+            <span>You're on the <strong style={{ textTransform: "capitalize" }}>{currentPlan}</strong> plan.</span>
+          </div>
+          <button
+            onClick={handleManageBilling}
+            disabled={working === "portal"}
+            className="btn-secondary"
+            style={{ padding: "7px 14px", fontSize: 12 }}>
+            {working === "portal" ? "Opening…" : "Manage billing"}
+          </button>
+        </div>
+      )}
 
       {/* Cadence toggle */}
       <div style={{ display: "flex", justifyContent: "center", marginBottom: 24 }}>

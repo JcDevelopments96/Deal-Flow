@@ -46,13 +46,16 @@ const NavButton = ({ tab, isActive, onClick, darkMode = true, watchlistCount }) 
     style={{
       padding: "8px 14px", fontSize: 13, fontWeight: 600,
       background: isActive
-        ? (darkMode ? "rgba(255, 255, 255, 0.15)" : THEME.bgRaised)
+        ? (darkMode ? "rgba(255, 255, 255, 0.28)" : THEME.bgRaised)
         : "transparent",
       color: isActive
         ? (darkMode ? "#FFFFFF" : THEME.accent)
         : (darkMode ? "rgba(255, 255, 255, 0.75)" : THEME.text),
       border: "none",
       borderRadius: 6,
+      // Bottom rule on active tab gives a much stronger visual cue than the
+      // muted background fill alone — closes a visibility gap from the audit.
+      boxShadow: isActive && darkMode ? `inset 0 -2px 0 ${THEME.accent}` : "none",
       display: "flex", alignItems: "center", gap: 6, cursor: "pointer",
       width: darkMode ? "auto" : "100%",   // full-width inside dropdown
       justifyContent: darkMode ? "center" : "flex-start",
