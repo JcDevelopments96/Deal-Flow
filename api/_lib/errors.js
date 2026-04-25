@@ -22,9 +22,14 @@ export function sendError(res, err) {
 }
 
 // Small wrapper that lets handlers just `throw new ApiError(...)` naturally.
+// Rate-limit check runs FIRST so a flood of requests gets throttled before
+// it reaches the auth/DB layers.
 export function handler(fn) {
   return async (req, res) => {
     try {
+      // Lazy import to avoid a circular dependency through rateLimit.js
+      const { rateLimit } = await import("./rateLimit.js");
+      rateLimit(req);
       await fn(req, res);
     } catch (err) {
       sendError(res, err);
