@@ -75,6 +75,10 @@ export const STATE_MAP_VIEW = {
 };
 
 export const COUNTIES_TOPOJSON = "https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json";
+// State polygons for the national overview view — same source/CDN as the
+// counties file, ~50 features instead of ~3,144 so it renders nearly
+// instantly on mobile.
+export const STATES_TOPOJSON   = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json";
 
 export const normalizeCountyName = (name) =>
   (name || "").toLowerCase().replace(/\s+county$/i, "").trim();

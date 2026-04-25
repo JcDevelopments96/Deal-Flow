@@ -1,12 +1,16 @@
 /* ============================================================================
-   US COUNTY MAP — interactive, county-level choropleth with listing pins.
+   US COUNTY MAP — drill-down choropleth.
+     • National view: 50 state polygons, colored by aggregate Zillow ZHVI.
+     • State view:    counties for the selected state with listing pins.
+   Click a state in national view to drill in; "← Back to US" returns home.
    ============================================================================ */
 import React, { useState, useMemo } from "react";
 import { ComposableMap, Geographies, Geography, ZoomableGroup, Marker } from "react-simple-maps";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, ArrowLeft } from "lucide-react";
 import { THEME } from "../theme.js";
 import {
-  STATE_FIPS_BY_CODE, STATE_CODE_BY_FIPS, STATE_MAP_VIEW, COUNTIES_TOPOJSON,
+  STATE_FIPS_BY_CODE, STATE_CODE_BY_FIPS, STATE_NAMES, STATE_MAP_VIEW,
+  COUNTIES_TOPOJSON, STATES_TOPOJSON,
   normalizeCountyName, scoreToHeatFill, scoreToHeatStroke, scoreToT,
   HEAT_SCALE_MIN, HEAT_SCALE_MAX
 } from "./mapUtils.js";
@@ -144,6 +148,48 @@ export const USCountyMap = ({
     return { staticCountyHeat: out, staticMin: sMin, staticMax: sMax };
   }, [staticCountyStats, metric]);
 
+  // Per-state aggregate ZHVI for the national overview. We bucket every
+  // county by its 2-char state FIPS, then take the median ZHVI in each
+  // bucket — median is more robust than mean against outliers like a
+  // county containing one ultra-luxury enclave (e.g., Los Alamos NM).
+  const { stateHeat, stateMin, stateMax } = useMemo(() => {
+    const out = new Map();
+    if (!staticCountyStats) return { stateHeat: out, stateMin: 0, stateMax: 0 };
+
+    const buckets = new Map(); // stateFips -> [zhvi values]
+    for (const [fips, s] of Object.entries(staticCountyStats)) {
+      const v = Number(s?.zhvi_latest);
+      if (!Number.isFinite(v) || v <= 0) continue;
+      const sf = String(fips).slice(0, 2);
+      if (!buckets.has(sf)) buckets.set(sf, []);
+      buckets.get(sf).push(v);
+    }
+
+    const medians = [];
+    for (const [sf, arr] of buckets.entries()) {
+      arr.sort((a, b) => a - b);
+      const m = arr.length % 2
+        ? arr[(arr.length - 1) / 2]
+        : (arr[arr.length / 2 - 1] + arr[arr.length / 2]) / 2;
+      medians.push([sf, m]);
+    }
+    if (medians.length === 0) return { stateHeat: out, stateMin: 0, stateMax: 0 };
+    const sMin = Math.min(...medians.map(m => m[1]));
+    const sMax = Math.max(...medians.map(m => m[1]));
+    const range = sMax - sMin;
+    for (const [sf, med] of medians) {
+      const raw = range > 0 ? (med - sMin) / range : 0.5;
+      const t = 1 - raw; // lower price = greener
+      out.set(sf, { t, median: med });
+    }
+    return { stateHeat: out, stateMin: sMin, stateMax: sMax };
+  }, [staticCountyStats]);
+
+  // Map mode: when no state is selected we render 50 state polygons
+  // for a clean national overview; when one is selected we drop down
+  // to the county-level render with listing pins.
+  const inStateView = !!selectedState;
+
   const view = (selectedState && STATE_MAP_VIEW[selectedState])
     ? STATE_MAP_VIEW[selectedState]
     : { center: [-96, 38], zoom: 1 };
@@ -174,6 +220,67 @@ export const USCountyMap = ({
             minZoom={1}
             maxZoom={12}
           >
+            {/* National view: 50 state polygons. Cleaner first impression
+                than 3,000+ counties, and clicking a state drills in to
+                the county-level render below. Only renders when no
+                state is selected. */}
+            {!inStateView && (
+              <Geographies geography={STATES_TOPOJSON}>
+                {({ geographies }) => {
+                  if (!geographies || geographies.length === 0) return null;
+                  return geographies.map(geo => {
+                    const sf = String(geo.id || "").padStart(2, "0");
+                    const stateCode = STATE_CODE_BY_FIPS[sf];
+                    const heat = stateHeat.get(sf);
+                    const fill   = heat ? scoreToHeatFill(heat.t)   : THEME.bgPanel;
+                    const stroke = heat ? scoreToHeatStroke(heat.t) : THEME.border;
+                    const opacity = heat ? 0.88 : 0.85;
+                    return (
+                      <Geography
+                        key={geo.rsmKey}
+                        geography={geo}
+                        fill={fill}
+                        stroke={stroke}
+                        strokeWidth={0.6}
+                        style={{
+                          default: { outline: "none", transition: "fill 0.2s, opacity 0.2s", opacity },
+                          hover:   { fill: THEME.accent, stroke: THEME.accent, opacity: 1, outline: "none", cursor: stateCode ? "pointer" : "default" },
+                          pressed: { outline: "none" }
+                        }}
+                        onMouseEnter={() => {
+                          if (!stateCode) return;
+                          setHoveredCounty({
+                            name: STATE_NAMES[stateCode] || stateCode,
+                            state: stateCode,
+                            isStateLevel: true,
+                            staticStats: heat ? { zhvi: heat.median } : null
+                          });
+                        }}
+                        onMouseLeave={() => setHoveredCounty(null)}
+                        onClick={() => {
+                          if (!onCountyClick || !stateCode) return;
+                          // Hand the click up as a "pick this state" signal.
+                          // Caller (AdvancedMarketIntel) sets selectedState,
+                          // which flips us into county view automatically.
+                          onCountyClick({
+                            state: stateCode,
+                            city: null,
+                            county: null,
+                            synthetic: true,
+                            stateFips: sf,
+                            countyFips: null,
+                            __pickState: true
+                          });
+                        }}
+                      />
+                    );
+                  });
+                }}
+              </Geographies>
+            )}
+
+            {/* State view: county-level render, listing pins, the works. */}
+            {inStateView && (
             <Geographies geography={COUNTIES_TOPOJSON}>
               {({ geographies }) => {
                 if (!geographies || geographies.length === 0) return null;
@@ -183,6 +290,11 @@ export const USCountyMap = ({
                   const countyName = geo.properties.name;
                   const countyNorm = normalizeCountyName(countyName);
                   const stateCode = STATE_CODE_BY_FIPS[stateFips];
+
+                  // Fast path: when a state IS selected, hide every county
+                  // that isn't in it. Avoids rendering ~3,000 unnecessary
+                  // SVG paths per frame and lets the selected state breathe.
+                  if (stateFips !== selectedFips) return null;
 
                   const stateMarkets = marketLookup.get(stateFips);
                   const market = stateMarkets ? stateMarkets.get(countyNorm) : null;
@@ -296,13 +408,15 @@ export const USCountyMap = ({
                 });
               }}
             </Geographies>
+            )}
 
-            {/* Listing pins — dropped for each live property with a valid
-                US lat/lng. geoAlbersUsa returns null for points outside its
-                valid range (most of the world, plus the sentinel 0,0), and
+            {/* Listing pins — only in state view. National view would be
+                visually noisy with thousands of pins coast to coast.
+                geoAlbersUsa returns null for points outside its valid
+                range (most of the world, plus the sentinel 0,0), and
                 react-simple-maps' <Marker> crashes when the projection
                 returns null — hence the strict bounds check. */}
-            {Array.isArray(listings) && listings.map(l => {
+            {inStateView && Array.isArray(listings) && listings.map(l => {
               const lat = Number(l?.latitude);
               const lng = Number(l?.longitude);
               // Rough continental US + AK/HI bounds. Anything outside this
@@ -338,7 +452,34 @@ export const USCountyMap = ({
           </ZoomableGroup>
         </ComposableMap>
 
-        {/* Reset view — zooms back to the national view, clears county selection. */}
+        {/* "← Back to US" — primary way out of state view. Shown top-LEFT
+            so it doesn't compete with the existing top-right reset
+            button (which also clears live highlights, not just zoom). */}
+        {onResetView && inStateView && (
+          <button
+            type="button"
+            onClick={onResetView}
+            aria-label="Back to US overview"
+            title="Back to US overview"
+            style={{
+              position: "absolute", top: 16, left: 16,
+              padding: "6px 10px",
+              background: "rgba(255,255,255,0.95)",
+              color: THEME.accent,
+              border: `1px solid ${THEME.border}`,
+              borderRadius: 6,
+              fontSize: 11, fontWeight: 700,
+              display: "inline-flex", alignItems: "center", gap: 5,
+              cursor: "pointer",
+              boxShadow: "0 2px 8px rgba(15,23,42,0.08)"
+            }}
+          >
+            <ArrowLeft size={12} />
+            Back to US
+          </button>
+        )}
+
+        {/* Reset view — top-right, kept for clearing highlighted markers */}
         {onResetView && (selectedState || highlightedMarket) && (
           <button
             type="button"
