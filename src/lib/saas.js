@@ -324,3 +324,10 @@ export async function fetchNearby(getToken, { lat, lng }) {
   const qs = new URLSearchParams({ source: "nearby", lat: String(lat), lng: String(lng) });
   return fetchMetered(getToken, `/api/lookup?${qs.toString()}`);
 }
+
+// Find local pros by category (lender, contractor, plumber, etc.) and ZIP.
+// Returns up to ~10 nearby businesses from Google Places Text Search.
+export async function fetchLocalPros(getToken, { category, zip }) {
+  const qs = new URLSearchParams({ source: "findpros", category, zip: String(zip) });
+  return fetchMetered(getToken, `/api/lookup?${qs.toString()}`);
+}

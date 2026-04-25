@@ -6,7 +6,7 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import {
   Plus, Users, Search, Filter, Phone, Mail, Globe, Edit3, Trash2,
-  Star, Building2, X, UserPlus
+  Star, Building2, X, UserPlus, MapPin, ExternalLink
 } from "lucide-react";
 import { THEME } from "../theme.js";
 import { isMobile } from "../utils.js";
@@ -14,8 +14,28 @@ import { Panel } from "../primitives.jsx";
 import { useToast } from "../contexts.jsx";
 import {
   isSaasMode, useSaasUser,
-  fetchTeam, saveTeamContact, updateTeamContact, removeTeamContact
+  fetchTeam, saveTeamContact, updateTeamContact, removeTeamContact,
+  fetchLocalPros
 } from "../lib/saas.js";
+
+// Categories for the "Find Local Pros" panel. Each maps to the Google
+// Places search query the server will run, plus the team_contacts.role
+// the result will be saved under when the user hits "Add to Team".
+const PRO_CATEGORIES = [
+  { key: "lender",      label: "Lender",       icon: "💰" },
+  { key: "contractor",  label: "Contractor",   icon: "🔨" },
+  { key: "plumber",     label: "Plumber",      icon: "🚰" },
+  { key: "electrician", label: "Electrician",  icon: "⚡" },
+  { key: "roofer",      label: "Roofer",       icon: "🏠" },
+  { key: "hvac",        label: "HVAC",         icon: "❄️" },
+  { key: "cleaner",     label: "Cleaner",      icon: "🧹" },
+  { key: "pm",          label: "Property Mgr", icon: "🔑" },
+  { key: "title",       label: "Title Co.",    icon: "📜" },
+  { key: "agent",       label: "Realtor",      icon: "🏘" },
+  { key: "inspector",   label: "Inspector",    icon: "🔍" },
+  { key: "insurance",   label: "Insurance",    icon: "🛡️" },
+  { key: "attorney",    label: "Attorney",     icon: "⚖️" }
+];
 
 const ROLES = [
   { key: "agent",            label: "Agent",             icon: "🏠", hint: "Investor-friendly realtor" },
@@ -240,6 +260,131 @@ const ContactCard = ({ contact, onEdit }) => {
   );
 };
 
+/**
+ * FindProsPanel — pulls local businesses from Google Places by category +
+ * ZIP, with a one-click "Add to Team" button per result.
+ */
+function FindProsPanel({ getToken, onAdd, savedNames }) {
+  const [zip, setZip] = useState("");
+  const [category, setCategory] = useState("contractor");
+  const [results, setResults] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const [meta, setMeta] = useState(null); // last { category, zip } we ran
+
+  const onSearch = async (cat) => {
+    if (!/^\d{5}$/.test(zip)) {
+      setErr("Enter a 5-digit ZIP first.");
+      return;
+    }
+    setBusy(true); setErr(null);
+    try {
+      const body = await fetchLocalPros(getToken, { category: cat, zip });
+      setResults(body.results || []);
+      setMeta({ category: cat, zip });
+      setCategory(cat);
+      if (!body.results || body.results.length === 0) {
+        setErr("No matches for that area. Try a nearby ZIP.");
+      }
+    } catch (e) {
+      setErr(e.message || "Search failed");
+      setResults([]);
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <Panel title="Find Local Pros" icon={<MapPin size={16} />} accent style={{ marginBottom: 24 }}>
+      <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 12 }}>
+        Pick a category + ZIP. We'll surface the top businesses nearby — one click adds them to your team.
+      </div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
+        <input
+          value={zip}
+          onChange={(e) => setZip(e.target.value.replace(/\D/g, "").slice(0, 5))}
+          placeholder="ZIP"
+          maxLength={5}
+          style={{ width: 90, padding: "8px 10px", fontSize: 13 }}
+        />
+        <span style={{ fontSize: 11, color: THEME.textDim }}>
+          {meta ? `Last search: ${meta.category} near ${meta.zip}` : ""}
+        </span>
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+        {PRO_CATEGORIES.map(c => (
+          <button
+            key={c.key}
+            onClick={() => onSearch(c.key)}
+            disabled={busy}
+            style={{
+              padding: "6px 10px", fontSize: 11, fontWeight: 700,
+              border: `1px solid ${category === c.key && results.length > 0 ? THEME.accent : THEME.border}`,
+              background: category === c.key && results.length > 0 ? THEME.bgRaised : THEME.bg,
+              color: category === c.key && results.length > 0 ? THEME.accent : THEME.text,
+              borderRadius: 999, cursor: busy ? "wait" : "pointer",
+              display: "inline-flex", alignItems: "center", gap: 4
+            }}>
+            <span>{c.icon}</span> {c.label}
+          </button>
+        ))}
+      </div>
+
+      {err && (
+        <div style={{ padding: 10, marginBottom: 10, background: THEME.bgOrange, color: THEME.orange, borderRadius: 6, fontSize: 12 }}>
+          {err}
+        </div>
+      )}
+
+      {results.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "repeat(auto-fill, minmax(300px, 1fr))", gap: 10 }}>
+          {results.map(r => {
+            const alreadyAdded = savedNames.has(r.name.toLowerCase());
+            return (
+              <div key={r.placeId} style={{
+                border: `1px solid ${THEME.border}`, borderRadius: 8, padding: 12,
+                background: THEME.bg, display: "flex", flexDirection: "column", gap: 6
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{r.name}</div>
+                  {r.rating && (
+                    <span style={{ fontSize: 11, color: "#F59E0B", fontWeight: 700, whiteSpace: "nowrap" }}>
+                      ★ {r.rating} <span style={{ color: THEME.textDim, fontWeight: 500 }}>({r.ratingCount})</span>
+                    </span>
+                  )}
+                </div>
+                {r.address && (
+                  <div style={{ fontSize: 11, color: THEME.textMuted, lineHeight: 1.4 }}>{r.address}</div>
+                )}
+                <div style={{ display: "flex", gap: 8, fontSize: 11, color: THEME.accent, flexWrap: "wrap" }}>
+                  {r.phone && (
+                    <a href={`tel:${r.phone}`} style={{ color: THEME.accent, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 3 }}>
+                      <Phone size={11} /> {r.phone}
+                    </a>
+                  )}
+                  {r.website && (
+                    <a href={r.website} target="_blank" rel="noopener noreferrer" style={{ color: THEME.accent, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 3 }}>
+                      <Globe size={11} /> Site
+                    </a>
+                  )}
+                  <a href={r.mapsUrl} target="_blank" rel="noopener noreferrer" style={{ color: THEME.accent, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 3 }}>
+                    <ExternalLink size={11} /> Maps
+                  </a>
+                </div>
+                <button
+                  onClick={() => onAdd(r)}
+                  disabled={alreadyAdded}
+                  className={alreadyAdded ? "btn-secondary" : "btn-primary"}
+                  style={{ marginTop: "auto", padding: "6px 10px", fontSize: 11, justifyContent: "center" }}>
+                  {alreadyAdded ? "✓ Already in your team" : "+ Add to Team"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 export const TeamView = () => {
   const saas = useSaasUser();
   const saasOn = isSaasMode();
@@ -298,6 +443,39 @@ export const TeamView = () => {
     return [...s].sort();
   }, [contacts]);
 
+  // Names already saved (lowercased) — used by FindProsPanel to dim the
+  // "Add to Team" button on duplicates.
+  const savedNames = useMemo(
+    () => new Set(contacts.map(c => (c.name || "").toLowerCase()).filter(Boolean)),
+    [contacts]
+  );
+
+  // Hand a Google Places result to /api/team. Splits the address into
+  // city/state when possible, otherwise leaves them blank for the user to fill.
+  const handleAddPro = async (pro) => {
+    const m = (pro.address || "").match(/,\s*([^,]+),\s*([A-Z]{2})/);
+    const city = m ? m[1].trim() : "";
+    const state = m ? m[2].trim() : "";
+    const draft = {
+      role: pro.role || "other",
+      name: pro.name,
+      company: pro.name,
+      phone: pro.phone || "",
+      email: "",
+      website: pro.website || "",
+      city, state,
+      notes: `Added from Find Local Pros · ${pro.address || ""}`.trim(),
+      rating: pro.rating ? Math.round(pro.rating) : null
+    };
+    try {
+      const { contact } = await saveTeamContact(saas.getToken, draft);
+      setContacts(prev => [...prev, contact]);
+      toast.push(`${pro.name} added to your team`, "success");
+    } catch (e) {
+      toast.push(e.message || "Add failed", "error");
+    }
+  };
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return contacts.filter(c => {
@@ -344,6 +522,12 @@ export const TeamView = () => {
           <UserPlus size={14} /> Add Contact
         </button>
       </div>
+
+      <FindProsPanel
+        getToken={saas.getToken}
+        onAdd={handleAddPro}
+        savedNames={savedNames}
+      />
 
       <Panel title="Filters" icon={<Filter size={16} />} accent style={{ marginBottom: 20 }}>
         <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "2fr 1fr 1fr", gap: 10 }}>

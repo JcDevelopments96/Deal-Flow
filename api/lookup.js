@@ -388,6 +388,81 @@ async function handleNearby(lat, lng) {
   return { ...payload, cached: false };
 }
 
+/* ── FIND LOCAL PROS (Google Places Text Search) ────────────────────── */
+// One Text Search call per (category, ZIP) — returns the top ~10 businesses
+// matching the natural-language query "<category> near <zip>". Cached 12h
+// because contractor lists don't churn quickly. Powers the Team tab's
+// "Find Local Pros" panel — single shared GOOGLE_MAPS_API_KEY, no extra
+// vendor required.
+const _findprosCache = new Map();
+const FINDPROS_TTL = 12 * 60 * 60 * 1000;
+
+// Each category maps to (a) a Google Places query string, (b) the
+// team_contacts.role enum value the user can save the result under.
+const PRO_CATEGORIES = {
+  lender:      { query: "hard money lender", role: "lender" },
+  contractor:  { query: "general contractor", role: "contractor" },
+  plumber:     { query: "plumber",            role: "contractor" },
+  electrician: { query: "electrician",        role: "contractor" },
+  roofer:      { query: "roofing contractor", role: "contractor" },
+  hvac:        { query: "HVAC contractor",    role: "contractor" },
+  cleaner:     { query: "house cleaning",     role: "other" },
+  pm:          { query: "property management company", role: "property_manager" },
+  title:       { query: "title insurance company",     role: "title" },
+  agent:       { query: "real estate agent",  role: "agent" },
+  inspector:   { query: "home inspector",     role: "inspector" },
+  insurance:   { query: "homeowners insurance agent",   role: "insurance" },
+  attorney:    { query: "real estate attorney",         role: "attorney" }
+};
+
+async function handleFindPros(category, zip) {
+  const key = process.env.GOOGLE_MAPS_API_KEY;
+  if (!key) throw new ApiError(503, "google_maps_not_configured",
+    "Set GOOGLE_MAPS_API_KEY in Vercel env.");
+  const cat = PRO_CATEGORIES[category];
+  if (!cat) throw new ApiError(400, "bad_category",
+    `category must be one of: ${Object.keys(PRO_CATEGORIES).join(", ")}`);
+  if (!/^\d{5}$/.test(String(zip))) throw new ApiError(400, "bad_zip", "5-digit zip required");
+
+  const cacheKey = `${category}:${zip}`;
+  const cached = _findprosCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < FINDPROS_TTL) {
+    return { ...cached.payload, cached: true };
+  }
+
+  // Text Search returns 20 max, ordered by Google's relevance/proximity.
+  const qs = new URLSearchParams({
+    query: `${cat.query} near ${zip}`,
+    key,
+    fields: "name,place_id,formatted_address,formatted_phone_number,rating,user_ratings_total,website"
+  });
+  const res = await fetch(
+    `https://maps.googleapis.com/maps/api/place/textsearch/json?${qs.toString()}`
+  );
+  if (!res.ok) throw new ApiError(502, "places_error", `Google ${res.status}`);
+  const data = await res.json();
+  if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
+    throw new ApiError(502, "places_error", data.error_message || data.status);
+  }
+  const results = (Array.isArray(data.results) ? data.results : [])
+    .slice(0, 10)
+    .map(r => ({
+      placeId: r.place_id,
+      name: r.name,
+      address: r.formatted_address || r.vicinity || null,
+      phone: r.formatted_phone_number || null, // often null on textsearch — needs Place Details for guaranteed
+      rating: typeof r.rating === "number" ? +r.rating.toFixed(1) : null,
+      ratingCount: r.user_ratings_total || 0,
+      website: r.website || null,
+      mapsUrl: `https://www.google.com/maps/place/?q=place_id:${r.place_id}`,
+      role: cat.role
+    }));
+
+  const payload = { category, zip: String(zip), results };
+  _findprosCache.set(cacheKey, { at: Date.now(), payload });
+  return { ...payload, cached: false };
+}
+
 /* ── Router ────────────────────────────────────────────────────────── */
 export default handler(async (req, res) => {
   if (req.method !== "GET") {
@@ -397,7 +472,7 @@ export default handler(async (req, res) => {
   await requireUserId(req);
 
   const source = (req.query?.source || "").toString();
-  const { stateFips, countyFips, lat, lng, address } = req.query || {};
+  const { stateFips, countyFips, lat, lng, address, category, zip } = req.query || {};
 
   let payload;
   switch (source) {
@@ -440,9 +515,14 @@ export default handler(async (req, res) => {
       payload = await handleNearby(latN, lngN);
       break;
     }
+    case "findpros": {
+      if (!category || !zip) throw new ApiError(400, "missing_params", "category + zip required");
+      payload = await handleFindPros(String(category), String(zip));
+      break;
+    }
     default:
       throw new ApiError(400, "unknown_source",
-        "source must be one of: census, fmr, unemployment, mortgage, flood, walkscore, photos, nearby");
+        "source must be one of: census, fmr, unemployment, mortgage, flood, walkscore, photos, nearby, findpros");
   }
 
   return res.status(200).json(payload);
