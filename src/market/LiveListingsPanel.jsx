@@ -516,7 +516,7 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
 
       {loading && (
         <div style={{ textAlign: "center", padding: 30, color: THEME.textMuted, fontSize: 13 }}>
-          <RefreshCw size={16} className="mono" style={{ animation: "spin 1s linear infinite" }} /> Loading live data from {activeProvider.name}…
+          <RefreshCw size={16} className="mono" style={{ animation: "spin 1s linear infinite" }} /> Loading…
         </div>
       )}
 

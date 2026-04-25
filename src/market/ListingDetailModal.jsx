@@ -494,7 +494,7 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
                     </div>
                   </div>
                   <div style={{ fontSize: 12, color: THEME.textDim, lineHeight: 1.4 }}>
-                    {intelLoading ? "Checking FEMA…" : floodErr || "Not available"}
+                    {intelLoading ? "Loading…" : floodErr || "Not available"}
                   </div>
                 </div>
               )}
@@ -547,7 +547,7 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
                     </div>
                   </div>
                   <div style={{ fontSize: 12, color: THEME.textDim, lineHeight: 1.4 }}>
-                    {intelLoading ? "Checking Walk Score…" : "Not available for this listing"}
+                    {intelLoading ? "Loading…" : "Not available for this listing"}
                   </div>
                 </div>
               )}
