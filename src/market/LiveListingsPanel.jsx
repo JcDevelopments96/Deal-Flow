@@ -86,7 +86,7 @@ const computeLiveStats = (sales) => {
   return out;
 };
 
-export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarkets, bedsFilter = "any", bathsFilter = "any", onStatsComputed, onListingsLoaded, countyFmr, mortgageRate, countyStats, pinnedListingId = null, onClearPin }) => {
+export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarkets, bedsFilter = "any", bathsFilter = "any", propertyTypeFilter = "any", onStatsComputed, onListingsLoaded, countyFmr, mortgageRate, countyStats, pinnedListingId = null, onClearPin }) => {
   const saasOn = isSaasMode();
 
   // SaaS hooks (safe to call even when saasOn=false — useSaasUser
@@ -181,6 +181,9 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
     }
     if (bathsRange.min !== null && bathsRange.min === bathsRange.max) {
       qsBase.bathrooms = bathsRange.min;
+    }
+    if (propertyTypeFilter && propertyTypeFilter !== "any") {
+      qsBase.propertyType = propertyTypeFilter;
     }
     const saleRes = await fetchSaleListings(saas.getToken, qsBase);
     if (saleRes.usage) saas.setUsageLocally(saleRes.usage);
@@ -292,7 +295,7 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
   }, [
     saasOn, saas.user, saas.getToken,
     apiKey, provider, selectedState, targetCity, referenceMarket,
-    activeProvider.name, bedsFilter, bathsFilter
+    activeProvider.name, bedsFilter, bathsFilter, propertyTypeFilter
   ]);
 
   useEffect(() => { loadData(); }, [loadData]);

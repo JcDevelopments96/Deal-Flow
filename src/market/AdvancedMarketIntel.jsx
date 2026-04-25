@@ -30,9 +30,10 @@ export const AdvancedMarketIntel = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
 
-  // Bed / bath filters applied to Live Listings + Comparables
+  // Bed / bath / property-type filters applied to Live Listings + Comparables
   const [bedsFilter, setBedsFilter] = useState("any");   // "any" | "1" | "2" | "3" | "4" | "5+"
   const [bathsFilter, setBathsFilter] = useState("any"); // "any" | "1" | "1.5" | "2" | "3" | "4+"
+  const [propertyTypeFilter, setPropertyTypeFilter] = useState("any"); // "any" | Realtor home_type key
 
   const marketData = {
     northeast: {
@@ -1616,6 +1617,44 @@ export const AdvancedMarketIntel = () => {
               ))}
             </div>
           </div>
+
+          {/* Property type — spans the full row so the dropdown isn't
+              cramped between the bed/bath chip rows. Maps directly to
+              Realtor's home_type filter; "any" omits the filter. */}
+          <div style={{ gridColumn: isMobile() ? "auto" : "1 / -1" }}>
+            <div className="label-xs" style={{ marginBottom: 6, display: "inline-flex", alignItems: "center" }}>
+              Property type
+              <CalcTooltip
+                size={12}
+                title="Property Type Filter"
+                description="Single-family, condo, multi-family, etc. 'Any' returns all types."
+              />
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {[
+                { key: "any",            label: "Any" },
+                { key: "single_family",  label: "Single-Family" },
+                { key: "multi_family",   label: "Multi-Family" },
+                { key: "condos",         label: "Condo" },
+                { key: "townhomes",      label: "Townhome" },
+                { key: "mobile",         label: "Mobile" },
+                { key: "land",           label: "Land" }
+              ].map(opt => (
+                <button
+                  key={opt.key}
+                  onClick={() => setPropertyTypeFilter(opt.key)}
+                  style={{
+                    padding: "5px 12px", fontSize: 12, fontWeight: 600,
+                    background: propertyTypeFilter === opt.key ? THEME.accent : THEME.bg,
+                    color: propertyTypeFilter === opt.key ? "#fff" : THEME.textMuted,
+                    border: `1px solid ${propertyTypeFilter === opt.key ? THEME.accent : THEME.border}`,
+                    borderRadius: 14, cursor: "pointer"
+                  }}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </Panel>
 
@@ -1835,6 +1874,7 @@ export const AdvancedMarketIntel = () => {
               stateMarkets={liveListingsStateMarkets}
               bedsFilter={bedsFilter}
               bathsFilter={bathsFilter}
+              propertyTypeFilter={propertyTypeFilter}
               onStatsComputed={setLiveCityStats}
               onListingsLoaded={(ls) => { setLiveListings(ls); setPinnedListingId(null); }}
               countyFmr={countyFmr}
