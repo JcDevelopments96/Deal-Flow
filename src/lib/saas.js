@@ -340,3 +340,14 @@ export async function fetchProReviews(getToken, { placeId, yelpId }) {
   if (yelpId)  qs.set("yelpId",  String(yelpId));
   return fetchMetered(getToken, `/api/lookup?${qs.toString()}`);
 }
+
+// Short-term-rental (Airbnb / VRBO) potential — annual revenue,
+// occupancy, average daily rate, and a per-month seasonal breakdown.
+// Backed by Rabbu's public estimate API. May return { available: false }
+// for unrecognized addresses.
+export async function fetchStrEstimate(getToken, { address, lat, lng }) {
+  const qs = new URLSearchParams({ source: "str", address });
+  if (lat != null) qs.set("lat", String(lat));
+  if (lng != null) qs.set("lng", String(lng));
+  return fetchMetered(getToken, `/api/lookup?${qs.toString()}`);
+}

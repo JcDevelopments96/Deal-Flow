@@ -7,7 +7,7 @@ import { X, Star, Calculator, ExternalLink, AlertTriangle, Building2, Droplets, 
 import { THEME } from "../theme.js";
 import { fmtUSD } from "../utils.js";
 import { useAppActions } from "../contexts.jsx";
-import { isSaasMode, useSaasUser, fetchFloodZone, fetchWalkScore, fetchListingDetail, fetchPropertyPhotos, fetchNearby } from "../lib/saas.js";
+import { isSaasMode, useSaasUser, fetchFloodZone, fetchWalkScore, fetchListingDetail, fetchPropertyPhotos, fetchNearby, fetchStrEstimate } from "../lib/saas.js";
 import { estimateCashflow } from "./cashflow.js";
 
 export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr, mortgageRate, countyStats }) => {
@@ -62,6 +62,7 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
   const [walkErr, setWalkErr] = useState(null);
   const [gmapsPhotos, setGmapsPhotos] = useState(null);  // { streetview_url, satellite_url }
   const [nearby, setNearby] = useState(null);             // { schools: [...], amenityCounts: {...} }
+  const [str, setStr] = useState(null);                   // { available, revenue, occupancy, adrLow, adrHigh, monthly }
   const [intelLoading, setIntelLoading] = useState(false);
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -100,7 +101,7 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
     if (!saasOn || !saas.user) return;
     const lat = Number(listing.latitude);
     const lng = Number(listing.longitude);
-    setFlood(null); setWalk(null); setGmapsPhotos(null); setNearby(null);
+    setFlood(null); setWalk(null); setGmapsPhotos(null); setNearby(null); setStr(null);
     setFloodErr(null); setWalkErr(null);
     if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) {
       setFloodErr("This listing has no geocode (lat/lng) — Realtor didn't return coordinates for it.");
@@ -113,8 +114,9 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
       fetchFloodZone(saas.getToken, { lat, lng }),
       fetchWalkScore(saas.getToken, { lat, lng, address: listing.formattedAddress }),
       fetchPropertyPhotos(saas.getToken, { lat, lng, address: listing.formattedAddress }),
-      fetchNearby(saas.getToken, { lat, lng })
-    ]).then(([floodRes, walkRes, photosRes, nearbyRes]) => {
+      fetchNearby(saas.getToken, { lat, lng }),
+      fetchStrEstimate(saas.getToken, { address: listing.formattedAddress, lat, lng })
+    ]).then(([floodRes, walkRes, photosRes, nearbyRes, strRes]) => {
       if (cancelled) return;
       if (floodRes.status === "fulfilled") setFlood(floodRes.value);
       else setFloodErr(floodRes.reason?.message || "Flood lookup failed");
@@ -122,6 +124,7 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
       else setWalkErr(walkRes.reason?.detail || walkRes.reason?.message || null);
       if (photosRes.status === "fulfilled") setGmapsPhotos(photosRes.value);
       if (nearbyRes.status === "fulfilled") setNearby(nearbyRes.value);
+      if (strRes.status === "fulfilled") setStr(strRes.value);
     }).finally(() => { if (!cancelled) setIntelLoading(false); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -613,6 +616,69 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
                           )}
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* STR (Airbnb / VRBO) potential — renders independent of the
+                nearby block. Only appears when Rabbu returned a usable
+                estimate. Shows annual revenue, avg occupancy, nightly rate
+                range (low → high), and a 12-bar monthly occupancy chart
+                so seasonality is visible at a glance. */}
+            {str?.available && (
+              <div style={{ marginTop: 12, padding: 12, background: THEME.bgPanel, borderRadius: 8, border: `1px solid ${THEME.border}` }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, flexWrap: "wrap", gap: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: THEME.textMuted, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                    Short-Term Rental Potential (Airbnb / VRBO)
+                  </div>
+                  <span style={{ fontSize: 9, color: THEME.textDim }}>Estimates by Rabbu</span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: str.monthly?.length ? 12 : 0 }}>
+                  <div style={{ padding: "8px 10px", background: THEME.bg, border: `1px solid ${THEME.borderLight}`, borderRadius: 6 }}>
+                    <div style={{ fontSize: 10, color: THEME.textMuted }}>Annual revenue</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: THEME.green, marginTop: 2 }}>
+                      {str.revenue ? fmtUSD(str.revenue) : "—"}
+                    </div>
+                  </div>
+                  <div style={{ padding: "8px 10px", background: THEME.bg, border: `1px solid ${THEME.borderLight}`, borderRadius: 6 }}>
+                    <div style={{ fontSize: 10, color: THEME.textMuted }}>Avg occupancy</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, marginTop: 2 }}>
+                      {str.occupancy != null
+                        ? `${Math.round(str.occupancy * (str.occupancy <= 1 ? 100 : 1))}%`
+                        : "—"}
+                    </div>
+                  </div>
+                  <div style={{ padding: "8px 10px", background: THEME.bg, border: `1px solid ${THEME.borderLight}`, borderRadius: 6 }}>
+                    <div style={{ fontSize: 10, color: THEME.textMuted }}>Nightly rate</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>
+                      {str.adrLow && str.adrHigh && str.adrLow !== str.adrHigh
+                        ? <>${Math.round(str.adrLow)}<span style={{ color: THEME.textDim }}> – </span>${Math.round(str.adrHigh)}</>
+                        : str.adr ? <>${Math.round(str.adr)}</>
+                        : "—"}
+                    </div>
+                  </div>
+                </div>
+
+                {str.monthly?.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 6 }}>
+                      Occupancy by month (Jan → Dec) — hover for nightly rate
+                    </div>
+                    <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 60, padding: "0 2px" }}>
+                      {str.monthly.map((m) => {
+                        const occ = (m.occupancy ?? 0) <= 1 ? (m.occupancy ?? 0) : (m.occupancy / 100);
+                        const pct = Math.max(0.05, Math.min(1, occ));
+                        const adrLabel = m.adr ? ` · $${Math.round(m.adr)}/night` : "";
+                        return (
+                          <div key={m.month} title={`${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m.month-1]}: ${Math.round(occ * 100)}%${adrLabel}`}
+                            style={{ flex: 1, height: `${pct * 100}%`, background: THEME.accent, opacity: 0.4 + pct * 0.6, borderRadius: "2px 2px 0 0", cursor: "default" }} />
+                        );
+                      })}
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 9, color: THEME.textDim }}>
+                      <span>Jan</span><span>Apr</span><span>Jul</span><span>Oct</span><span>Dec</span>
                     </div>
                   </div>
                 )}
