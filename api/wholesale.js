@@ -358,15 +358,17 @@ async function handleEmail({ leadId, subject, body }, user) {
   return { ok: true, resendId: emailData?.id || null };
 }
 
-/* ── Save / update BYOK integration keys ──────────────────────────────── */
-// Accepts any subset of { batchskip_api_key, lob_api_key, return_address }.
-// Returns only a "connected" map so keys never leak back to the client.
+/* ── Save / read BYOK integration keys ───────────────────────────────────
+   Only batchskip_api_key remains a real BYOK option (Lob postcards were
+   removed entirely). The endpoint stays so a future settings UI can let
+   power users override the server-wide BATCHSKIP_API_KEY with their own.
+─────────────────────────────────────────────────────────────────────────*/
 async function handleSaveIntegration({ updates }, user) {
   if (!updates || typeof updates !== "object") throw new ApiError(400, "missing_updates");
   const allowed = {};
-  if (updates.batchskip_api_key !== undefined) allowed.batchskip_api_key = updates.batchskip_api_key ? String(updates.batchskip_api_key).trim() : null;
-  if (updates.lob_api_key !== undefined)       allowed.lob_api_key       = updates.lob_api_key ? String(updates.lob_api_key).trim() : null;
-  if (updates.return_address !== undefined)    allowed.return_address    = updates.return_address || null;
+  if (updates.batchskip_api_key !== undefined) {
+    allowed.batchskip_api_key = updates.batchskip_api_key ? String(updates.batchskip_api_key).trim() : null;
+  }
   if (Object.keys(allowed).length === 0) throw new ApiError(400, "nothing_to_update");
   allowed.updated_at = new Date().toISOString();
 
@@ -374,26 +376,13 @@ async function handleSaveIntegration({ updates }, user) {
   const { data, error } = await db
     .from("users").update(allowed)
     .eq("id", user.id)
-    .select("batchskip_api_key, lob_api_key, return_address").single();
+    .select("batchskip_api_key").single();
   if (error) throw new ApiError(500, "db_update_failed", error.message);
-  return {
-    connected: {
-      batchskip: !!data.batchskip_api_key,
-      lob: !!data.lob_api_key
-    },
-    return_address: data.return_address || null
-  };
+  return { connected: { batchskip: !!data.batchskip_api_key } };
 }
 
-// GET-style version — what's connected (without leaking the keys)
 async function handleIntegrationStatus(user) {
-  return {
-    connected: {
-      batchskip: !!user.batchskip_api_key,
-      lob: !!user.lob_api_key
-    },
-    return_address: user.return_address || null
-  };
+  return { connected: { batchskip: !!user.batchskip_api_key } };
 }
 
 /* ── Router ───────────────────────────────────────────────────────────── */
