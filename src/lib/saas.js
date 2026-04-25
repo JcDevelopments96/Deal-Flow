@@ -115,12 +115,13 @@ export function useSaasUser() {
  * `{ listings | rentals, usage }`. Callers can pass the `usage` straight
  * into `useSaasUser().setUsageLocally(usage)` to keep the meter in sync.
  */
-export async function fetchSaleListings(getToken, { city, state, bedrooms, bathrooms, limit }) {
+export async function fetchSaleListings(getToken, { city, state, bedrooms, bathrooms, limit, propertyType }) {
   const qs = new URLSearchParams({ state });
   if (city) qs.set("city", city); // omit entirely for state-wide query — server supports it
   if (bedrooms) qs.set("bedrooms", bedrooms);
   if (bathrooms) qs.set("bathrooms", bathrooms);
   if (limit) qs.set("limit", String(limit));
+  if (propertyType && propertyType !== "any") qs.set("propertyType", propertyType);
   return fetchMetered(getToken, `/api/market/listings?${qs.toString()}`);
 }
 
