@@ -1864,7 +1864,7 @@ export const AdvancedMarketIntel = () => {
                 padding: 10, marginBottom: 14, fontSize: 12, color: THEME.textMuted,
                 background: THEME.bgRaised, borderRadius: 6
               }}>
-                Loading free county data…
+                Loading…
               </div>
             )}
             <LiveListingsPanel
