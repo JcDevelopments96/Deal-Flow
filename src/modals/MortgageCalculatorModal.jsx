@@ -132,14 +132,19 @@ export const MortgageCalculatorModal = ({ onClose }) => {
                 key={t.key}
                 onClick={() => setMode(t.key)}
                 style={{
-                  padding: "8px 14px", fontSize: 13, fontWeight: 600,
-                  background: mode === t.key ? THEME.bg : "transparent",
-                  color: mode === t.key ? THEME.accent : THEME.textMuted,
-                  border: `1px solid ${mode === t.key ? THEME.border : "transparent"}`,
+                  // Active mode gets a solid accent fill + white text so it
+                  // reads as the obvious choice; inactive stays muted on the
+                  // panel-tinted tray. Same pattern as the cadence toggle on
+                  // PlansView so the segmented-control feel is consistent.
+                  padding: "9px 14px", fontSize: 13, fontWeight: 700,
+                  background: mode === t.key ? THEME.accent : "transparent",
+                  color: mode === t.key ? "#FFFFFF" : THEME.textMuted,
+                  border: "none",
                   borderRadius: 6,
                   display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
                   cursor: "pointer",
-                  boxShadow: mode === t.key ? "0 1px 2px rgba(15,23,42,0.06)" : "none"
+                  boxShadow: mode === t.key ? "0 1px 4px rgba(15,23,42,0.18)" : "none",
+                  transition: "background 0.12s, color 0.12s, box-shadow 0.12s"
                 }}
               >
                 {t.icon} {t.label}
