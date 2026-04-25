@@ -205,16 +205,35 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
         }
       } catch (err) {
         if (err instanceof QuotaExceededError) {
-          setListings([]);
-          setLiveMode(false);
+          // First quota hit → show the upgrade modal once. After the user
+          // dismisses it, every subsequent click silently falls back to
+          // demo data so we don't trap them in a "click → modal → close →
+          // click → modal" loop. The flag lives in sessionStorage so it
+          // resets when they close the tab (lets them see the prompt
+          // fresh next visit) but persists across navigation in-session.
           const onFree = saas.usage?.plan === "free";
-          setError(onFree
-            ? "Market Intel is a paid feature — subscribe to load live listings."
-            : "You've used all your Market Intel clicks for this period.");
-          setUpgradeReason(onFree
-            ? "Pick a plan to unlock Market Intel. Cancel anytime."
-            : "You've hit your monthly click limit. Upgrade for more.");
-          setShowUpgrade(true);
+          let alreadyPrompted = false;
+          try { alreadyPrompted = sessionStorage.getItem("dt_market_quota_prompted") === "1"; }
+          catch {}
+
+          if (alreadyPrompted) {
+            // Quiet fallback — user has already seen the pitch.
+            fallbackToDemo(onFree
+              ? "Showing demo data. Upgrade for live listings."
+              : "Out of Market Intel clicks this period. Showing demo data."
+            );
+          } else {
+            try { sessionStorage.setItem("dt_market_quota_prompted", "1"); } catch {}
+            setListings([]);
+            setLiveMode(false);
+            setError(onFree
+              ? "Market Intel is a paid feature — subscribe to load live listings."
+              : "You've used all your Market Intel clicks for this period.");
+            setUpgradeReason(onFree
+              ? "Pick a plan to unlock Market Intel. Cancel anytime."
+              : "You've hit your monthly click limit. Upgrade for more.");
+            setShowUpgrade(true);
+          }
           saas.refetch();
         } else {
           console.warn("SaaS market fetch failed:", err);
