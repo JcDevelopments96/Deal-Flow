@@ -1059,8 +1059,10 @@ export const AdvancedMarketIntel = () => {
   const [liveListings, setLiveListings] = useState([]);
   // A clicked map pin filters the listings column down to that one property.
   const [pinnedListingId, setPinnedListingId] = useState(null);
-  // Which metric colors the map (price | yield | rent | listings).
-  const [mapMetric, setMapMetric] = useState("price");
+  // Map heat layer is fixed at median home value (Zillow ZHVI). The picker
+  // for yield/rent/listings was removed — those metrics only worked when
+  // live data was loaded, leading to a confusingly empty map most of the time.
+  const mapMetric = "price";
 
   // Sorted, de-duplicated city + county lists for the filter dropdowns.
   const liveCityList = useMemo(() => {
@@ -1602,25 +1604,9 @@ export const AdvancedMarketIntel = () => {
               title="Market Map — US Counties"
               icon={<MapPin size={16} />}
               accent
-              action={
-                <select
-                  value={mapMetric}
-                  onChange={(e) => setMapMetric(e.target.value)}
-                  aria-label="Metric shown on map"
-                  style={{
-                    padding: "4px 8px", fontSize: 11,
-                    borderRadius: 4, border: `1px solid ${THEME.border}`,
-                    background: THEME.bg, color: THEME.text
-                  }}
-                >
-                  {Object.values(MAP_METRICS).map(m => (
-                    <option key={m.key} value={m.key}>{m.label}</option>
-                  ))}
-                </select>
-              }
             >
               <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 14 }}>
-                Color-coded by <strong>{MAP_METRICS[mapMetric].label}</strong> from live data · red pins mark each loaded listing · click any county to drill in.
+                Color-coded by median home value (Zillow ZHVI) · red pins mark each loaded listing · click any county to drill in.
               </div>
               <USCountyMap
                 allMarkets={allMarkets}
@@ -1835,25 +1821,9 @@ export const AdvancedMarketIntel = () => {
           icon={<MapPin size={16} />}
           accent
           style={{ marginBottom: 24 }}
-          action={
-            <select
-              value={mapMetric}
-              onChange={(e) => setMapMetric(e.target.value)}
-              aria-label="Metric shown on map"
-              style={{
-                padding: "4px 8px", fontSize: 11,
-                borderRadius: 4, border: `1px solid ${THEME.border}`,
-                background: THEME.bg, color: THEME.text
-              }}
-            >
-              {Object.values(MAP_METRICS).map(m => (
-                <option key={m.key} value={m.key}>{m.label}</option>
-              ))}
-            </select>
-          }
         >
           <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 14 }}>
-            Pick a state above or click any county to load live listings. Choose a metric on the right to switch the heat layer.
+            Counties are colored by median home value (Zillow ZHVI). Pick a state above or click any county to load live listings.
           </div>
           <USCountyMap
             allMarkets={allMarkets}
