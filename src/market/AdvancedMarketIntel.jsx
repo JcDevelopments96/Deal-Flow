@@ -14,7 +14,7 @@ import { Panel, CalcTooltip } from "../primitives.jsx";
 import { USCountyMap, MAP_METRICS } from "./USCountyMap.jsx";
 import { LiveListingsPanel } from "./LiveListingsPanel.jsx";
 import { STATE_NAMES, STATE_DEFAULT_CITIES } from "./mapUtils.js";
-import { isSaasMode, useSaasUser, fetchCountyCensus, fetchCountyFMR, fetchMarketIndexes, fetchCountyUnemployment, fetchMortgageRate } from "../lib/saas.js";
+import { isSaasMode, useSaasUser, fetchCountyCensus, fetchCountyFMR, fetchMarketIndexes, fetchStateMarketIndexes, fetchNationalMarketIndexes, fetchCountyUnemployment, fetchMortgageRate } from "../lib/saas.js";
 
 const RepeatIcon = RotateCcw;
 
@@ -1057,8 +1057,12 @@ export const AdvancedMarketIntel = () => {
   const [liveCityStats, setLiveCityStats] = useState(null);
   // Full listings array so the map can drop a pin for each one.
   const [liveListings, setLiveListings] = useState([]);
-  // Which metric colors the map (price | yield | rent | listings).
-  const [mapMetric, setMapMetric] = useState("price");
+  // A clicked map pin filters the listings column down to that one property.
+  const [pinnedListingId, setPinnedListingId] = useState(null);
+  // Map heat layer is fixed at median home value (Zillow ZHVI). The picker
+  // for yield/rent/listings was removed — those metrics only worked when
+  // live data was loaded, leading to a confusingly empty map most of the time.
+  const mapMetric = "price";
 
   // Sorted, de-duplicated city + county lists for the filter dropdowns.
   const liveCityList = useMemo(() => {
@@ -1082,6 +1086,45 @@ export const AdvancedMarketIntel = () => {
   // from our /api/census/county proxy (cached 24h server-side).
   const saas = useSaasUser();
   const saasOn = isSaasMode();
+
+  // Pre-ingested Zillow ZHVI + Redfin snapshot for every county in the
+  // country, keyed by 5-char FIPS. Loaded once on mount so the map gets
+  // a nationwide home-price gradient immediately — no need for the user
+  // to pick a state first.
+  const [nationalCountyIndexes, setNationalCountyIndexes] = useState(null);
+  useEffect(() => {
+    if (!saasOn || !saas.user) return;
+    let cancelled = false;
+    fetchNationalMarketIndexes(saas.getToken)
+      .then(body => { if (!cancelled && body?.byFips) setNationalCountyIndexes(body.byFips); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saasOn, saas.user]);
+
+  // When a state is selected, also pull the per-state slice as a fallback
+  // for any county that's missing from the national dump (rare, but cheap
+  // insurance against edge cases in the ingest).
+  const [stateCountyIndexes, setStateCountyIndexes] = useState(null);
+  useEffect(() => {
+    if (!saasOn || !saas.user || !selectedState) {
+      setStateCountyIndexes(null);
+      return;
+    }
+    let cancelled = false;
+    fetchStateMarketIndexes(saas.getToken, selectedState)
+      .then(body => { if (!cancelled && body?.byFips) setStateCountyIndexes(body.byFips); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saasOn, saas.user, selectedState]);
+
+  // Merge national + state-specific. State wins on overlap so any fresher
+  // slice replaces the stale nationwide snapshot.
+  const mapCountyIndexes = useMemo(() => {
+    if (!nationalCountyIndexes && !stateCountyIndexes) return null;
+    return { ...(nationalCountyIndexes || {}), ...(stateCountyIndexes || {}) };
+  }, [nationalCountyIndexes, stateCountyIndexes]);
 
   // Live 30-year mortgage rate — fetched once per session (12h cache server-side)
   // and passed to the listing cards for quick-cashflow estimates.
@@ -1561,25 +1604,9 @@ export const AdvancedMarketIntel = () => {
               title="Market Map — US Counties"
               icon={<MapPin size={16} />}
               accent
-              action={
-                <select
-                  value={mapMetric}
-                  onChange={(e) => setMapMetric(e.target.value)}
-                  aria-label="Metric shown on map"
-                  style={{
-                    padding: "4px 8px", fontSize: 11,
-                    borderRadius: 4, border: `1px solid ${THEME.border}`,
-                    background: THEME.bg, color: THEME.text
-                  }}
-                >
-                  {Object.values(MAP_METRICS).map(m => (
-                    <option key={m.key} value={m.key}>{m.label}</option>
-                  ))}
-                </select>
-              }
             >
               <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 14 }}>
-                Color-coded by <strong>{MAP_METRICS[mapMetric].label}</strong> from live data · red pins mark each loaded listing · click any county to drill in.
+                Color-coded by median home value (Zillow ZHVI) · red pins mark each loaded listing · click any county to drill in.
               </div>
               <USCountyMap
                 allMarkets={allMarkets}
@@ -1587,8 +1614,11 @@ export const AdvancedMarketIntel = () => {
                 highlightedMarket={mapHighlight}
                 onCountyClick={handleMapCountyClick}
                 liveCountyStats={liveCityStats?.byCounty || null}
+                staticCountyStats={mapCountyIndexes}
                 metric={mapMetric}
                 listings={liveListings}
+                onListingClick={(l) => setPinnedListingId(l.id)}
+                pinnedListingId={pinnedListingId}
                 onResetView={handleResetView}
               />
             </Panel>
@@ -1776,10 +1806,12 @@ export const AdvancedMarketIntel = () => {
               bedsFilter={bedsFilter}
               bathsFilter={bathsFilter}
               onStatsComputed={setLiveCityStats}
-              onListingsLoaded={setLiveListings}
+              onListingsLoaded={(ls) => { setLiveListings(ls); setPinnedListingId(null); }}
               countyFmr={countyFmr}
               mortgageRate={mortgageRate}
               countyStats={liveCityStats?.byCounty || null}
+              pinnedListingId={pinnedListingId}
+              onClearPin={() => setPinnedListingId(null)}
             />
           </div>
         </div>
@@ -1789,25 +1821,9 @@ export const AdvancedMarketIntel = () => {
           icon={<MapPin size={16} />}
           accent
           style={{ marginBottom: 24 }}
-          action={
-            <select
-              value={mapMetric}
-              onChange={(e) => setMapMetric(e.target.value)}
-              aria-label="Metric shown on map"
-              style={{
-                padding: "4px 8px", fontSize: 11,
-                borderRadius: 4, border: `1px solid ${THEME.border}`,
-                background: THEME.bg, color: THEME.text
-              }}
-            >
-              {Object.values(MAP_METRICS).map(m => (
-                <option key={m.key} value={m.key}>{m.label}</option>
-              ))}
-            </select>
-          }
         >
           <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 14 }}>
-            Pick a state above or click any county to load live listings. Choose a metric on the right to switch the heat layer.
+            Counties are colored by median home value (Zillow ZHVI). Pick a state above or click any county to load live listings.
           </div>
           <USCountyMap
             allMarkets={allMarkets}
@@ -1815,8 +1831,11 @@ export const AdvancedMarketIntel = () => {
             highlightedMarket={mapHighlight}
             onCountyClick={handleMapCountyClick}
             liveCountyStats={liveCityStats?.byCounty || null}
+                staticCountyStats={mapCountyIndexes}
             metric={mapMetric}
             listings={liveListings}
+            onListingClick={(l) => setPinnedListingId(l.id)}
+            pinnedListingId={pinnedListingId}
             onResetView={handleResetView}
           />
         </Panel>

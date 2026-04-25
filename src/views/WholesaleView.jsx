@@ -4,20 +4,20 @@
    ============================================================================ */
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
-  Search, Filter, Phone, Mail, Trash2, Star, Crown, Users, Clock,
-  Home, Zap, CheckCircle2, MessageSquare, DollarSign, AlertTriangle, X,
-  Settings, Send
+  Search, Phone, Mail, Trash2, Star, Crown, Users, Clock,
+  Home, Zap, CheckCircle2, MessageSquare, DollarSign, AlertTriangle, X
 } from "lucide-react";
 import { THEME } from "../theme.js";
 import { fmtUSD, isMobile } from "../utils.js";
 import { Panel } from "../primitives.jsx";
-import { useToast } from "../contexts.jsx";
+import { useToast, useAppActions } from "../contexts.jsx";
 import {
   isSaasMode, useSaasUser,
   searchWholesaleLeads, listWholesaleLeads, saveWholesaleLead,
-  skipTraceLead, updateWholesaleLead, deleteWholesaleLead, emailWholesaleLead,
-  sendPostcard, getWholesaleIntegrations, saveWholesaleIntegrations
+  skipTraceLead, updateWholesaleLead, deleteWholesaleLead, emailWholesaleLead
 } from "../lib/saas.js";
+import { STATE_NAMES } from "../market/mapUtils.js";
+import { CITIES_BY_STATE } from "../lib/usCities.js";
 
 const STATUSES = [
   { key: "new",         label: "New",         color: THEME.textMuted },
@@ -48,184 +48,6 @@ Best,
 [Your Name]
 [Your Phone]`
 });
-
-const POSTCARD_TEMPLATE = (lead) => (
-`Hi ${(lead.owner_name || "").split(",")[1]?.trim() || "there"},
-
-I'm a local real estate investor interested in your property at ${lead.address}${lead.city ? ", " + lead.city : ""}. I'm not a realtor — I'd like to make a direct cash offer.
-
-What I can offer:
-  - Cash close, no financing contingency
-  - Flexible closing timeline, as-is, no repairs needed
-  - Zero agent fees
-
-If you'd consider selling, please give me a call — worst case I hand you a free estimate of the current market value of your home.
-
-Thanks for your time,
-[Your Name]
-[Your Phone]`
-);
-
-const IntegrationsModal = ({ status, onSave, onClose }) => {
-  const [batchskip, setBatchskip] = useState("");
-  const [lobKey, setLobKey] = useState("");
-  const [addr, setAddr] = useState(status?.return_address || {
-    name: "", street: "", city: "", state: "", zip: ""
-  });
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState(null);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setSaving(true); setErr(null);
-    const updates = {};
-    if (batchskip.trim()) updates.batchskip_api_key = batchskip.trim();
-    if (lobKey.trim()) updates.lob_api_key = lobKey.trim();
-    if (addr.street && addr.zip) updates.return_address = addr;
-    if (Object.keys(updates).length === 0) {
-      setErr("Nothing to save — fill at least one field.");
-      setSaving(false); return;
-    }
-    try { await onSave(updates); onClose(); }
-    catch (e) { setErr(e.message || "Save failed"); setSaving(false); }
-  };
-
-  return (
-    <div role="dialog" aria-modal="true" onClick={onClose} style={{
-      position: "fixed", inset: 0, background: "rgba(15,23,42,0.6)",
-      display: "flex", alignItems: "flex-start", justifyContent: "center",
-      zIndex: 150, padding: 16, overflowY: "auto"
-    }}>
-      <form onSubmit={submit} onClick={(e) => e.stopPropagation()} style={{
-        background: THEME.bg, borderRadius: 12, maxWidth: 560, width: "100%",
-        marginTop: 40, padding: 24, boxShadow: "0 20px 60px rgba(15,23,42,0.22)"
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <h2 className="serif" style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Wholesale Integrations</h2>
-          <button type="button" onClick={onClose} style={{ border: "none", background: "transparent", cursor: "pointer", color: THEME.textMuted }}>
-            <X size={18} />
-          </button>
-        </div>
-
-        <div style={{ fontSize: 12, color: THEME.textMuted, lineHeight: 1.5, marginBottom: 16 }}>
-          You pay these services directly — we only proxy your requests. Keys are stored encrypted and only used when you click Skip Trace or Send Postcard.
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: "block" }}>
-            <div className="label-xs" style={{ marginBottom: 4 }}>
-              BatchData skip-trace key {status?.connected?.batchskip && <span style={{ color: THEME.green }}>✓ connected</span>}
-            </div>
-            <input type="password" value={batchskip} onChange={(e) => setBatchskip(e.target.value)}
-              placeholder={status?.connected?.batchskip ? "(leave blank to keep existing)" : "Paste your BatchData API token"}
-              style={{ width: "100%", padding: "8px 10px", fontSize: 13 }} />
-          </label>
-          <div style={{ fontSize: 10, color: THEME.textDim, marginTop: 3 }}>
-            Sign up at <a href="https://batchdata.com" target="_blank" rel="noopener noreferrer" style={{ color: THEME.accent }}>batchdata.com</a> — ~$0.15 per successful trace.
-          </div>
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: "block" }}>
-            <div className="label-xs" style={{ marginBottom: 4 }}>
-              Lob postcards key {status?.connected?.lob && <span style={{ color: THEME.green }}>✓ connected</span>}
-            </div>
-            <input type="password" value={lobKey} onChange={(e) => setLobKey(e.target.value)}
-              placeholder={status?.connected?.lob ? "(leave blank to keep existing)" : "Paste your Lob live or test API key"}
-              style={{ width: "100%", padding: "8px 10px", fontSize: 13 }} />
-          </label>
-          <div style={{ fontSize: 10, color: THEME.textDim, marginTop: 3 }}>
-            Sign up at <a href="https://lob.com" target="_blank" rel="noopener noreferrer" style={{ color: THEME.accent }}>lob.com</a> — postcards ~$0.69 each, printed + mailed for you.
-          </div>
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          <div className="label-xs" style={{ marginBottom: 6 }}>Your return address (printed on every postcard)</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <input placeholder="Name" value={addr.name || ""} onChange={(e) => setAddr({ ...addr, name: e.target.value })}
-              style={{ padding: "7px 10px", fontSize: 12, gridColumn: "1 / -1" }} />
-            <input placeholder="Street address" value={addr.street || ""} onChange={(e) => setAddr({ ...addr, street: e.target.value })}
-              style={{ padding: "7px 10px", fontSize: 12, gridColumn: "1 / -1" }} />
-            <input placeholder="City" value={addr.city || ""} onChange={(e) => setAddr({ ...addr, city: e.target.value })}
-              style={{ padding: "7px 10px", fontSize: 12 }} />
-            <div style={{ display: "grid", gridTemplateColumns: "60px 1fr", gap: 8 }}>
-              <input placeholder="ST" maxLength={2} value={addr.state || ""} onChange={(e) => setAddr({ ...addr, state: e.target.value.toUpperCase() })}
-                style={{ padding: "7px 10px", fontSize: 12, textTransform: "uppercase" }} />
-              <input placeholder="ZIP" value={addr.zip || ""} onChange={(e) => setAddr({ ...addr, zip: e.target.value })}
-                style={{ padding: "7px 10px", fontSize: 12 }} />
-            </div>
-          </div>
-        </div>
-
-        {err && (
-          <div style={{ padding: 10, background: THEME.redDim, color: THEME.red, borderRadius: 6, fontSize: 12, marginBottom: 12 }}>
-            {err}
-          </div>
-        )}
-
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <button type="button" onClick={onClose} className="btn-secondary" style={{ padding: "8px 14px", fontSize: 12 }}>Cancel</button>
-          <button type="submit" disabled={saving} className="btn-primary" style={{ padding: "8px 14px", fontSize: 12 }}>
-            {saving ? "Saving…" : "Save"}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-};
-
-const PostcardModal = ({ lead, onSend, onClose }) => {
-  const [message, setMessage] = useState(POSTCARD_TEMPLATE(lead));
-  const [sending, setSending] = useState(false);
-  const [err, setErr] = useState(null);
-
-  return (
-    <div role="dialog" aria-modal="true" onClick={onClose} style={{
-      position: "fixed", inset: 0, background: "rgba(15,23,42,0.6)",
-      display: "flex", alignItems: "flex-start", justifyContent: "center",
-      zIndex: 150, padding: 16, overflowY: "auto"
-    }}>
-      <div onClick={(e) => e.stopPropagation()} style={{
-        background: THEME.bg, borderRadius: 12, maxWidth: 600, width: "100%",
-        marginTop: 40, padding: 24, boxShadow: "0 20px 60px rgba(15,23,42,0.22)"
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <h2 className="serif" style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>
-            Send postcard — {lead.owner_name || "owner"}
-          </h2>
-          <button onClick={onClose} style={{ border: "none", background: "transparent", cursor: "pointer", color: THEME.textMuted }}>
-            <X size={18} />
-          </button>
-        </div>
-        <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 12, lineHeight: 1.5 }}>
-          Mails to: <strong>{lead.owner_mailing_address || lead.address}, {lead.owner_mailing_city || lead.city} {lead.owner_mailing_state || lead.state} {lead.owner_mailing_zip || lead.zip}</strong>
-          <br />Charged to your Lob account (~$0.69).
-        </div>
-        <label style={{ display: "block" }}>
-          <div className="label-xs" style={{ marginBottom: 4 }}>Back-of-postcard message</div>
-          <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={13}
-            style={{ width: "100%", padding: "8px 10px", fontSize: 12, fontFamily: "inherit", resize: "vertical" }} />
-        </label>
-        <div style={{ fontSize: 10, color: THEME.textDim, marginTop: 6 }}>
-          Replace <code>[Your Name]</code> / <code>[Your Phone]</code> before sending. Front of postcard uses a default DealTrack-branded "Interested in your home?" header.
-        </div>
-        {err && <div style={{ marginTop: 10, padding: 10, background: THEME.redDim, color: THEME.red, borderRadius: 6, fontSize: 12 }}>{err}</div>}
-        <div style={{ display: "flex", gap: 8, marginTop: 16, justifyContent: "flex-end" }}>
-          <button onClick={onClose} className="btn-secondary" style={{ padding: "8px 14px", fontSize: 12 }}>Cancel</button>
-          <button className="btn-primary" disabled={sending || !message.trim()}
-            onClick={async () => {
-              setSending(true); setErr(null);
-              try { await onSend({ message }); onClose(); }
-              catch (e) { setErr(e.message || "Send failed"); setSending(false); }
-            }}
-            style={{ padding: "8px 14px", fontSize: 12 }}>
-            <Send size={13} /> {sending ? "Sending…" : "Send postcard"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const EmailModal = ({ lead, onSend, onClose }) => {
   const [subject, setSubject] = useState(EMAIL_TEMPLATE(lead).subject);
@@ -287,6 +109,229 @@ const EmailModal = ({ lead, onSend, onClose }) => {
             style={{ padding: "8px 14px", fontSize: 12 }}>
             <Mail size={13} /> {sending ? "Sending…" : "Send email"}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/** Full-detail modal — opened by clicking a lead card. Surfaces every
+ * field ATTOM + skip-trace + Google gave us, with inline actions. */
+const WholesaleDetailModal = ({ lead, onClose, onSkipTrace, onEmail, onStatusChange, onSave, busy }) => {
+  const status = STATUS_BY_KEY[lead.status] || STATUS_BY_KEY.new;
+  const isSearchResult = !!lead.__isSearchResult;
+  const flags = [];
+  if (lead.is_tax_delinquent) flags.push({ label: "Pre-foreclosure / tax distressed", color: THEME.red, icon: <DollarSign size={11} /> });
+  if (lead.is_absentee) flags.push({ label: "Absentee owner", color: THEME.accent, icon: <Home size={11} /> });
+  if (lead.is_long_time_owner) flags.push({ label: `Held ${lead.years_owned}+ years`, color: THEME.orange, icon: <Clock size={11} /> });
+
+  const [view, setView] = useState("street");
+  const activeSrc = view === "satellite" ? lead.satellite_url : lead.streetview_url;
+
+  const kv = (label, value, opts = {}) => value ? (
+    <div style={{ padding: "6px 0", borderBottom: `1px solid ${THEME.borderLight}` }}>
+      <div style={{ fontSize: 10, color: THEME.textMuted, letterSpacing: "0.05em", textTransform: "uppercase" }}>{label}</div>
+      <div style={{ fontSize: 13, fontWeight: opts.bold ? 700 : 500, color: opts.color || THEME.text, marginTop: 2 }}>{value}</div>
+    </div>
+  ) : null;
+
+  return (
+    <div role="dialog" aria-modal="true" onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, background: "rgba(15,23,42,0.6)",
+        display: "flex", alignItems: "flex-start", justifyContent: "center",
+        zIndex: 150, padding: 16, overflowY: "auto"
+      }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: THEME.bg, borderRadius: 12, maxWidth: 780, width: "100%",
+        marginTop: 40, marginBottom: 40,
+        boxShadow: "0 20px 60px rgba(15,23,42,0.22)", overflow: "hidden"
+      }}>
+        {/* Hero */}
+        {(lead.streetview_url || lead.satellite_url) && (
+          <div style={{ position: "relative", aspectRatio: "16 / 9", background: THEME.bgPanel }}>
+            {activeSrc && (
+              <img src={activeSrc} alt={lead.address} loading="lazy"
+                style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            )}
+            {lead.streetview_url && lead.satellite_url && (
+              <div style={{ position: "absolute", top: 12, right: 12, display: "flex",
+                background: "rgba(15,23,42,0.78)", borderRadius: 999, padding: 2, fontSize: 10, fontWeight: 700 }}>
+                {[
+                  { key: "street", label: "Street" },
+                  { key: "satellite", label: "Aerial" }
+                ].map(opt => (
+                  <button key={opt.key} onClick={() => setView(opt.key)}
+                    style={{
+                      padding: "3px 10px", border: "none", cursor: "pointer",
+                      background: view === opt.key ? "#FFFFFF" : "transparent",
+                      color: view === opt.key ? THEME.navy : "#FFFFFF",
+                      borderRadius: 999, letterSpacing: "0.04em", textTransform: "uppercase"
+                    }}>{opt.label}</button>
+                ))}
+              </div>
+            )}
+            <button onClick={onClose} aria-label="Close"
+              style={{
+                position: "absolute", top: 12, left: 12,
+                width: 34, height: 34, borderRadius: "50%",
+                background: "rgba(15,23,42,0.72)", color: "#fff",
+                border: "none", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center"
+              }}>
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
+        <div style={{ padding: 22 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 10 }}>
+            <div>
+              <h2 className="serif" style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>{lead.address}</h2>
+              <div style={{ fontSize: 13, color: THEME.textMuted, marginTop: 2 }}>
+                {[lead.city, lead.state, lead.zip].filter(Boolean).join(", ")}
+              </div>
+            </div>
+            <div style={{
+              padding: "4px 10px", fontSize: 12, fontWeight: 700,
+              background: lead.lead_score >= 60 ? THEME.greenDim : lead.lead_score >= 40 ? THEME.bgOrange : THEME.bgRaised,
+              color: lead.lead_score >= 60 ? THEME.green : lead.lead_score >= 40 ? THEME.orange : THEME.textMuted,
+              borderRadius: 6, flexShrink: 0
+            }}>
+              Score {lead.lead_score}/100
+            </div>
+          </div>
+
+          {/* Flags */}
+          {flags.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
+              {flags.map((f, i) => (
+                <span key={i} style={{
+                  display: "inline-flex", alignItems: "center", gap: 4,
+                  padding: "3px 9px", fontSize: 11, fontWeight: 700,
+                  background: f.color === THEME.red ? THEME.redDim : f.color === THEME.accent ? THEME.bgRaised : THEME.bgOrange,
+                  color: f.color, borderRadius: 4
+                }}>{f.icon}{f.label}</span>
+              ))}
+            </div>
+          )}
+
+          {/* Contact block — prominent, what the investor actually needs */}
+          <div style={{
+            padding: 14, marginBottom: 16,
+            background: (lead.owner_phone || lead.owner_email) ? THEME.bgTeal : THEME.bgPanel,
+            border: `1px solid ${(lead.owner_phone || lead.owner_email) ? THEME.teal : THEME.border}`,
+            borderRadius: 8
+          }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
+              color: (lead.owner_phone || lead.owner_email) ? THEME.teal : THEME.textMuted, marginBottom: 8 }}>
+              Owner contact
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{lead.owner_name || "—"}</div>
+            {lead.owner_mailing_address && (
+              <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 8, lineHeight: 1.4 }}>
+                Mailing: {lead.owner_mailing_address}
+                {(lead.owner_mailing_city || lead.owner_mailing_state) && (
+                  <>, {[lead.owner_mailing_city, lead.owner_mailing_state, lead.owner_mailing_zip].filter(Boolean).join(", ")}</>
+                )}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {lead.owner_phone ? (
+                <a href={`tel:${lead.owner_phone}`} style={{
+                  display: "inline-flex", alignItems: "center", gap: 5,
+                  fontSize: 14, fontWeight: 700, color: THEME.teal, textDecoration: "none"
+                }}>
+                  <Phone size={14} /> {lead.owner_phone}
+                </a>
+              ) : null}
+              {lead.owner_email ? (
+                <a href={`mailto:${lead.owner_email}`} style={{
+                  display: "inline-flex", alignItems: "center", gap: 5,
+                  fontSize: 14, fontWeight: 700, color: THEME.teal, textDecoration: "none",
+                  wordBreak: "break-all"
+                }}>
+                  <Mail size={14} /> {lead.owner_email}
+                </a>
+              ) : null}
+              {!lead.owner_phone && !lead.owner_email && !isSearchResult && (
+                <button onClick={() => onSkipTrace(lead.id)} disabled={busy}
+                  className="btn-primary" style={{ padding: "6px 12px", fontSize: 12 }}>
+                  <Zap size={12} /> Run skip trace to find phone / email
+                </button>
+              )}
+              {!lead.owner_phone && !lead.owner_email && isSearchResult && (
+                <span style={{ fontSize: 11, color: THEME.textMuted }}>
+                  Save as lead first, then run skip trace to find phone/email.
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Property detail grid */}
+          <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 16 }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: THEME.textMuted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>Property</div>
+              {kv("Type", lead.property_type)}
+              {kv("Year built", lead.year_built)}
+              {kv("Bedrooms / Bathrooms", `${lead.bedrooms || "?"} / ${lead.bathrooms || "?"}`)}
+              {kv("Square footage", lead.sqft ? lead.sqft.toLocaleString() : null)}
+              {kv("County", lead.county)}
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: THEME.textMuted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>Financials</div>
+              {kv("Market value", lead.market_value ? fmtUSD(lead.market_value) : null, { bold: true })}
+              {kv("Assessed value", lead.assessed_value ? fmtUSD(lead.assessed_value) : null)}
+              {kv("Last sale price", lead.last_sale_price ? fmtUSD(lead.last_sale_price) : null, { bold: true, color: THEME.accent })}
+              {kv("Last sale date", lead.last_sale_date)}
+              {kv("Years owned", lead.years_owned != null ? `${lead.years_owned} years` : null)}
+            </div>
+          </div>
+
+          {/* Status + notes (only for saved leads) */}
+          {!isSearchResult && (
+            <div style={{ padding: 12, background: THEME.bgPanel, borderRadius: 8, border: `1px solid ${THEME.border}`, marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginBottom: lead.notes ? 8 : 0 }}>
+                <span style={{ color: THEME.textMuted }}>Status:</span>
+                <select value={lead.status} onChange={(e) => onStatusChange(lead.id, e.target.value)}
+                  style={{
+                    padding: "4px 8px", fontSize: 12, borderRadius: 4,
+                    border: `1px solid ${status.color}`, background: THEME.bg, color: status.color, fontWeight: 700
+                  }}>
+                  {STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </select>
+              </div>
+              {lead.notes && (
+                <div style={{ fontSize: 12, color: THEME.textMuted, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+                  <strong style={{ color: THEME.text }}>Notes:</strong> {lead.notes}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Action row */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            {isSearchResult ? (
+              <button onClick={() => onSave && onSave(lead)} className="btn-primary"
+                style={{ padding: "8px 14px", fontSize: 12 }}>
+                <Star size={13} /> Save as lead
+              </button>
+            ) : (
+              <>
+                {lead.owner_email && (
+                  <button onClick={() => onEmail(lead)} className="btn-secondary" style={{ padding: "8px 14px", fontSize: 12 }}>
+                    <Mail size={13} /> Email owner
+                  </button>
+                )}
+                {!lead.skip_traced_at && (
+                  <button onClick={() => onSkipTrace(lead.id)} disabled={busy}
+                    className="btn-primary" style={{ padding: "8px 14px", fontSize: 12 }}>
+                    <Zap size={13} /> Skip trace
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -361,17 +406,20 @@ const PropertyPhoto = ({ streetSrc, satelliteSrc, alt, aspectRatio = "4 / 3" }) 
   );
 };
 
-const LeadCard = ({ lead, onSkipTrace, onStatusChange, onDelete, onEmail, onPostcard, busy }) => {
+const LeadCard = ({ lead, onSkipTrace, onStatusChange, onDelete, onEmail, onOpen, busy }) => {
   const status = STATUS_BY_KEY[lead.status] || STATUS_BY_KEY.new;
   const flags = [];
   if (lead.is_tax_delinquent) flags.push({ icon: <DollarSign size={10} />, label: "Tax delinquent", color: THEME.red });
   if (lead.is_absentee) flags.push({ icon: <Home size={10} />, label: "Absentee", color: THEME.accent });
   if (lead.is_long_time_owner) flags.push({ icon: <Clock size={10} />, label: `${lead.years_owned}yr+`, color: THEME.orange });
 
+  const stop = (e) => e.stopPropagation();
+
   return (
-    <div style={{
+    <div onClick={() => onOpen && onOpen(lead)} style={{
       border: `1px solid ${THEME.border}`, borderRadius: 8, padding: 14,
-      background: THEME.bg, display: "flex", flexDirection: "column", gap: 10
+      background: THEME.bg, display: "flex", flexDirection: "column", gap: 10,
+      cursor: onOpen ? "pointer" : "default"
     }}>
       <PropertyPhoto streetSrc={lead.streetview_url} satelliteSrc={lead.satellite_url} alt={lead.address} />
 
@@ -446,7 +494,7 @@ const LeadCard = ({ lead, onSkipTrace, onStatusChange, onDelete, onEmail, onPost
           {lead.owner_phone && (
             <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
               <Phone size={11} color={THEME.teal} />
-              <a href={`tel:${lead.owner_phone}`} style={{ color: THEME.teal, fontWeight: 600, textDecoration: "none" }}>
+              <a href={`tel:${lead.owner_phone}`} onClick={stop} style={{ color: THEME.teal, fontWeight: 600, textDecoration: "none" }}>
                 {lead.owner_phone}
               </a>
             </div>
@@ -460,10 +508,11 @@ const LeadCard = ({ lead, onSkipTrace, onStatusChange, onDelete, onEmail, onPost
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: "auto" }}>
+      <div onClick={stop} style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: "auto" }}>
         <select
           value={lead.status}
           onChange={(e) => onStatusChange(lead.id, e.target.value)}
+          onClick={stop}
           style={{
             padding: "5px 8px", fontSize: 11, borderRadius: 4,
             border: `1px solid ${status.color}`, background: THEME.bg, color: status.color,
@@ -474,7 +523,7 @@ const LeadCard = ({ lead, onSkipTrace, onStatusChange, onDelete, onEmail, onPost
         </select>
 
         {!lead.skip_traced_at ? (
-          <button onClick={() => onSkipTrace(lead.id)} disabled={busy}
+          <button onClick={(e) => { stop(e); onSkipTrace(lead.id); }} disabled={busy}
             className="btn-secondary" style={{ padding: "5px 9px", fontSize: 11 }}>
             <Zap size={11} /> Skip trace
           </button>
@@ -486,21 +535,16 @@ const LeadCard = ({ lead, onSkipTrace, onStatusChange, onDelete, onEmail, onPost
         )}
 
         {lead.owner_phone && (
-          <a href={`tel:${lead.owner_phone}`} className="btn-secondary" style={{ padding: "5px 9px", fontSize: 11 }}>
+          <a href={`tel:${lead.owner_phone}`} onClick={stop} className="btn-secondary" style={{ padding: "5px 9px", fontSize: 11 }}>
             <Phone size={11} /> Call
           </a>
         )}
         {lead.owner_email && (
-          <button onClick={() => onEmail(lead)} className="btn-secondary" style={{ padding: "5px 9px", fontSize: 11 }}>
+          <button onClick={(e) => { stop(e); onEmail(lead); }} className="btn-secondary" style={{ padding: "5px 9px", fontSize: 11 }}>
             <Mail size={11} /> Email
           </button>
         )}
-        {(lead.owner_mailing_address || lead.address) && (
-          <button onClick={() => onPostcard(lead)} className="btn-secondary" style={{ padding: "5px 9px", fontSize: 11 }}>
-            <Send size={11} /> Postcard
-          </button>
-        )}
-        <button onClick={() => onDelete(lead.id)} className="btn-ghost"
+        <button onClick={(e) => { stop(e); onDelete(lead.id); }} className="btn-ghost"
           style={{ padding: "5px 9px", fontSize: 11, color: THEME.red, marginLeft: "auto" }}>
           <Trash2 size={11} />
         </button>
@@ -509,15 +553,44 @@ const LeadCard = ({ lead, onSkipTrace, onStatusChange, onDelete, onEmail, onPost
   );
 };
 
+// Adapt a wholesale lead into the shape ListingCard / Watchlist expect so
+// saved leads surface in the main Watchlist tab alongside Market Intel
+// favorites. The `__wholesale` flag lets the UI show a "Wholesale lead"
+// chip on the card so the origin is obvious.
+const leadToWatchlist = (lead) => ({
+  id: `wholesale-${lead.id}`,
+  wholesale_lead_id: lead.id,
+  __wholesale: true,
+  formattedAddress: [
+    lead.address,
+    [lead.city, lead.state, lead.zip].filter(Boolean).join(", ")
+  ].filter(Boolean).join(", "),
+  city: lead.city, state: lead.state, zip: lead.zip,
+  latitude: lead.latitude, longitude: lead.longitude,
+  price: lead.market_value || lead.last_sale_price || null,
+  bedrooms: lead.bedrooms, bathrooms: lead.bathrooms,
+  squareFootage: lead.sqft, yearBuilt: lead.year_built,
+  propertyType: lead.property_type,
+  imageUrl: lead.streetview_url || lead.satellite_url || null,
+  photos: [lead.streetview_url, lead.satellite_url].filter(Boolean),
+  streetview_url: lead.streetview_url,
+  satellite_url: lead.satellite_url,
+  demo: false
+});
+
 export const WholesaleView = () => {
   const saas = useSaasUser();
   const saasOn = isSaasMode();
   const toast = useToast();
+  const { toggleWatch, isWatched } = useAppActions();
   const plan = saas.usage?.plan;
   const isPaid = plan && plan !== "free";
 
   const [zip, setZip] = useState("");
+  const [searchState, setSearchState] = useState("");
+  const [searchCity, setSearchCity] = useState("");
   const [taxDelinquentOnly, setTaxDelinquentOnly] = useState(false);
+  const [detailLead, setDetailLead] = useState(null);
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState(null);
@@ -526,33 +599,7 @@ export const WholesaleView = () => {
   const [loadingLeads, setLoadingLeads] = useState(true);
   const [busyIds, setBusyIds] = useState(new Set());
   const [emailingLead, setEmailingLead] = useState(null);
-  const [postcardLead, setPostcardLead] = useState(null);
-  const [integrations, setIntegrations] = useState(null);
-  const [showIntegrations, setShowIntegrations] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
-
-  const loadIntegrations = useCallback(async () => {
-    if (!saasOn || !saas.user || !isPaid) return;
-    try {
-      const data = await getWholesaleIntegrations(saas.getToken);
-      setIntegrations(data);
-    } catch (e) { console.warn(e); }
-  }, [saasOn, saas.user, saas.getToken, isPaid]);
-  useEffect(() => { loadIntegrations(); }, [loadIntegrations]);
-
-  const onSaveIntegrations = async (updates) => {
-    const data = await saveWholesaleIntegrations(saas.getToken, updates);
-    setIntegrations(data);
-    toast.push("Integrations updated", "success");
-  };
-
-  const onSendPostcard = async ({ message }) => {
-    if (!postcardLead) return;
-    await sendPostcard(saas.getToken, { leadId: postcardLead.id, message });
-    const { lead } = await updateWholesaleLead(saas.getToken, postcardLead.id, { status: "contacted" }).catch(() => ({}));
-    if (lead) setLeads(prev => prev.map(l => l.id === lead.id ? lead : l));
-    toast.push("Postcard queued with Lob", "success");
-  };
 
   const loadLeads = useCallback(async () => {
     if (!saasOn || !saas.user || !isPaid) { setLeads([]); setLoadingLeads(false); return; }
@@ -569,12 +616,22 @@ export const WholesaleView = () => {
   });
 
   const onSearch = async () => {
-    if (!/^\d{5}$/.test(zip)) { setSearchError("Enter a 5-digit ZIP code"); return; }
+    const hasZip = /^\d{5}$/.test(zip);
+    const hasCityState = !!searchCity && !!searchState;
+    if (!hasZip && !hasCityState) {
+      setSearchError("Pick a state + city, or enter a 5-digit ZIP.");
+      return;
+    }
     setSearching(true); setSearchError(null);
     try {
-      const { results } = await searchWholesaleLeads(saas.getToken, { zip, taxDelinquentOnly });
+      const { results } = await searchWholesaleLeads(saas.getToken, {
+        zip: hasZip ? zip : undefined,
+        city: hasZip ? undefined : searchCity,
+        state: hasZip ? undefined : searchState,
+        taxDelinquentOnly
+      });
       setSearchResults(results || []);
-      if (!results || results.length === 0) setSearchError("No matching properties in that ZIP.");
+      if (!results || results.length === 0) setSearchError("No matching properties for that location.");
     } catch (e) {
       setSearchError(e.message || "Search failed");
     } finally { setSearching(false); }
@@ -584,8 +641,16 @@ export const WholesaleView = () => {
     try {
       const { lead } = await saveWholesaleLead(saas.getToken, property);
       setLeads(prev => [lead, ...prev.filter(l => l.id !== lead.id)]);
-      toast.push("Lead saved", "success");
+      // Also push to the app-wide Watchlist so it's easy to find from the
+      // Watchlist tab alongside Market Intel favorites.
+      const watchShape = leadToWatchlist(lead);
+      if (!isWatched(watchShape.id)) toggleWatch(watchShape);
+      toast.push("Lead saved to Your Leads + Watchlist", "success");
       setSearchResults(prev => prev.filter(p => p.address !== property.address));
+      // Also refetch in the background so the server's authoritative state
+      // replaces the optimistic prepend — guards against edge cases where
+      // the upsert returns a slightly different shape than we expected.
+      loadLeads();
     } catch (e) { toast.push(e.message || "Save failed", "error"); }
   };
 
@@ -614,6 +679,9 @@ export const WholesaleView = () => {
     try {
       await deleteWholesaleLead(saas.getToken, id);
       setLeads(prev => prev.filter(l => l.id !== id));
+      // Keep the Watchlist in sync — toggleWatch removes when already present.
+      const watchId = `wholesale-${id}`;
+      if (isWatched(watchId)) toggleWatch({ id: watchId });
       toast.push("Lead removed", "info");
     } catch (e) { toast.push(e.message, "error"); }
   };
@@ -664,42 +732,65 @@ export const WholesaleView = () => {
   /* ── Main UI ─────────────────────────────────────────────────────── */
   return (
     <div style={{ maxWidth: 1400, margin: "0 auto", padding: isMobile() ? 16 : "24px 28px" }}>
-      <div style={{ marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
-        <div style={{ flex: 1, minWidth: 280 }}>
-          <h1 className="serif" style={{ fontSize: 26, fontWeight: 700, margin: 0 }}>
-            <Crown size={20} style={{ display: "inline", verticalAlign: "-4px", marginRight: 8, color: THEME.accent }} />
-            Wholesale Lead Finder
-          </h1>
-          <p style={{ fontSize: 13, color: THEME.textMuted, margin: "4px 0 0" }}>
-            Absentee owners, long-time holders, and distressed properties by ZIP. Send direct-mail postcards or skip-trace for phone/email. You pay your own Lob + BatchData bills.
-          </p>
-        </div>
-        <button onClick={() => setShowIntegrations(true)} className="btn-secondary"
-          style={{ padding: "8px 14px", fontSize: 12 }}>
-          <Settings size={13} />
-          {integrations?.connected?.lob || integrations?.connected?.batchskip
-            ? "Integrations ✓"
-            : "Set up integrations"}
-        </button>
+      <div style={{ marginBottom: 20 }}>
+        <h1 className="serif" style={{ fontSize: 26, fontWeight: 700, margin: 0 }}>
+          <Crown size={20} style={{ display: "inline", verticalAlign: "-4px", marginRight: 8, color: THEME.accent }} />
+          Wholesale Lead Finder
+        </h1>
+        <p style={{ fontSize: 13, color: THEME.textMuted, margin: "4px 0 0" }}>
+          Absentee owners, long-time holders, and distressed properties by ZIP. Skip-trace for phone/email and reach out directly.
+        </p>
       </div>
 
       <Panel title="Find leads" icon={<Search size={16} />} accent style={{ marginBottom: 20 }}>
-        <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1.5fr 1fr auto", gap: 12, alignItems: "end" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "160px 1fr 140px auto", gap: 10, alignItems: "end" }}>
           <div>
-            <div className="label-xs" style={{ marginBottom: 4 }}>ZIP code</div>
+            <div className="label-xs" style={{ marginBottom: 4 }}>State</div>
+            <select value={searchState}
+              onChange={(e) => { setSearchState(e.target.value); setSearchCity(""); }}
+              style={{ width: "100%", padding: "9px 10px", fontSize: 14, background: THEME.bg }}>
+              <option value="">Select state…</option>
+              {Object.keys(STATE_NAMES).sort((a, b) => STATE_NAMES[a].localeCompare(STATE_NAMES[b])).map(code => (
+                <option key={code} value={code}>{STATE_NAMES[code]}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <div className="label-xs" style={{ marginBottom: 4 }}>
+              City <span style={{ color: THEME.textDim, fontWeight: 400 }}>(type any)</span>
+            </div>
+            <input
+              list="wholesale-city-suggestions"
+              value={searchCity}
+              onChange={(e) => setSearchCity(e.target.value)}
+              disabled={!searchState}
+              placeholder={searchState ? "Miami, Fort Myers, Naples…" : "Pick a state first"}
+              style={{ width: "100%", padding: "9px 10px", fontSize: 14, background: THEME.bg,
+                opacity: searchState ? 1 : 0.5 }} />
+            <datalist id="wholesale-city-suggestions">
+              {(CITIES_BY_STATE[searchState] || []).map(c => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
+          </div>
+          <div>
+            <div className="label-xs" style={{ marginBottom: 4 }}>
+              ZIP <span style={{ color: THEME.textDim, fontWeight: 400 }}>(overrides)</span>
+            </div>
             <input value={zip} onChange={(e) => setZip(e.target.value.replace(/\D/g, "").slice(0, 5))}
               placeholder="33101" maxLength={5}
               style={{ width: "100%", padding: "9px 10px", fontSize: 14 }} />
           </div>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }} title="Cross-references ATTOM's foreclosure + pre-foreclosure feeds">
-            <input type="checkbox" checked={taxDelinquentOnly} onChange={(e) => setTaxDelinquentOnly(e.target.checked)} />
-            <span>Pre-foreclosure / tax-distressed only</span>
-          </label>
-          <button onClick={onSearch} disabled={searching || !zip} className="btn-primary"
+          <button onClick={onSearch} disabled={searching} className="btn-primary"
             style={{ padding: "10px 16px", fontSize: 13 }}>
             <Search size={14} /> {searching ? "Searching…" : "Search"}
           </button>
         </div>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginTop: 10 }}
+          title="Cross-references ATTOM's foreclosure + pre-foreclosure feeds">
+          <input type="checkbox" checked={taxDelinquentOnly} onChange={(e) => setTaxDelinquentOnly(e.target.checked)} />
+          <span>Pre-foreclosure / tax-distressed only</span>
+        </label>
         {searchError && (
           <div style={{ marginTop: 10, padding: 10, background: THEME.bgOrange, color: THEME.orange,
             borderRadius: 6, fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
@@ -717,7 +808,13 @@ export const WholesaleView = () => {
           }>
           <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "repeat(auto-fill, minmax(320px, 1fr))", gap: 10 }}>
             {searchResults.map((p, idx) => (
-              <div key={idx} style={{ border: `1px solid ${THEME.border}`, borderRadius: 8, padding: 12, background: THEME.bgPanel, display: "flex", flexDirection: "column", gap: 8 }}>
+              <div key={idx}
+                onClick={() => setDetailLead({ ...p, id: `search-${idx}`, status: "new", __isSearchResult: true })}
+                style={{
+                  border: `1px solid ${THEME.border}`, borderRadius: 8, padding: 12,
+                  background: THEME.bgPanel, display: "flex", flexDirection: "column", gap: 8,
+                  cursor: "pointer"
+                }}>
                 <PropertyPhoto streetSrc={p.streetview_url} satelliteSrc={p.satellite_url} alt={p.address} aspectRatio="16 / 9" />
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 700 }}>{p.address}</div>
@@ -741,7 +838,7 @@ export const WholesaleView = () => {
                   {p.is_absentee && <> · absentee</>}
                   {p.market_value && <> · {fmtUSD(p.market_value, { short: true })}</>}
                 </div>
-                <button onClick={() => onSaveSearchResult(p)} className="btn-primary"
+                <button onClick={(e) => { e.stopPropagation(); onSaveSearchResult(p); }} className="btn-primary"
                   style={{ padding: "6px 10px", fontSize: 11, width: "100%", justifyContent: "center", marginTop: "auto" }}>
                   <Star size={11} /> Save lead
                 </button>
@@ -784,7 +881,7 @@ export const WholesaleView = () => {
                 onStatusChange={onStatusChange}
                 onDelete={onDeleteLead}
                 onEmail={setEmailingLead}
-                onPostcard={setPostcardLead}
+                onOpen={setDetailLead}
               />
             ))}
           </div>
@@ -799,19 +896,19 @@ export const WholesaleView = () => {
         />
       )}
 
-      {postcardLead && (
-        <PostcardModal
-          lead={postcardLead}
-          onSend={onSendPostcard}
-          onClose={() => setPostcardLead(null)}
-        />
-      )}
-
-      {showIntegrations && (
-        <IntegrationsModal
-          status={integrations}
-          onSave={onSaveIntegrations}
-          onClose={() => setShowIntegrations(false)}
+      {detailLead && (
+        <WholesaleDetailModal
+          lead={detailLead.__isSearchResult ? detailLead : (leads.find(l => l.id === detailLead.id) || detailLead)}
+          busy={busyIds.has(detailLead.id)}
+          onClose={() => setDetailLead(null)}
+          onSkipTrace={onSkipTrace}
+          onStatusChange={onStatusChange}
+          onEmail={(l) => { setEmailingLead(l); setDetailLead(null); }}
+          onSave={async (l) => {
+            const { __isSearchResult, id, ...property } = l;
+            await onSaveSearchResult(property);
+            setDetailLead(null);
+          }}
         />
       )}
 

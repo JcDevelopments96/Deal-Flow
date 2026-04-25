@@ -146,10 +146,10 @@ export async function removeWatchlistItem(getToken, listingId) {
 
 /* ── Wholesaling (ATTOM + BatchSkipTracing + Resend) ─────────────────── */
 
-export async function searchWholesaleLeads(getToken, { zip, minYearsOwned, absenteeOnly, taxDelinquentOnly, limit }) {
+export async function searchWholesaleLeads(getToken, { zip, city, state, minYearsOwned, absenteeOnly, taxDelinquentOnly, limit }) {
   return fetchMetered(getToken, "/api/wholesale?action=search", {
     method: "POST",
-    body: JSON.stringify({ zip, minYearsOwned, absenteeOnly, taxDelinquentOnly, limit })
+    body: JSON.stringify({ zip, city, state, minYearsOwned, absenteeOnly, taxDelinquentOnly, limit })
   });
 }
 
@@ -189,13 +189,6 @@ export async function emailWholesaleLead(getToken, { leadId, subject, body }) {
   return fetchMetered(getToken, "/api/wholesale?action=email", {
     method: "POST",
     body: JSON.stringify({ leadId, subject, body })
-  });
-}
-
-export async function sendPostcard(getToken, { leadId, message }) {
-  return fetchMetered(getToken, "/api/wholesale?action=postcard", {
-    method: "POST",
-    body: JSON.stringify({ leadId, message })
   });
 }
 
@@ -284,6 +277,20 @@ export async function fetchMarketIndexes(getToken, { regionType, regionId }) {
   return fetchMetered(getToken, `/api/market/indexes?${qs.toString()}`);
 }
 
+// Bulk per-state fetch — returns every county in the state keyed by 5-char
+// FIPS. Used to color the Market Intel map before any live search fires.
+export async function fetchStateMarketIndexes(getToken, stateCode) {
+  const qs = new URLSearchParams({ state: stateCode });
+  return fetchMetered(getToken, `/api/market/indexes?${qs.toString()}`);
+}
+
+// Nationwide county snapshot — every county keyed by 5-char FIPS. Loaded
+// once on mount so the map is gradient-colored everywhere regardless of
+// which state (if any) the user has selected.
+export async function fetchNationalMarketIndexes(getToken) {
+  return fetchMetered(getToken, `/api/market/indexes?all=1`);
+}
+
 // Full-gallery + long-description lookup for a single Realtor listing.
 // Unmetered, cached 24h server-side — fired on-demand when the user opens
 // the detail modal.
@@ -315,5 +322,12 @@ export async function fetchPropertyPhotos(getToken, { lat, lng, address }) {
 // Google Places Nearby — top 3 schools + amenity counts within 1 mile.
 export async function fetchNearby(getToken, { lat, lng }) {
   const qs = new URLSearchParams({ source: "nearby", lat: String(lat), lng: String(lng) });
+  return fetchMetered(getToken, `/api/lookup?${qs.toString()}`);
+}
+
+// Find local pros by category (lender, contractor, plumber, etc.) and ZIP.
+// Returns up to ~10 nearby businesses from Google Places Text Search.
+export async function fetchLocalPros(getToken, { category, zip }) {
+  const qs = new URLSearchParams({ source: "findpros", category, zip: String(zip) });
   return fetchMetered(getToken, `/api/lookup?${qs.toString()}`);
 }

@@ -86,7 +86,7 @@ const computeLiveStats = (sales) => {
   return out;
 };
 
-export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarkets, bedsFilter = "any", bathsFilter = "any", onStatsComputed, onListingsLoaded, countyFmr, mortgageRate, countyStats }) => {
+export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stateMarkets, bedsFilter = "any", bathsFilter = "any", onStatsComputed, onListingsLoaded, countyFmr, mortgageRate, countyStats, pinnedListingId = null, onClearPin }) => {
   const saasOn = isSaasMode();
 
   // SaaS hooks (safe to call even when saasOn=false — useSaasUser
@@ -266,6 +266,11 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
   // Client-side filter + sort. Rental "bedrooms" are not always accurate, so
   // we soft-filter there.
   const filteredListings = useMemo(() => {
+    // A clicked map pin trumps every other filter — show only that listing.
+    if (pinnedListingId) {
+      const hit = listings.find(l => l.id === pinnedListingId);
+      return hit ? [hit] : [];
+    }
     const out = listings.filter(l => matchesRange(l.bedrooms, bedsRange) && matchesRange(l.bathrooms, bathsRange));
     const cmp = {
       newest:    (a, b) => (new Date(b.listedDate || 0).getTime()) - (new Date(a.listedDate || 0).getTime()),
@@ -275,7 +280,7 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
       dom:       (a, b) => (a.daysOnMarket ?? Infinity) - (b.daysOnMarket ?? Infinity)
     };
     return out.sort(cmp[sortBy] || cmp.newest);
-  }, [listings, bedsRange, bathsRange, sortBy]);
+  }, [listings, bedsRange, bathsRange, sortBy, pinnedListingId]);
 
   const saveKey = (providerId, val) => {
     const trimmed = (val || "").trim();
@@ -504,10 +509,25 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
             <div style={{
               fontSize: 12, fontWeight: 700, color: THEME.accent,
               textTransform: "uppercase", letterSpacing: "0.1em",
-              display: "flex", alignItems: "center", gap: 8
+              display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap"
             }}>
               <Building2 size={13} />
               Properties For Sale ({filteredListings.length})
+              {pinnedListingId && (
+                <button
+                  onClick={() => onClearPin && onClearPin()}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 4,
+                    padding: "3px 9px", fontSize: 10, fontWeight: 700,
+                    background: THEME.bgOrange, color: THEME.orange,
+                    border: `1px solid ${THEME.orange}`, borderRadius: 999,
+                    cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.06em"
+                  }}
+                  title="Clear map-pin filter"
+                >
+                  Pinned · clear ×
+                </button>
+              )}
             </div>
             <select
               value={sortBy}

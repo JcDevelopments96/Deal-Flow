@@ -54,8 +54,11 @@ export const USCountyMap = ({
   highlightedMarket,
   onCountyClick,
   liveCountyStats,
+  staticCountyStats,  // keyed by 5-char FIPS, from market_indexes (Zillow ZHVI)
   metric = "price",
   listings = [],
+  onListingClick,
+  pinnedListingId,
   onResetView
 }) => {
   const [hoveredCounty, setHoveredCounty] = useState(null);
@@ -116,6 +119,31 @@ export const USCountyMap = ({
     return out;
   }, [usingLiveData, liveCountyStats, minScore, maxScore, metricDef]);
 
+  // Static heat — keyed by 5-char FIPS so we can look up by geo.id directly.
+  // Sourced from the Zillow ZHVI snapshot in market_indexes. Covers ~3,000
+  // counties nationwide so the map doesn't read as "yellow everywhere"
+  // when the user hasn't run a live search yet. Only used for price metric
+  // since ZHVI is a home-value index.
+  const { staticCountyHeat, staticMin, staticMax } = useMemo(() => {
+    const out = new Map();
+    if (!staticCountyStats || metric !== "price") return { staticCountyHeat: out, staticMin: 0, staticMax: 0 };
+    const values = Object.values(staticCountyStats)
+      .map(s => Number(s?.zhvi_latest))
+      .filter(v => Number.isFinite(v) && v > 0);
+    if (values.length === 0) return { staticCountyHeat: out, staticMin: 0, staticMax: 0 };
+    const sMin = Math.min(...values);
+    const sMax = Math.max(...values);
+    const range = sMax - sMin;
+    for (const [fips, s] of Object.entries(staticCountyStats)) {
+      const v = Number(s?.zhvi_latest);
+      if (!Number.isFinite(v) || v <= 0) continue;
+      const raw = range > 0 ? (v - sMin) / range : 0.5;
+      const t = 1 - raw; // price inverted: lower = greener
+      out.set(fips, { t, value: v, zhvi: v, zori: s?.zori_latest || null });
+    }
+    return { staticCountyHeat: out, staticMin: sMin, staticMax: sMax };
+  }, [staticCountyStats, metric]);
+
   const view = (selectedState && STATE_MAP_VIEW[selectedState])
     ? STATE_MAP_VIEW[selectedState]
     : { center: [-96, 38], zoom: 1 };
@@ -162,36 +190,40 @@ export const USCountyMap = ({
                   const isHighlighted = highlightedFips === stateFips && highlightedCounty === countyNorm;
                   const isInSelectedState = selectedFips === stateFips;
                   const liveHeat = liveCountyHeat.get(countyNorm);
+                  const staticHeat = staticCountyHeat.get(fips);
 
-                  // Fill priority:
-                  //   1. Highlighted (active pin) → accent
-                  //   2. Live county data (real listings in this county) → price-based heat
-                  //   3. Selected state → teal tint
-                  //   4. Curated market (legacy, only when no live data) → score-based heat
-                  //   5. Otherwise → soft mid-scale coverage fill
-                  const t_default = 0.5;
-                  let fill = scoreToHeatFill(t_default);
-                  let stroke = scoreToHeatStroke(t_default);
-                  let strokeWidth = 0.45;
-                  let opacity = 0.35;
+                  // Fill priority (first match wins):
+                  //   1. Highlighted active pin → accent
+                  //   2. Live county data from recent search → metric heat
+                  //   3. Static ZHVI snapshot (Zillow home values) → price heat
+                  //   4. Selected state tint → teal
+                  //   5. Otherwise → neutral gray (no data — quiet, not yellow)
+                  // NOTE: we intentionally do NOT color un-searched counties
+                  // by the curated BRRRR "deal score". That metric only
+                  // covered ~60 cherry-picked markets and produced an
+                  // inconsistent, misleading map where a handful of
+                  // counties had strong color and everything else was gray.
+                  // Nationwide ZHVI coverage replaces it.
+                  let fill = THEME.bgPanel;           // neutral gray, not yellow
+                  let stroke = THEME.border;
+                  let strokeWidth = 0.4;
+                  let opacity = 0.9;
 
-                  if (isInSelectedState && !liveHeat) {
+                  if (isInSelectedState && !liveHeat && !staticHeat) {
                     fill = THEME.bgTeal;
                     stroke = THEME.teal;
                     strokeWidth = 0.55;
                     opacity = 0.95;
                   }
+                  if (staticHeat && !liveHeat) {
+                    fill = scoreToHeatFill(staticHeat.t);
+                    stroke = scoreToHeatStroke(staticHeat.t);
+                    strokeWidth = 0.5;
+                    opacity = 0.82;                   // slightly muted vs. live
+                  }
                   if (liveHeat) {
                     fill = scoreToHeatFill(liveHeat.t);
                     stroke = scoreToHeatStroke(liveHeat.t);
-                    strokeWidth = 0.6;
-                    opacity = 1;
-                  } else if (isMarket && !usingLiveData) {
-                    // Only fall back to curated scores when we have no live data at all
-                    const score = getScore(market);
-                    const t = scoreToT(score);
-                    fill = scoreToHeatFill(t);
-                    stroke = scoreToHeatStroke(t);
                     strokeWidth = 0.6;
                     opacity = 1;
                   }
@@ -234,7 +266,8 @@ export const USCountyMap = ({
                           state: stateCode,
                           market: market || null,
                           isMarket,
-                          liveStats: liveHeat ? liveHeat.stats : null
+                          liveStats: liveHeat ? liveHeat.stats : null,
+                          staticStats: staticHeat || null
                         });
                       }}
                       onMouseLeave={() => setHoveredCounty(null)}
@@ -282,15 +315,23 @@ export const USCountyMap = ({
                 // listings coming back with (0, 0) when geocode is missing.
                 !(lat === 0 && lng === 0);
               if (!validUS) return null;
+              const isPinned = pinnedListingId && pinnedListingId === l.id;
+              const clickable = !!onListingClick;
               return (
                 <Marker key={l.id} coordinates={[lng, lat]}>
                   <circle
-                    r={2.2}
-                    fill={THEME.accent}
+                    r={isPinned ? 3.6 : 2.2}
+                    fill={isPinned ? THEME.orange : THEME.accent}
                     stroke="#FFFFFF"
-                    strokeWidth={0.6}
-                    style={{ pointerEvents: "none" }}
-                  />
+                    strokeWidth={isPinned ? 1 : 0.6}
+                    onClick={clickable ? (e) => { e.stopPropagation(); onListingClick(l); } : undefined}
+                    style={{
+                      cursor: clickable ? "pointer" : "default",
+                      pointerEvents: clickable ? "auto" : "none"
+                    }}
+                  >
+                    {clickable && <title>{l.address || "listing"} — click to filter</title>}
+                  </circle>
                 </Marker>
               );
             })}
@@ -361,10 +402,16 @@ export const USCountyMap = ({
                   {metricDef.label}: {metricDef.format(metricDef.extract(hoveredCounty.liveStats))}
                   {hoveredCounty.liveStats.listingCount ? ` · ${hoveredCounty.liveStats.listingCount} listings` : ""}
                 </>
+              ) : hoveredCounty.staticStats?.zhvi ? (
+                <>
+                  Median value (ZHVI): ${Math.round(hoveredCounty.staticStats.zhvi / 1000)}k
+                  {hoveredCounty.staticStats.zori ? ` · Rent: $${Math.round(hoveredCounty.staticStats.zori)}` : ""}
+                  <div style={{ marginTop: 2, fontSize: 10, opacity: 0.7 }}>Click to load live listings</div>
+                </>
               ) : hoveredCounty.isMarket ? (
                 `${hoveredCounty.market.city} • Click to drill in`
               ) : (
-                "Click to load live listings for this area"
+                "No data yet — click to load live listings"
               )}
             </div>
           </div>
@@ -386,19 +433,27 @@ export const USCountyMap = ({
           marginBottom: 6
         }}>
           <span className="label-xs">
-            {usingLiveData ? `County ${metricDef.label} (Live)` : "Deal Score Heatmap"}
+            {usingLiveData
+              ? `County ${metricDef.label} (Live)`
+              : staticCountyHeat.size > 0
+                ? "Median Home Value (Zillow ZHVI)"
+                : "Median Home Value"}
           </span>
           <span style={{ fontSize: 10, color: THEME.textDim }}>
             {usingLiveData
               ? `${Object.keys(liveCountyStats || {}).length} counties · range ${metricDef.rangeLabel(minScore)} – ${metricDef.rangeLabel(maxScore)}`
-              : `${allMarkets.length} markets · your range ${minScore}-${maxScore}`}
+              : staticCountyHeat.size > 0
+                ? `${staticCountyHeat.size} counties · $${Math.round(staticMin/1000)}k – $${Math.round(staticMax/1000)}k`
+                : "Loading nationwide data…"}
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span className="mono" style={{ fontSize: 11, color: "#15803D", minWidth: 56, fontWeight: 700 }}>
             {usingLiveData
               ? (metricDef.invert ? metricDef.rangeLabel(minScore) : metricDef.rangeLabel(maxScore))
-              : HEAT_SCALE_MIN}
+              : staticCountyHeat.size > 0
+                ? `$${Math.round(staticMin/1000)}k`
+                : HEAT_SCALE_MIN}
           </span>
           <div style={{
             flex: 1,
@@ -414,7 +469,9 @@ export const USCountyMap = ({
           <span className="mono" style={{ fontSize: 11, color: "#B91C1C", minWidth: 56, textAlign: "right", fontWeight: 700 }}>
             {usingLiveData
               ? (metricDef.invert ? metricDef.rangeLabel(maxScore) : metricDef.rangeLabel(minScore))
-              : HEAT_SCALE_MAX}
+              : staticCountyHeat.size > 0
+                ? `$${Math.round(staticMax/1000)}k`
+                : HEAT_SCALE_MAX}
           </span>
         </div>
         <div style={{

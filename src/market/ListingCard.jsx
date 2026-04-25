@@ -20,17 +20,29 @@ import { estimateCashflow } from "./cashflow.js";
  * The arrows and count badge only appear when there's more than one photo.
  * Arrow clicks stop propagation so they don't trigger the card's onOpen.
  */
-export const ListingImage = ({ photos, url, demo, photoCount }) => {
+export const ListingImage = ({ photos, url, demo, photoCount, streetviewUrl, satelliteUrl }) => {
   const urls = Array.isArray(photos) && photos.length > 0
     ? photos
     : url
       ? [url]
       : [];
-  const count = urls.length;
+  // View modes: "photos" (MLS carousel) | "street" (Google Street View) | "aerial" (Satellite).
+  // Only show toggle pills for modes we actually have URLs for.
+  const modes = [];
+  if (urls.length > 0) modes.push({ key: "photos", label: "Photos" });
+  if (streetviewUrl)  modes.push({ key: "street", label: "Street" });
+  if (satelliteUrl)   modes.push({ key: "aerial", label: "Aerial" });
+  const [view, setView] = useState(modes[0]?.key || "photos");
   const [index, setIndex] = useState(0);
   const [errored, setErrored] = useState(false);
-  const current = urls[index] || null;
+  const current = view === "photos"
+    ? (urls[index] || null)
+    : view === "street" ? streetviewUrl
+    : view === "aerial" ? satelliteUrl
+    : null;
+  const count = urls.length;
   const showImage = current && !errored;
+  const carouselActive = view === "photos";
 
   const prev = (e) => {
     e.stopPropagation();
@@ -76,8 +88,41 @@ export const ListingImage = ({ photos, url, demo, photoCount }) => {
         <Building2 size={40} color={THEME.textDim} />
       )}
 
-      {/* Arrows — only when there's actually something to scroll through */}
-      {count > 1 && (
+      {/* Photos / Street / Aerial toggle pill — only appears when more than
+          one view mode is available. Matches the wholesale PropertyPhoto
+          treatment so users see a consistent control app-wide. */}
+      {modes.length > 1 && (
+        <div style={{
+          position: "absolute", top: 10, left: 10,
+          display: "flex", background: "rgba(15, 23, 42, 0.78)",
+          borderRadius: 999, padding: 2, fontSize: 10, fontWeight: 700,
+          zIndex: 2
+        }}>
+          {modes.map(m => (
+            <button
+              key={m.key}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setView(m.key);
+                setErrored(false);
+              }}
+              style={{
+                padding: "3px 9px", border: "none", cursor: "pointer",
+                background: view === m.key ? "#FFFFFF" : "transparent",
+                color: view === m.key ? THEME.navy : "#FFFFFF",
+                borderRadius: 999, letterSpacing: "0.04em", textTransform: "uppercase"
+              }}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Arrows — only when there's actually something to scroll through
+          in MLS photo mode */}
+      {carouselActive && count > 1 && (
         <>
           <button
             type="button"
@@ -117,7 +162,7 @@ export const ListingImage = ({ photos, url, demo, photoCount }) => {
           - We only have the primary photo but the upstream told us more exist
             (Realtor v3/list returns photo_count but only one photo URL) → show "N photos"
             so the user knows more are available on the full listing page. */}
-      {count > 1 ? (
+      {carouselActive && count > 1 ? (
         <div style={{
           position: "absolute", bottom: 10, right: 10,
           padding: "3px 9px 3px 8px", fontSize: 11, fontWeight: 700,
@@ -128,7 +173,7 @@ export const ListingImage = ({ photos, url, demo, photoCount }) => {
           <Camera size={11} />
           {index + 1} / {count}
         </div>
-      ) : (showImage && typeof photoCount === "number" && photoCount > 1) ? (
+      ) : (carouselActive && showImage && typeof photoCount === "number" && photoCount > 1) ? (
         <div style={{
           position: "absolute", bottom: 10, right: 10,
           padding: "3px 9px 3px 8px", fontSize: 11, fontWeight: 700,
@@ -206,7 +251,14 @@ export const ListingCard = ({ listing, type = "sale", onOpen, showWatchToggle = 
     >
       {/* Hero photo area — edge-to-edge */}
       <div style={{ position: "relative" }}>
-        <ListingImage photos={listing.photos} url={listing.imageUrl} demo={listing.demo} photoCount={listing.photoCount} />
+        <ListingImage
+          photos={listing.photos}
+          url={listing.imageUrl}
+          demo={listing.demo}
+          photoCount={listing.photoCount}
+          streetviewUrl={listing.streetview_url}
+          satelliteUrl={listing.satellite_url}
+        />
         {showWatchToggle && (
           <button
             type="button"

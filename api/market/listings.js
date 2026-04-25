@@ -19,6 +19,7 @@ import { requireUserId } from "../_lib/auth.js";
 import { ensureUser } from "../_lib/db.js";
 import { recordMeteredClick } from "../_lib/metering.js";
 import { normalizeRealtor } from "./_normalize.js";
+import { streetViewUrl, satelliteUrl } from "../_lib/googlePhotos.js";
 
 async function fetchRealtorPage({ city, state, bedrooms, bathrooms, offset, apiKey }) {
   const body = {
@@ -114,6 +115,14 @@ export default handler(async (req, res) => {
   } catch (err) {
     console.warn("[market/listings] realtor fetch failed:", err.message);
     throw new ApiError(502, "upstream_error", err.message);
+  }
+
+  // Attach Google Maps Static URLs (street + aerial) to every listing so the
+  // cards can offer a Photos / Street / Aerial toggle without each card
+  // firing its own /api/lookup call.
+  for (const l of listings) {
+    l.streetview_url = streetViewUrl(l);
+    l.satellite_url = satelliteUrl(l);
   }
 
   return res.status(200).json({ listings, usage, provider: "realtor" });
