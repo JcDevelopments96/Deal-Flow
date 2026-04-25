@@ -15,8 +15,10 @@ import { useToast } from "../contexts.jsx";
 import {
   isSaasMode, useSaasUser,
   fetchTeam, saveTeamContact, updateTeamContact, removeTeamContact,
-  fetchLocalPros, fetchProReviews
+  fetchLocalPros, fetchProReviews,
+  QuotaExceededError
 } from "../lib/saas.js";
+import { UpgradeModal } from "../modals/UpgradeModal.jsx";
 
 // Categories for the "Find Local Pros" panel. Each maps to the Google
 // Places search query the server will run, plus the team_contacts.role
@@ -460,6 +462,9 @@ function FindProsPanel({ getToken, onAdd, savedNames }) {
   const [err, setErr] = useState(null);
   const [meta, setMeta] = useState(null); // last { category, zip } we ran
   const [reviewing, setReviewing] = useState(null); // pro currently in reviews modal
+  // usage = { used, limit } — limit=null means unlimited (paid plan).
+  const [usage, setUsage] = useState(null);
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   const onSearch = async (cat) => {
     if (!/^\d{5}$/.test(zip)) {
@@ -472,17 +477,48 @@ function FindProsPanel({ getToken, onAdd, savedNames }) {
       setResults(body.results || []);
       setMeta({ category: cat, zip });
       setCategory(cat);
+      if (body.usage) setUsage(body.usage);
       if (!body.results || body.results.length === 0) {
         setErr("No matches for that area. Try a nearby ZIP.");
       }
     } catch (e) {
-      setErr(e.message || "Search failed");
+      // Free-tier monthly cap — open the upgrade modal instead of a toast.
+      if (e instanceof QuotaExceededError) {
+        const detail = e.detail || {};
+        if (detail.limit) setUsage({ used: detail.used, limit: detail.limit });
+        setShowUpgrade(true);
+      } else {
+        setErr(e.message || "Search failed");
+      }
       setResults([]);
     } finally { setBusy(false); }
   };
 
   return (
-    <Panel title="Find Local Pros" icon={<MapPin size={16} />} accent style={{ marginBottom: 24 }}>
+    <Panel
+      title="Find Local Pros"
+      icon={<MapPin size={16} />}
+      accent
+      style={{ marginBottom: 24 }}
+      action={
+        // Show "X of 5 free searches left" pill on the free tier so the
+        // limit isn't a surprise. Paid plans hide the counter entirely.
+        usage && usage.limit && (
+          <span
+            onClick={() => setShowUpgrade(true)}
+            title="Click for unlimited"
+            style={{
+              padding: "3px 9px", fontSize: 10, fontWeight: 700,
+              letterSpacing: "0.06em", textTransform: "uppercase",
+              borderRadius: 999, cursor: "pointer",
+              background: usage.used >= usage.limit ? THEME.bgOrange : THEME.bgRaised,
+              color: usage.used >= usage.limit ? THEME.orange : THEME.textMuted,
+              border: `1px solid ${usage.used >= usage.limit ? THEME.orange : THEME.borderLight}`
+            }}>
+            {Math.max(0, usage.limit - usage.used)} of {usage.limit} free this month
+          </span>
+        )
+      }>
       <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 12 }}>
         Pick a category + ZIP. We'll surface the top businesses nearby — one click adds them to your team.
       </div>
@@ -658,6 +694,13 @@ function FindProsPanel({ getToken, onAdd, savedNames }) {
           onClose={() => setReviewing(null)}
           onAdd={(pro) => { onAdd(pro); setReviewing(null); }}
           alreadyAdded={savedNames.has(reviewing.name.toLowerCase())}
+        />
+      )}
+
+      {showUpgrade && (
+        <UpgradeModal
+          reason={`You've used all ${usage?.limit || 5} free Find Local Pros searches this period. Starter, Pro, and Scale plans get unlimited searches plus the full Wholesale toolkit.`}
+          onClose={() => setShowUpgrade(false)}
         />
       )}
     </Panel>

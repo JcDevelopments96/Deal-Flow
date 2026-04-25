@@ -13,7 +13,14 @@
  */
 import { handler, ApiError } from "./_lib/errors.js";
 import { requireUserId } from "./_lib/auth.js";
+import { ensureUser, adminDb } from "./_lib/db.js";
+import { currentPeriod } from "./_lib/periods.js";
 import { STATE_CODE_BY_FIPS } from "./_lib/stateFips.js";
+
+// Free-tier monthly cap for the Find Local Pros search. Paid plans
+// (starter/pro/scale) are unlimited because each search is cheap (~$0.02)
+// and gating heavy usage there would punish power users.
+const FINDPROS_FREE_LIMIT = 5;
 
 // Per-source caches. TTLs tuned per how often upstream data actually changes.
 const _censusCache = new Map();     // 24h
@@ -448,7 +455,7 @@ function nameKey(name) {
     .trim();
 }
 
-async function handleFindPros(category, zip) {
+async function handleFindPros(category, zip, user) {
   const key = process.env.GOOGLE_MAPS_API_KEY;
   if (!key) throw new ApiError(503, "google_maps_not_configured",
     "Set GOOGLE_MAPS_API_KEY in Vercel env.");
@@ -457,10 +464,42 @@ async function handleFindPros(category, zip) {
     `category must be one of: ${Object.keys(PRO_CATEGORIES).join(", ")}`);
   if (!/^\d{5}$/.test(String(zip))) throw new ApiError(400, "bad_zip", "5-digit zip required");
 
+  // ── Free-tier quota: 5 Find Local Pros searches per period ──────────
+  // Paid plans bypass entirely. Period boundaries match the rest of the
+  // metering stack (Stripe billing period if subscribed, else calendar
+  // month). Counts only NEW searches — cache hits below this point don't
+  // burn quota, since they don't hit Google/Yelp.
+  const isFree = !user.plan || user.plan === "free";
+  let usage = { used: 0, limit: null }; // null = unlimited (paid plans)
+  if (isFree) {
+    const db = adminDb();
+    const { data: sub } = await db.from("subscriptions")
+      .select("status, current_period_start, current_period_end")
+      .eq("user_id", user.id).maybeSingle();
+    const period = currentPeriod(sub);
+    const { count } = await db.from("usage_events")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("kind", "findpros_search")
+      .gte("created_at", period.start.toISOString());
+    const used = count || 0;
+    if (used >= FINDPROS_FREE_LIMIT) {
+      throw new ApiError(402, "quota_exceeded", {
+        feature: "findpros",
+        plan: "free",
+        used,
+        limit: FINDPROS_FREE_LIMIT,
+        upgradeRequired: true,
+        message: `You've used all ${FINDPROS_FREE_LIMIT} free Find Local Pros searches this period. Upgrade to Starter or higher for unlimited.`
+      });
+    }
+    usage = { used, limit: FINDPROS_FREE_LIMIT };
+  }
+
   const cacheKey = `${category}:${zip}`;
   const cached = _findprosCache.get(cacheKey);
   if (cached && Date.now() - cached.at < FINDPROS_TTL) {
-    return { ...cached.payload, cached: true };
+    return { ...cached.payload, cached: true, usage };
   }
 
   // Fan out Google Places + Yelp Fusion in parallel. Yelp may return
@@ -559,7 +598,23 @@ async function handleFindPros(category, zip) {
     yelpAvailable: !!process.env.YELP_API_KEY
   };
   _findprosCache.set(cacheKey, { at: Date.now(), payload });
-  return { ...payload, cached: false };
+
+  // Log the search so the next invocation's quota check sees it. Fire-
+  // and-forget — a logging blip shouldn't fail an otherwise-good request.
+  adminDb().from("usage_events").insert({
+    user_id: user.id,
+    kind: "findpros_search",
+    provider: "google_places",
+    endpoint: "/v1/findpros",
+    cost_cents: 0,
+    metadata: { category, zip: String(zip) }
+  }).then(() => {}).catch(() => {});
+
+  return {
+    ...payload,
+    cached: false,
+    usage: isFree ? { used: usage.used + 1, limit: FINDPROS_FREE_LIMIT } : { used: 0, limit: null }
+  };
 }
 
 /* ── PRO REVIEWS (Google Place Details + Yelp Reviews) ───────────────── */
@@ -655,10 +710,15 @@ export default handler(async (req, res) => {
     res.setHeader("Allow", "GET");
     return res.status(405).json({ error: "method_not_allowed" });
   }
-  await requireUserId(req);
+  const { clerkUserId, email } = await requireUserId(req);
 
   const source = (req.query?.source || "").toString();
   const { stateFips, countyFips, lat, lng, address, category, zip, placeId, yelpId } = req.query || {};
+
+  // Only findpros needs the full user record (plan + id for quota gating).
+  // Skip the DB roundtrip on every other source.
+  const needsUser = source === "findpros";
+  const user = needsUser ? await ensureUser({ clerkUserId, email }) : null;
 
   let payload;
   switch (source) {
@@ -703,7 +763,7 @@ export default handler(async (req, res) => {
     }
     case "findpros": {
       if (!category || !zip) throw new ApiError(400, "missing_params", "category + zip required");
-      payload = await handleFindPros(String(category), String(zip));
+      payload = await handleFindPros(String(category), String(zip), user);
       break;
     }
     case "proreviews": {

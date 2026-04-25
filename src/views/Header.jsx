@@ -182,21 +182,22 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
   );
   const wholesaleLocked = isSaasMode() && (!saas.user || usage?.plan === "free");
 
-  // Primary destinations — concrete nouns, no jargon. Keep at 4 so the bar
-  // stays scannable. "Find Properties" replaces "Market Intel" (jargon),
-  // "Deals" replaces "Dashboard" (vague).
+  // Primary destinations — concrete nouns, no jargon. Team got promoted
+  // from More on the strength of the new Find Local Pros + reviews flow;
+  // Watchlist stays visible (the count badge is a useful "unfinished
+  // work" nudge) but moves to the end so Team sits next to the
+  // discovery flow it pairs with.
   const primary = [
     { key: "dashboard", label: "Deals",           icon: <Layout size={14} /> },
     { key: "market",    label: "Find Properties", icon: <Search size={14} />, locked: marketLocked },
     { key: "wholesale", label: "Wholesale",       icon: <Crown size={14} />,  locked: wholesaleLocked },
+    { key: "team",      label: "Team",            icon: <Users size={14} /> },
     { key: "watchlist", label: "Watchlist",       icon: <Star size={14} /> }
   ];
 
-  // Secondary destinations + tools — the More menu now also holds the
-  // mortgage Calculator (it's a utility, not a destination, so it doesn't
-  // deserve top-bar real estate).
+  // Secondary — Learn + Plans + the mortgage Calculator (a tool, not a
+  // destination, so it doesn't deserve top-bar real estate).
   const secondary = [
-    { key: "team",      label: "Team",        icon: <Users size={14} /> },
     { key: "education", label: "Learn",       icon: <GraduationCap size={14} /> },
     { key: "plans",     label: "Plans",       icon: <CreditCard size={14} /> },
     ...(onOpenCalculator ? [{
