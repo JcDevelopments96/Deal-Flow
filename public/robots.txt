@@ -1,0 +1,63 @@
+# DealTrack — robots.txt
+#
+# Allow normal search engines so the marketing landing can be indexed.
+# Block AI training crawlers from ingesting the app for model training.
+# Well-behaved bots respect this; bad actors will ignore it (the auth
+# gate handles the rest).
+
+User-agent: *
+Allow: /
+
+# OpenAI
+User-agent: GPTBot
+Disallow: /
+User-agent: ChatGPT-User
+Disallow: /
+User-agent: OAI-SearchBot
+Disallow: /
+
+# Anthropic
+User-agent: ClaudeBot
+Disallow: /
+User-agent: Claude-Web
+Disallow: /
+User-agent: anthropic-ai
+Disallow: /
+
+# Google AI (Bard / Gemini training)
+User-agent: Google-Extended
+Disallow: /
+
+# Common Crawl — feeds many model training corpora
+User-agent: CCBot
+Disallow: /
+
+# Meta AI
+User-agent: FacebookBot
+Disallow: /
+User-agent: Meta-ExternalAgent
+Disallow: /
+
+# Other AI scrapers
+User-agent: PerplexityBot
+Disallow: /
+User-agent: Bytespider
+Disallow: /
+User-agent: Amazonbot
+Disallow: /
+User-agent: Applebot-Extended
+Disallow: /
+User-agent: Diffbot
+Disallow: /
+User-agent: ImagesiftBot
+Disallow: /
+User-agent: Omgilibot
+Disallow: /
+User-agent: Omgili
+Disallow: /
+User-agent: cohere-ai
+Disallow: /
+
+# Don't index the API surface (auth-gated anyway, but be explicit)
+User-agent: *
+Disallow: /api/
