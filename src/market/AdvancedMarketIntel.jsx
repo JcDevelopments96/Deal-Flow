@@ -1256,6 +1256,19 @@ export const AdvancedMarketIntel = () => {
 
   const handleMapCountyClick = useCallback((payload) => {
     if (!payload) return;
+
+    // National-view state pick: drill in without firing a county-detail
+    // panel. The map reads `selectedState` and switches itself into
+    // county view; LiveListingsPanel fetches state-wide listings.
+    if (payload.__pickState && payload.state) {
+      setSelectedState(payload.state);
+      setShowStateResults(true);
+      setSearchQuery("");
+      setShowSearchResults(false);
+      setClickedArea(null);
+      return;
+    }
+
     // Carry FIPS codes through so we can fetch Census demographics without
     // re-deriving them.
     const common = {
