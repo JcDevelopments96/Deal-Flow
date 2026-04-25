@@ -1087,6 +1087,23 @@ export const AdvancedMarketIntel = () => {
   const saas = useSaasUser();
   const saasOn = isSaasMode();
 
+  // Force a fresh /api/me read whenever the user lands on Market Intel.
+  // Catches the post-upgrade window where Stripe webhook has already
+  // updated the DB but the client cache (loaded once on app boot) still
+  // remembers the old plan. Also clears the quota-suppression flag if
+  // the user is now paid — they shouldn't be silently shown demo data
+  // because they declined an upgrade prompt back when they were free.
+  useEffect(() => {
+    if (!saasOn || !saas.user) return;
+    saas.refetch().then(() => {
+      const plan = saas.usage?.plan;
+      if (plan && plan !== "free") {
+        try { sessionStorage.removeItem("dt_market_quota_prompted"); } catch {}
+      }
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Pre-ingested Zillow ZHVI + Redfin snapshot for every county in the
   // country, keyed by 5-char FIPS. Loaded once on mount so the map gets
   // a nationwide home-price gradient immediately — no need for the user

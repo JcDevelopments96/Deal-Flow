@@ -725,26 +725,60 @@ async function handleStr(address, lat, lng) {
     return { ...cached.payload, cached: true };
   }
 
-  let body = null;
-  try {
-    const res = await fetch("https://api.rabbu.com/v1/property_searches", {
+  // Rabbu's API is undocumented — they use an internal endpoint to power
+  // their landing-page calculator. The request shape isn't public so we
+  // try the most plausible endpoint patterns in sequence, log what each
+  // returns, and surface the first usable response. The console output
+  // appears in Vercel function logs so we can tune the right endpoint
+  // without redeploying blindly.
+  const candidates = [
+    {
+      url: "https://api.rabbu.com/api/v1/property_searches",
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "accept": "application/json",
-        // Rabbu's calculator sends a generic browser UA; mirror that to
-        // avoid being filtered as a bot.
-        "User-Agent": "Mozilla/5.0 (DealTrack STR estimate)"
-      },
       body: JSON.stringify({
         address,
         ...(Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))
-          ? { latitude: Number(lat), longitude: Number(lng) }
-          : {})
+          ? { latitude: Number(lat), longitude: Number(lng) } : {})
       })
-    });
-    if (res.ok) body = await res.json().catch(() => null);
-  } catch { /* network blip — fall through to "not available" */ }
+    },
+    {
+      url: "https://api.rabbu.com/v1/property_searches",
+      method: "POST",
+      body: JSON.stringify({ address })
+    },
+    {
+      url: `https://api.rabbu.com/properties?address=${encodeURIComponent(address)}`,
+      method: "GET",
+      body: null
+    }
+  ];
+
+  let body = null;
+  let lastStatus = null;
+  for (const c of candidates) {
+    try {
+      const res = await fetch(c.url, {
+        method: c.method,
+        headers: {
+          "Content-Type": "application/json",
+          "accept": "application/json",
+          "User-Agent": "Mozilla/5.0 (compatible; DealTrack)"
+        },
+        ...(c.body ? { body: c.body } : {})
+      });
+      lastStatus = res.status;
+      console.log(`[str] ${c.method} ${c.url} → ${res.status}`);
+      if (!res.ok) continue;
+      const json = await res.json().catch(() => null);
+      if (json) {
+        console.log(`[str] response keys: ${Object.keys(json || {}).join(",")}`);
+        body = json;
+        break;
+      }
+    } catch (err) {
+      console.log(`[str] ${c.method} ${c.url} failed: ${err.message}`);
+    }
+  }
 
   // Rabbu's public response has historically nested estimates under .data
   // .estimates with monthly_revenue / monthly_occupancy / adr / revenue

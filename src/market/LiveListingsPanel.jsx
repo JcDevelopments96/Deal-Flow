@@ -111,6 +111,17 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
   const activeProvider = PROVIDERS[provider] || PROVIDERS.zillow;
   const apiKey = keys[provider] || "";
 
+  // Plan-change watchdog: when the user's plan flips from free → paid
+  // (mid-session checkout completes, webhook fires, /api/me refreshes),
+  // wipe the quota-suppression flag so paid users never get silently
+  // routed to demo data because they once dismissed an upgrade prompt.
+  useEffect(() => {
+    const plan = saas.usage?.plan;
+    if (plan && plan !== "free") {
+      try { sessionStorage.removeItem("dt_market_quota_prompted"); } catch {}
+    }
+  }, [saas.usage?.plan]);
+
   // Primary reference market for demo defaults
   const referenceMarket = useMemo(() => {
     if (!selectedState) return null;
@@ -196,7 +207,11 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
       try {
         const result = await fetchViaSaas();
         if (!result.listings || result.listings.length === 0) {
-          fallbackToDemo("No live results for this area — showing demo data.");
+          // Tell the user *why* — the most common cause is "no Realtor
+          // listings match the state-only query for that area," not a
+          // billing problem. This message is visible in the panel so
+          // they can act on it (try a more populous state, broaden filters).
+          fallbackToDemo(`No live listings returned for ${selectedCity || selectedState}. Showing demo data.`);
         } else {
           setListings(result.listings);
           setLiveMode(true);
