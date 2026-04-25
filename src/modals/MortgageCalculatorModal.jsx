@@ -88,7 +88,11 @@ export const MortgageCalculatorModal = ({ onClose }) => {
         }}
       >
         <div style={{
-          padding: "16px 24px", borderBottom: `1px solid ${THEME.border}`,
+          // Tinted bg + slightly heavier border separates the title from the
+          // form below, matching the standard dialog-header treatment.
+          padding: "18px 24px",
+          background: THEME.bgPanel,
+          borderBottom: `1px solid ${THEME.border}`,
           display: "flex", alignItems: "center", justifyContent: "space-between"
         }}>
           <div>
@@ -104,7 +108,7 @@ export const MortgageCalculatorModal = ({ onClose }) => {
             aria-label="Close calculator"
             style={{
               width: 34, height: 34, borderRadius: "50%",
-              background: "transparent", border: `1px solid ${THEME.border}`,
+              background: THEME.bg, border: `1px solid ${THEME.border}`,
               display: "flex", alignItems: "center", justifyContent: "center",
               color: THEME.textMuted, cursor: "pointer"
             }}
