@@ -29,6 +29,7 @@ import { EducationCenter } from "./views/EducationCenter.jsx";
 import { TeamView } from "./views/TeamView.jsx";
 import { PlansView } from "./views/PlansView.jsx";
 import { WholesaleView } from "./views/WholesaleView.jsx";
+import { TermsView } from "./views/TermsView.jsx";
 import { Analyzer } from "./analyzer/Analyzer.jsx";
 import { AdvancedMarketIntel } from "./market/AdvancedMarketIntel.jsx";
 import { ErrorBoundary } from "./ErrorBoundary.jsx";
@@ -485,6 +486,8 @@ function BRRRRTrackerInner() {
       {view === "wholesale" && <WholesaleView />}
 
       {view === "education" && <EducationCenter />}
+
+      {view === "terms" && <TermsView />}
 
       {showTemplatePicker && (
         <TemplatePicker
