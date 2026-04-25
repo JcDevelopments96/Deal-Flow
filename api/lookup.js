@@ -519,10 +519,12 @@ async function handleFindPros(category, zip) {
       if (!existing.phone && y.phone) existing.phone = y.display_phone || y.phone;
       if (!existing.website && y.url) existing.website = y.url;
       existing.yelpUrl = y.url || null;
+      existing.yelpId = y.id;        // tracked separately so the reviews modal can fetch from both sources
       existing.sources = Array.from(new Set([...(existing.sources || []), "yelp"]));
     } else {
       byKey.set(k, {
         placeId: `yelp:${y.id}`,
+        yelpId: y.id,
         name: y.name,
         address: y.location?.display_address?.join(", ") || null,
         phone: y.display_phone || y.phone || null,
@@ -560,6 +562,93 @@ async function handleFindPros(category, zip) {
   return { ...payload, cached: false };
 }
 
+/* ── PRO REVIEWS (Google Place Details + Yelp Reviews) ───────────────── */
+// Fetches actual review text for a single business — fans out to whichever
+// sources are available (Google Place Details, Yelp v3/businesses/{id}/reviews)
+// and merges into one chronological list. Cached 24h since reviews change
+// slowly. Powers the "View reviews" modal in the Find Local Pros panel.
+const _proReviewsCache = new Map();
+const PRO_REVIEWS_TTL = 24 * 60 * 60 * 1000;
+
+async function fetchGoogleReviews(placeId, key) {
+  if (!placeId || placeId.startsWith("yelp:") || !key) return [];
+  const qs = new URLSearchParams({
+    place_id: placeId,
+    fields: "reviews,rating,user_ratings_total",
+    key
+  });
+  try {
+    const res = await fetch(`https://maps.googleapis.com/maps/api/place/details/json?${qs.toString()}`);
+    if (!res.ok) return [];
+    const json = await res.json();
+    const reviews = json?.result?.reviews || [];
+    return reviews.map(r => ({
+      source: "google",
+      author: r.author_name || "Anonymous",
+      authorPhoto: r.profile_photo_url || null,
+      rating: typeof r.rating === "number" ? r.rating : null,
+      relativeTime: r.relative_time_description || null,
+      time: r.time ? r.time * 1000 : null, // Google returns unix seconds
+      text: r.text || ""
+    }));
+  } catch { return []; }
+}
+
+async function fetchYelpReviews(yelpId, key) {
+  if (!yelpId || !key) return [];
+  try {
+    const res = await fetch(`https://api.yelp.com/v3/businesses/${encodeURIComponent(yelpId)}/reviews`, {
+      headers: { Authorization: `Bearer ${key}`, accept: "application/json" }
+    });
+    if (!res.ok) return [];
+    const json = await res.json();
+    const reviews = json?.reviews || [];
+    return reviews.map(r => ({
+      source: "yelp",
+      author: r.user?.name || "Anonymous",
+      authorPhoto: r.user?.image_url || null,
+      rating: typeof r.rating === "number" ? r.rating : null,
+      relativeTime: null,
+      time: r.time_created ? new Date(r.time_created).getTime() : null,
+      text: r.text || "",
+      url: r.url || null
+    }));
+  } catch { return []; }
+}
+
+async function handleProReviews(placeId, yelpId) {
+  const googleKey = process.env.GOOGLE_MAPS_API_KEY;
+  const yelpKey   = process.env.YELP_API_KEY;
+  if (!placeId && !yelpId) {
+    throw new ApiError(400, "missing_params", "placeId or yelpId required");
+  }
+
+  const cacheKey = `${placeId || "-"}|${yelpId || "-"}`;
+  const cached = _proReviewsCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < PRO_REVIEWS_TTL) {
+    return { ...cached.payload, cached: true };
+  }
+
+  const [googleReviews, yelpReviews] = await Promise.all([
+    fetchGoogleReviews(placeId, googleKey),
+    fetchYelpReviews(yelpId, yelpKey)
+  ]);
+
+  // Merge then sort newest-first so the freshest signal is on top
+  const all = [...googleReviews, ...yelpReviews]
+    .sort((a, b) => (b.time || 0) - (a.time || 0));
+
+  const payload = {
+    reviews: all,
+    sources: {
+      google: googleReviews.length,
+      yelp: yelpReviews.length
+    }
+  };
+  _proReviewsCache.set(cacheKey, { at: Date.now(), payload });
+  return { ...payload, cached: false };
+}
+
 /* ── Router ────────────────────────────────────────────────────────── */
 export default handler(async (req, res) => {
   if (req.method !== "GET") {
@@ -569,7 +658,7 @@ export default handler(async (req, res) => {
   await requireUserId(req);
 
   const source = (req.query?.source || "").toString();
-  const { stateFips, countyFips, lat, lng, address, category, zip } = req.query || {};
+  const { stateFips, countyFips, lat, lng, address, category, zip, placeId, yelpId } = req.query || {};
 
   let payload;
   switch (source) {
@@ -617,9 +706,16 @@ export default handler(async (req, res) => {
       payload = await handleFindPros(String(category), String(zip));
       break;
     }
+    case "proreviews": {
+      payload = await handleProReviews(
+        placeId ? String(placeId) : null,
+        yelpId  ? String(yelpId)  : null
+      );
+      break;
+    }
     default:
       throw new ApiError(400, "unknown_source",
-        "source must be one of: census, fmr, unemployment, mortgage, flood, walkscore, photos, nearby, findpros");
+        "source must be one of: census, fmr, unemployment, mortgage, flood, walkscore, photos, nearby, findpros, proreviews");
   }
 
   return res.status(200).json(payload);

@@ -15,7 +15,7 @@ import { useToast } from "../contexts.jsx";
 import {
   isSaasMode, useSaasUser,
   fetchTeam, saveTeamContact, updateTeamContact, removeTeamContact,
-  fetchLocalPros
+  fetchLocalPros, fetchProReviews
 } from "../lib/saas.js";
 
 // Categories for the "Find Local Pros" panel. Each maps to the Google
@@ -261,6 +261,194 @@ const ContactCard = ({ contact, onEdit }) => {
 };
 
 /**
+ * ProReviewsModal — opens when a user clicks a pro result card. Fans out
+ * to Google Place Details + Yelp Reviews server-side and renders the
+ * merged review list with author, rating, source, and timestamp.
+ */
+function ProReviewsModal({ pro, getToken, onClose, onAdd, alreadyAdded }) {
+  const [reviews, setReviews] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true); setErr(null);
+      try {
+        const body = await fetchProReviews(getToken, {
+          // For dual-source results, placeId is the Google one; for yelp-only
+          // it's "yelp:<id>" — server-side detects and ignores accordingly.
+          placeId: pro.placeId && !pro.placeId.startsWith("yelp:") ? pro.placeId : null,
+          yelpId: pro.yelpId || null
+        });
+        if (!cancelled) setReviews(body);
+      } catch (e) {
+        if (!cancelled) setErr(e.message || "Couldn't load reviews");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [pro.placeId, pro.yelpId, getToken]);
+
+  const sources = pro.sources || ["google"];
+  const isVerified = sources.length > 1;
+
+  return (
+    <div role="dialog" aria-modal="true" onClick={onClose} style={{
+      position: "fixed", inset: 0, background: "rgba(15,23,42,0.6)",
+      display: "flex", alignItems: "flex-start", justifyContent: "center",
+      zIndex: 150, padding: 16, overflowY: "auto"
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: THEME.bg, borderRadius: 12, maxWidth: 640, width: "100%",
+        marginTop: 40, marginBottom: 40,
+        boxShadow: "0 20px 60px rgba(15,23,42,0.22)", overflow: "hidden"
+      }}>
+        {/* Header */}
+        <div style={{ padding: "18px 22px 14px", borderBottom: `1px solid ${THEME.borderLight}` }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h2 className="serif" style={{ fontSize: 20, fontWeight: 700, margin: "0 0 4px" }}>
+                {pro.name}
+              </h2>
+              {pro.address && (
+                <div style={{ fontSize: 12, color: THEME.textMuted, lineHeight: 1.4 }}>{pro.address}</div>
+              )}
+            </div>
+            <button onClick={onClose} aria-label="Close"
+              style={{ border: "none", background: "transparent", cursor: "pointer", color: THEME.textMuted, padding: 4 }}>
+              <X size={18} />
+            </button>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+            {pro.rating && (
+              <span style={{ fontSize: 13, color: "#F59E0B", fontWeight: 700 }}>
+                ★ {pro.rating} <span style={{ color: THEME.textDim, fontWeight: 500 }}>({pro.ratingCount} reviews)</span>
+              </span>
+            )}
+            {isVerified && (
+              <span style={{
+                fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
+                padding: "2px 6px", background: THEME.greenDim, color: THEME.green, borderRadius: 3
+              }}>
+                ✓ Verified · Google + Yelp
+              </span>
+            )}
+          </div>
+
+          {/* Quick actions */}
+          <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+            {pro.phone && (
+              <a href={`tel:${pro.phone}`} className="btn-secondary" style={{ padding: "6px 11px", fontSize: 11 }}>
+                <Phone size={11} /> Call
+              </a>
+            )}
+            {pro.website && (
+              <a href={pro.website} target="_blank" rel="noopener noreferrer" className="btn-secondary" style={{ padding: "6px 11px", fontSize: 11 }}>
+                <Globe size={11} /> Website
+              </a>
+            )}
+            <button
+              onClick={() => onAdd(pro)}
+              disabled={alreadyAdded}
+              className={alreadyAdded ? "btn-secondary" : "btn-primary"}
+              style={{ padding: "6px 11px", fontSize: 11 }}>
+              {alreadyAdded ? "✓ Already in your team" : "+ Add to Team"}
+            </button>
+          </div>
+        </div>
+
+        {/* Reviews body */}
+        <div style={{ padding: "16px 22px 22px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: THEME.textMuted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>
+            Reviews
+          </div>
+
+          {loading && (
+            <div style={{ padding: 40, textAlign: "center", color: THEME.textMuted, fontSize: 13 }}>
+              Loading reviews…
+            </div>
+          )}
+          {err && (
+            <div style={{ padding: 12, background: THEME.bgOrange, color: THEME.orange, borderRadius: 6, fontSize: 12 }}>
+              {err}
+            </div>
+          )}
+          {reviews && !loading && reviews.reviews.length === 0 && (
+            <div style={{ padding: 24, textAlign: "center", color: THEME.textMuted, fontSize: 12 }}>
+              No reviews available for this business yet.
+            </div>
+          )}
+          {reviews && reviews.reviews.length > 0 && (
+            <>
+              <div style={{ fontSize: 10, color: THEME.textDim, marginBottom: 10 }}>
+                {reviews.sources.google + reviews.sources.yelp} reviews ·
+                {reviews.sources.google > 0 && ` ${reviews.sources.google} from Google`}
+                {reviews.sources.google > 0 && reviews.sources.yelp > 0 && " ·"}
+                {reviews.sources.yelp > 0 && ` ${reviews.sources.yelp} from Yelp`}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {reviews.reviews.map((r, i) => (
+                  <div key={i} style={{
+                    padding: 12, border: `1px solid ${THEME.borderLight}`,
+                    borderRadius: 8, background: THEME.bgPanel
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        {r.authorPhoto ? (
+                          <img src={r.authorPhoto} alt=""
+                            style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover" }}
+                            onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                        ) : (
+                          <div style={{
+                            width: 28, height: 28, borderRadius: "50%",
+                            background: THEME.bgRaised, color: THEME.textMuted,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 11, fontWeight: 700
+                          }}>
+                            {(r.author || "?").slice(0, 1).toUpperCase()}
+                          </div>
+                        )}
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 700 }}>{r.author}</div>
+                          <div style={{ fontSize: 10, color: THEME.textDim }}>
+                            {r.rating != null && <span style={{ color: "#F59E0B", fontWeight: 700 }}>{"★".repeat(Math.round(r.rating))}</span>}
+                            {r.relativeTime && <span> · {r.relativeTime}</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <span style={{
+                        fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
+                        padding: "2px 6px", borderRadius: 3,
+                        background: r.source === "yelp" ? "#FEE2E2" : "#DBEAFE",
+                        color:      r.source === "yelp" ? "#991B1B" : "#1E40AF"
+                      }}>
+                        {r.source}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: THEME.text, lineHeight: 1.55, whiteSpace: "pre-wrap" }}>
+                      {r.text}
+                    </div>
+                    {r.url && (
+                      <a href={r.url} target="_blank" rel="noopener noreferrer"
+                        style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 10, color: THEME.accent, textDecoration: "none", marginTop: 6 }}>
+                        <ExternalLink size={10} /> Read on Yelp
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * FindProsPanel — pulls local businesses from Google Places by category +
  * ZIP, with a one-click "Add to Team" button per result.
  */
@@ -271,6 +459,7 @@ function FindProsPanel({ getToken, onAdd, savedNames }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [meta, setMeta] = useState(null); // last { category, zip } we ran
+  const [reviewing, setReviewing] = useState(null); // pro currently in reviews modal
 
   const onSearch = async (cat) => {
     if (!/^\d{5}$/.test(zip)) {
@@ -341,10 +530,27 @@ function FindProsPanel({ getToken, onAdd, savedNames }) {
             const sources = r.sources || ["google"];
             const isVerified = sources.length > 1; // appears in both Google + Yelp
             return (
-              <div key={r.placeId} style={{
-                border: `1px solid ${isVerified ? THEME.green : THEME.border}`, borderRadius: 8, padding: 12,
-                background: THEME.bg, display: "flex", flexDirection: "column", gap: 6
-              }}>
+              <div key={r.placeId}
+                onClick={() => setReviewing(r)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setReviewing(r); } }}
+                title="Click to read reviews"
+                style={{
+                  border: `1px solid ${isVerified ? THEME.green : THEME.border}`, borderRadius: 8, padding: 12,
+                  background: THEME.bg, display: "flex", flexDirection: "column", gap: 6,
+                  cursor: "pointer", transition: "border-color 0.15s, transform 0.15s, box-shadow 0.15s"
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = THEME.accent;
+                  e.currentTarget.style.boxShadow = "0 4px 14px rgba(15,23,42,0.08)";
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = isVerified ? THEME.green : THEME.border;
+                  e.currentTarget.style.boxShadow = "none";
+                  e.currentTarget.style.transform = "translateY(0)";
+                }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                   <div style={{ fontSize: 13, fontWeight: 700 }}>{r.name}</div>
                   {r.rating && (
@@ -387,22 +593,22 @@ function FindProsPanel({ getToken, onAdd, savedNames }) {
                 )}
                 <div style={{ display: "flex", gap: 8, fontSize: 11, color: THEME.accent, flexWrap: "wrap" }}>
                   {r.phone && (
-                    <a href={`tel:${r.phone}`} style={{ color: THEME.accent, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 3 }}>
+                    <a href={`tel:${r.phone}`} onClick={(e) => e.stopPropagation()} style={{ color: THEME.accent, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 3 }}>
                       <Phone size={11} /> {r.phone}
                     </a>
                   )}
                   {r.website && (
-                    <a href={r.website} target="_blank" rel="noopener noreferrer" style={{ color: THEME.accent, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 3 }}>
+                    <a href={r.website} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: THEME.accent, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 3 }}>
                       <Globe size={11} /> Site
                     </a>
                   )}
                   {r.mapsUrl && (
-                    <a href={r.mapsUrl} target="_blank" rel="noopener noreferrer" style={{ color: THEME.accent, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 3 }}>
+                    <a href={r.mapsUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: THEME.accent, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 3 }}>
                       <ExternalLink size={11} /> Maps
                     </a>
                   )}
                   {r.yelpUrl && (
-                    <a href={r.yelpUrl} target="_blank" rel="noopener noreferrer" style={{ color: THEME.accent, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 3 }}>
+                    <a href={r.yelpUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: THEME.accent, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 3 }}>
                       <ExternalLink size={11} /> Yelp
                     </a>
                   )}
@@ -413,6 +619,7 @@ function FindProsPanel({ getToken, onAdd, savedNames }) {
                     confirm the license. */}
                 {r.nmlsVerifyUrl && (
                   <a href={r.nmlsVerifyUrl} target="_blank" rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
                     style={{
                       display: "inline-flex", alignItems: "center", gap: 4,
                       padding: "4px 8px", fontSize: 10, fontWeight: 700,
@@ -425,7 +632,7 @@ function FindProsPanel({ getToken, onAdd, savedNames }) {
                 )}
 
                 <button
-                  onClick={() => onAdd(r)}
+                  onClick={(e) => { e.stopPropagation(); onAdd(r); }}
                   disabled={alreadyAdded}
                   className={alreadyAdded ? "btn-secondary" : "btn-primary"}
                   style={{ marginTop: "auto", padding: "6px 10px", fontSize: 11, justifyContent: "center" }}>
@@ -439,9 +646,19 @@ function FindProsPanel({ getToken, onAdd, savedNames }) {
 
       {meta && results.length > 0 && (
         <div style={{ marginTop: 10, fontSize: 10, color: THEME.textDim }}>
-          Sources: Google Places{process.env.YELP_PUBLIC === "1" || results.some(r => r.sources?.includes("yelp")) ? " + Yelp Fusion" : ""}
+          Click any result to read reviews · Sources: Google Places{results.some(r => r.sources?.includes("yelp")) ? " + Yelp Fusion" : ""}
           {category === "lender" && " · NMLS verify links open the federal Consumer Access registry"}
         </div>
+      )}
+
+      {reviewing && (
+        <ProReviewsModal
+          pro={reviewing}
+          getToken={getToken}
+          onClose={() => setReviewing(null)}
+          onAdd={(pro) => { onAdd(pro); setReviewing(null); }}
+          alreadyAdded={savedNames.has(reviewing.name.toLowerCase())}
+        />
       )}
     </Panel>
   );
