@@ -593,7 +593,10 @@ export const WholesaleView = () => {
   const [detailLead, setDetailLead] = useState(null);
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState(null);
+  // Search-result feedback. `kind` distinguishes a real failure ("error",
+  // red/orange pill) from an empty-but-successful query ("info", neutral
+  // info pill) — same input field, very different meanings to the user.
+  const [searchNotice, setSearchNotice] = useState(null); // { kind: "error"|"info", message: string }
 
   const [leads, setLeads] = useState([]);
   const [loadingLeads, setLoadingLeads] = useState(true);
@@ -619,10 +622,10 @@ export const WholesaleView = () => {
     const hasZip = /^\d{5}$/.test(zip);
     const hasCityState = !!searchCity && !!searchState;
     if (!hasZip && !hasCityState) {
-      setSearchError("Pick a state + city, or enter a 5-digit ZIP.");
+      setSearchNotice({ kind: "error", message: "Pick a state + city, or enter a 5-digit ZIP." });
       return;
     }
-    setSearching(true); setSearchError(null);
+    setSearching(true); setSearchNotice(null);
     try {
       const { results } = await searchWholesaleLeads(saas.getToken, {
         zip: hasZip ? zip : undefined,
@@ -631,9 +634,14 @@ export const WholesaleView = () => {
         taxDelinquentOnly
       });
       setSearchResults(results || []);
-      if (!results || results.length === 0) setSearchError("No matching properties for that location.");
+      if (!results || results.length === 0) {
+        setSearchNotice({
+          kind: "info",
+          message: "No matching properties for that location. Try a nearby ZIP, a different city, or remove the tax-distressed filter."
+        });
+      }
     } catch (e) {
-      setSearchError(e.message || "Search failed");
+      setSearchNotice({ kind: "error", message: e.message || "Search failed" });
     } finally { setSearching(false); }
   };
 
@@ -791,10 +799,18 @@ export const WholesaleView = () => {
           <input type="checkbox" checked={taxDelinquentOnly} onChange={(e) => setTaxDelinquentOnly(e.target.checked)} />
           <span>Pre-foreclosure / tax-distressed only</span>
         </label>
-        {searchError && (
-          <div style={{ marginTop: 10, padding: 10, background: THEME.bgOrange, color: THEME.orange,
-            borderRadius: 6, fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
-            <AlertTriangle size={12} /> {searchError}
+        {searchNotice && (
+          <div style={{
+            marginTop: 10, padding: 10, borderRadius: 6, fontSize: 12,
+            display: "flex", alignItems: "center", gap: 6,
+            background: searchNotice.kind === "error" ? THEME.bgOrange : THEME.bgRaised,
+            color: searchNotice.kind === "error" ? THEME.orange : THEME.textMuted,
+            border: searchNotice.kind === "error" ? "none" : `1px solid ${THEME.borderLight}`
+          }}>
+            {searchNotice.kind === "error"
+              ? <AlertTriangle size={12} />
+              : <Search size={12} />}
+            {searchNotice.message}
           </div>
         )}
       </Panel>

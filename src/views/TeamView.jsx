@@ -629,7 +629,16 @@ export const TeamView = () => {
         </div>
       ) : filtered.length === 0 ? (
         <div style={{ padding: 24, textAlign: "center", color: THEME.textMuted, fontSize: 13 }}>
-          No contacts match the current filters.
+          No contacts match the current filters.{" "}
+          <button
+            onClick={() => { setQuery(""); setRoleFilter("all"); setStateFilter("all"); }}
+            style={{
+              border: "none", background: "transparent", padding: 0,
+              color: THEME.accent, fontSize: 13, fontWeight: 600,
+              cursor: "pointer", textDecoration: "underline"
+            }}>
+            Clear filters
+          </button>
         </div>
       ) : (
         ROLES.filter(r => grouped[r.key]?.length > 0).map(role => (
