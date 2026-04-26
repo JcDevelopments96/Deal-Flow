@@ -9,6 +9,7 @@ import { THEME } from "../theme.js";
 import { fmtUSD } from "../utils.js";
 import { useAppActions } from "../contexts.jsx";
 import { estimateCashflow } from "./cashflow.js";
+import { isSaasMode, useSaasUser, fetchListingDetail } from "../lib/saas.js";
 
 /**
  * ListingImage — Zillow/Redfin-style hero photo with a simple carousel.
@@ -20,16 +21,34 @@ import { estimateCashflow } from "./cashflow.js";
  * The arrows and count badge only appear when there's more than one photo.
  * Arrow clicks stop propagation so they don't trigger the card's onOpen.
  */
-export const ListingImage = ({ photos, url, demo, photoCount, streetviewUrl, satelliteUrl }) => {
-  const urls = Array.isArray(photos) && photos.length > 0
+export const ListingImage = ({ photos, url, demo, photoCount, streetviewUrl, satelliteUrl, listingId }) => {
+  const seedUrls = Array.isArray(photos) && photos.length > 0
     ? photos
     : url
       ? [url]
       : [];
+  // Realtor's v3/list endpoint only returns the primary photo, so most
+  // cards arrive with 1 image plus a `photoCount` like 23 telling us
+  // more exist. We lazy-fetch the full gallery on the FIRST arrow click —
+  // each card pays a detail-API call only when the user actually wants
+  // to scroll, never proactively for all cards on screen.
+  const saas = useSaasUser();
+  const saasOn = isSaasMode();
+  const canLazyLoad = saasOn && !!listingId && photoCount > seedUrls.length;
+  const [extraPhotos, setExtraPhotos] = useState([]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadAttempted, setLoadAttempted] = useState(false);
+  const urls = useMemo(() => {
+    if (extraPhotos.length === 0) return seedUrls;
+    const merged = [...seedUrls];
+    for (const p of extraPhotos) if (!merged.includes(p)) merged.push(p);
+    return merged;
+  }, [seedUrls, extraPhotos]);
+
   // View modes: "photos" (MLS carousel) | "street" (Google Street View) | "aerial" (Satellite).
   // Only show toggle pills for modes we actually have URLs for.
   const modes = [];
-  if (urls.length > 0) modes.push({ key: "photos", label: "Photos" });
+  if (urls.length > 0 || photoCount > 0) modes.push({ key: "photos", label: "Photos" });
   if (streetviewUrl)  modes.push({ key: "street", label: "Street" });
   if (satelliteUrl)   modes.push({ key: "aerial", label: "Aerial" });
   const [view, setView] = useState(modes[0]?.key || "photos");
@@ -44,15 +63,40 @@ export const ListingImage = ({ photos, url, demo, photoCount, streetviewUrl, sat
   const showImage = current && !errored;
   const carouselActive = view === "photos";
 
+  // True when there are more photos available than we've fetched yet.
+  // Drives the right-arrow visibility so the user sees there's more to
+  // scroll even before the lazy fetch lands.
+  const moreAvailable = canLazyLoad && !loadAttempted;
+  const showArrows = carouselActive && (count > 1 || moreAvailable);
+
+  // Lazy-load on first arrow click. Idempotent — only fires once per card.
+  const ensureFullGallery = async () => {
+    if (loadAttempted || loadingMore || !canLazyLoad) return;
+    setLoadingMore(true);
+    setLoadAttempted(true);
+    try {
+      const body = await fetchListingDetail(saas.getToken, { id: listingId });
+      const all = Array.isArray(body?.photos) ? body.photos.filter(Boolean) : [];
+      if (all.length > 0) setExtraPhotos(all);
+    } catch { /* silently degrade — user keeps the primary photo */ }
+    finally { setLoadingMore(false); }
+  };
+
   const prev = (e) => {
     e.stopPropagation();
+    if (count <= 1) return;
     setErrored(false);
     setIndex(i => (i - 1 + count) % count);
   };
   const next = (e) => {
     e.stopPropagation();
     setErrored(false);
-    setIndex(i => (i + 1) % count);
+    // First click: trigger the lazy fetch and advance once we have data.
+    if (count <= 1 && moreAvailable) {
+      ensureFullGallery().then(() => setIndex(1));
+      return;
+    }
+    setIndex(i => (i + 1) % Math.max(1, count));
   };
 
   const arrowStyle = {
@@ -121,15 +165,17 @@ export const ListingImage = ({ photos, url, demo, photoCount, streetviewUrl, sat
         </div>
       )}
 
-      {/* Arrows — only when there's actually something to scroll through
-          in MLS photo mode */}
-      {carouselActive && count > 1 && (
+      {/* Arrows — visible whenever there's more to scroll through OR
+          more photos haven't been lazy-loaded yet. Right-arrow click
+          on a single-photo card triggers the gallery fetch. */}
+      {showArrows && (
         <>
           <button
             type="button"
             aria-label="Previous photo"
             onClick={prev}
-            style={{ ...arrowStyle, left: 8 }}
+            disabled={count <= 1}
+            style={{ ...arrowStyle, left: 8, opacity: count <= 1 ? 0.4 : 1 }}
             onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(15, 23, 42, 0.82)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(15, 23, 42, 0.55)"; }}
           >
@@ -137,7 +183,7 @@ export const ListingImage = ({ photos, url, demo, photoCount, streetviewUrl, sat
           </button>
           <button
             type="button"
-            aria-label="Next photo"
+            aria-label={loadingMore ? "Loading more photos…" : "Next photo"}
             onClick={next}
             style={{ ...arrowStyle, right: 8 }}
             onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(15, 23, 42, 0.82)"; }}
@@ -259,6 +305,7 @@ export const ListingCard = ({ listing, type = "sale", onOpen, showWatchToggle = 
           photoCount={listing.photoCount}
           streetviewUrl={listing.streetview_url}
           satelliteUrl={listing.satellite_url}
+          listingId={listing.id}
         />
         {showWatchToggle && (
           <button

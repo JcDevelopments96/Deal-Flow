@@ -10,7 +10,7 @@ import { RotateCcw, ArrowLeft } from "lucide-react";
 import { THEME } from "../theme.js";
 import {
   STATE_FIPS_BY_CODE, STATE_CODE_BY_FIPS, STATE_NAMES, STATE_MAP_VIEW,
-  COUNTIES_TOPOJSON, STATES_TOPOJSON,
+  COUNTIES_TOPOJSON, STATES_TOPOJSON, MAJOR_CITY_LABELS,
   normalizeCountyName, scoreToHeatFill, scoreToHeatStroke, scoreToT,
   HEAT_SCALE_MIN, HEAT_SCALE_MAX
 } from "./mapUtils.js";
@@ -409,6 +409,38 @@ export const USCountyMap = ({
               }}
             </Geographies>
             )}
+
+            {/* City labels — Zillow-style metro names floating above the
+                choropleth. Tier 1 (top-25 metros) renders nationwide;
+                tier 2 only renders in the selected state to keep the
+                national view readable. Each label is a tiny dot + text
+                pair so the user can see which point on the map the name
+                refers to. */}
+            {MAJOR_CITY_LABELS.filter(c => {
+              if (inStateView) return c.state === selectedState;
+              return c.tier === 1;
+            }).map(c => (
+              <Marker key={`${c.name}-${c.state}`} coordinates={[c.lng, c.lat]}>
+                <circle r={1.6} fill="#FFFFFF" stroke={THEME.navy} strokeWidth={0.5} style={{ pointerEvents: "none" }} />
+                <text
+                  x={4} y={2.2}
+                  style={{
+                    fontFamily: "DM Sans, system-ui, sans-serif",
+                    fontSize: inStateView ? 5 : 6,
+                    fontWeight: 700,
+                    fill: THEME.navy,
+                    paintOrder: "stroke",
+                    stroke: "rgba(255,255,255,0.95)",
+                    strokeWidth: 1.2,
+                    strokeLinejoin: "round",
+                    pointerEvents: "none",
+                    userSelect: "none"
+                  }}
+                >
+                  {c.name}
+                </text>
+              </Marker>
+            ))}
 
             {/* Listing pins — only in state view. National view would be
                 visually noisy with thousands of pins coast to coast.
