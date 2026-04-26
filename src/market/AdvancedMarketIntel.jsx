@@ -1105,6 +1105,24 @@ export const AdvancedMarketIntel = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Auto-default selectedState to the visitor's home state on first load.
+  // homeState comes from Vercel's edge geolocation header via /api/me,
+  // populated for US visitors only. Fires once per session — if the user
+  // explicitly clears their state choice, we don't keep snapping it back.
+  useEffect(() => {
+    if (selectedState) return;            // user already has one set
+    const guess = saas.user?.homeState;
+    if (!guess) return;                   // no geo signal (local dev / non-US)
+    let alreadyDefaulted = false;
+    try { alreadyDefaulted = sessionStorage.getItem("dt_market_auto_state") === "1"; }
+    catch {}
+    if (alreadyDefaulted) return;
+    try { sessionStorage.setItem("dt_market_auto_state", "1"); } catch {}
+    setSelectedState(guess);
+    setShowStateResults(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saas.user?.homeState]);
+
   // Pre-ingested Zillow ZHVI + Redfin snapshot for every county in the
   // country, keyed by 5-char FIPS. Loaded once on mount so the map gets
   // a nationwide home-price gradient immediately — no need for the user
