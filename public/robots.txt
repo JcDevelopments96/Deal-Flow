@@ -61,3 +61,6 @@ Disallow: /
 # Don't index the API surface (auth-gated anyway, but be explicit)
 User-agent: *
 Disallow: /api/
+
+# Sitemap location — submit this to Google Search Console + Bing Webmaster Tools
+Sitemap: https://dealdocket.ai/sitemap.xml

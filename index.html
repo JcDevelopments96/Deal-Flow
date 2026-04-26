@@ -3,41 +3,104 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Deal Docket — Real Estate Investment Platform</title>
-  <meta name="description" content="Deal Docket — the real estate investor's end-to-end toolkit. Live MLS listings, off-market wholesale leads, county-level market map, deal analysis, AI-powered inspection summaries, and a vetted local-pro directory in one place." />
-  <meta name="keywords" content="Deal Docket, real estate investment, BRRRR, deal analyzer, wholesale, MLS listings, market intel, rental property, Airbnb, cash flow calculator" />
+
+  <!-- Title leads with brand + the highest-volume function the app actually
+       performs. Keep under ~60 chars so it doesn't truncate in SERPs. -->
+  <title>Deal Docket — Real Estate Deal Analyzer & Wholesale Leads</title>
+  <meta name="description" content="Deal Docket is the real estate investor's end-to-end toolkit: live MLS listings, off-market wholesale leads, BRRRR & rental deal analyzer, AI-powered inspection summaries, and a vetted local-pro directory — all in one app." />
+  <meta name="keywords" content="Deal Docket, dealdocket.ai, real estate investment software, BRRRR calculator, deal analyzer, wholesale real estate leads, MLS listings, rental property analysis, Airbnb income calculator, AI inspection report, real estate investor toolkit" />
   <meta name="author" content="Deal Docket" />
+  <link rel="canonical" href="https://dealdocket.ai/" />
 
-  <!-- AI crawler opt-out — well-behaved scrapers (GPTBot, ClaudeBot, etc.)
-       respect these. Won't stop bad actors, but signals "not for ingest." -->
-  <meta name="robots" content="noai, noimageai" />
-  <meta name="googlebot" content="noai, noimageai" />
+  <!-- Search engines: index normally. AI training crawlers: stay out
+       (separate `noai`/Google-Extended/etc. directives below). The two
+       are independent — Google Search and Google's AI training crawler
+       are different bots. -->
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta name="ai-content-declaration" content="noai, noimageai" />
 
-  <!-- Open Graph / Social Media -->
+  <!-- Open Graph — social card metadata -->
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="Deal Docket — Real Estate Investment Platform" />
-  <meta property="og:description" content="The real estate investor's end-to-end toolkit. Listings, wholesale leads, deal analysis, AI inspections, and a local-pro directory — in one place." />
-  <meta property="og:url" content="https://your-domain.com" />
-  
+  <meta property="og:site_name" content="Deal Docket" />
+  <meta property="og:locale" content="en_US" />
+  <meta property="og:title" content="Deal Docket — Real Estate Deal Analyzer & Wholesale Leads" />
+  <meta property="og:description" content="The real estate investor's end-to-end toolkit. Live MLS, off-market wholesale leads, deal analysis, AI inspections, and a local-pro directory — in one place." />
+  <meta property="og:url" content="https://dealdocket.ai/" />
+  <meta property="og:image" content="https://dealdocket.ai/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Deal Docket — real estate investor toolkit" />
+
+  <!-- Twitter / X card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Deal Docket — Real Estate Deal Analyzer & Wholesale Leads" />
+  <meta name="twitter:description" content="Live MLS, off-market wholesale leads, BRRRR analyzer, AI inspections, and a local-pro directory — all in one app." />
+  <meta name="twitter:image" content="https://dealdocket.ai/og-image.png" />
+
+  <!-- Structured data — three JSON-LD blocks Google parses for the
+       knowledge panel + sitelinks search box + product-style listing. -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Deal Docket",
+    "url": "https://dealdocket.ai/",
+    "logo": "https://dealdocket.ai/icon-512.png",
+    "description": "Real estate investor's end-to-end toolkit — listings, wholesale leads, deal analysis, AI inspections, and a local-pro directory."
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "Deal Docket",
+    "url": "https://dealdocket.ai/",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": "https://dealdocket.ai/?q={search_term_string}",
+      "query-input": "required name=search_term_string"
+    }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Deal Docket",
+    "applicationCategory": "BusinessApplication",
+    "applicationSubCategory": "Real Estate Investment Software",
+    "operatingSystem": "Web",
+    "url": "https://dealdocket.ai/",
+    "description": "All-in-one real estate investor toolkit: live MLS listings, wholesale lead finder, BRRRR & rental deal analyzer, AI inspection summaries, and a vetted local-pro directory.",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD",
+      "description": "Free plan available with paid Starter, Pro, and Scale tiers."
+    }
+  }
+  </script>
+
   <!-- Favicon -->
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  
+
   <!-- Fonts - Preload for performance -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
-  
+
   <!-- Theme color -->
   <meta name="theme-color" content="#0B0F14" />
-  
+
   <!-- PWA manifest -->
   <link rel="manifest" href="/manifest.json" />
-  
+
   <style>
     /* Prevent flash of unstyled content */
-    body { 
-      margin: 0; 
-      background: #0B0F14; 
+    body {
+      margin: 0;
+      background: #0B0F14;
       color: #E8E4D9;
       font-family: 'DM Sans', sans-serif;
       overflow-x: hidden;
@@ -59,8 +122,18 @@
   </style>
 </head>
 <body>
+  <!-- SEO content for crawlers (and a graceful no-JS fallback). Hidden
+       from sighted users via the loader, but in the DOM at parse time so
+       Googlebot reads keyword-rich copy without waiting on the JS bundle. -->
   <div id="root">
     <div id="loading">Loading Deal Docket...</div>
+    <noscript>
+      <main style="max-width: 720px; margin: 60px auto; padding: 24px; color: #E8E4D9; font-family: 'DM Sans', sans-serif;">
+        <h1>Deal Docket — Real Estate Investor Toolkit</h1>
+        <p>Deal Docket is an end-to-end app for real estate investors. Find live MLS listings, source off-market wholesale leads with owner data and skip-trace, run BRRRR / rental / fix-and-flip deal analysis, generate AI summaries of inspection PDFs, and build a vetted directory of local agents, lenders, and contractors.</p>
+        <p>This app requires JavaScript. Visit <a href="https://dealdocket.ai/" style="color:#0D9488">dealdocket.ai</a> in a modern browser to get started.</p>
+      </main>
+    </noscript>
   </div>
   <script type="module" src="/src/main.jsx"></script>
 </body>

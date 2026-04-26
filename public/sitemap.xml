@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Deal Docket sitemap. The app is a single-page React app, so the only
+  truly crawlable URL is the root. We list it here so Google Search
+  Console + Bing Webmaster Tools can pick it up after submission.
+  Update <lastmod> when the marketing landing materially changes.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://dealdocket.ai/</loc>
+    <lastmod>2026-04-26</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>
