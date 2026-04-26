@@ -13,7 +13,7 @@ import { isSaasMode, useSaasUser, fetchMetered, ApiRequestError } from "../lib/s
 const FAQS = [
   {
     q: "What counts as a 'Market Intel click'?",
-    a: "Each call to the state/city listings API is one click. Picking a state, clicking a county on the map, or running a search each use 1 click. Opening a specific listing's photo gallery, the watchlist, the team CRM, and the Ari chat don't cost clicks."
+    a: "Each call to the state/city listings API is one click. Picking a state, clicking a county on the map, or running a search each use 1 click. Opening a specific listing's photo gallery, the watchlist, the team CRM, and the Ari AI chat don't cost clicks."
   },
   {
     q: "Can I switch plans or cancel anytime?",
@@ -256,7 +256,7 @@ export const PlansView = () => {
                 )}
                 <li style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: THEME.textMuted }}>
                   <Check size={14} color={THEME.green} />
-                  <span>Full Analyzer, Watchlist, Team, Ari</span>
+                  <span>Full Analyzer, Watchlist, Team, Ari AI</span>
                 </li>
                 {!isFree && (
                   <li style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: THEME.textMuted }}>

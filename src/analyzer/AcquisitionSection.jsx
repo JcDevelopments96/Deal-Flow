@@ -1,36 +1,59 @@
 /* ============================================================================
    ACQUISITION ANALYSIS SECTION — first tab of the Analyzer.
+
+   Financing strategy: pick a loan type and the down payment / rate / term
+   auto-populate using current-market typical numbers. Each field stays
+   editable underneath so the user can dial in the actual quote they got.
    ============================================================================ */
 import React, { useState } from "react";
-import { Search, Calculator } from "lucide-react";
+import { Search, Calculator, Check, X } from "lucide-react";
 import { THEME } from "../theme.js";
 import { fmtUSD, isMobile } from "../utils.js";
 import { NumberField, StatRow, Panel } from "../primitives.jsx";
+
+// Typical investor-loan starting points — meant as a quick set-up, not as
+// a quoted rate. Updated April 2026; user should override with their actual
+// loan estimate. Term defaults are how each loan type is most commonly
+// structured (HM short, conventional 30, etc.).
+const FINANCING_OPTIONS = {
+  conventional: { name: "Conventional",   downPayment: 25,  rate: 7.0,  termYears: 30, description: "Fannie/Freddie investor loan — standard 30-yr financing." },
+  dscr:         { name: "DSCR Loan",      downPayment: 20,  rate: 7.75, termYears: 30, description: "Qualifies on the property's rent, not your W2 — popular for pros." },
+  hardMoney:    { name: "Hard Money",     downPayment: 20,  rate: 11.0, termYears: 1,  description: "Short-term bridge, interest-only, fast close. Refi out within 12 mo." },
+  portfolio:    { name: "Portfolio Bank", downPayment: 20,  rate: 8.0,  termYears: 25, description: "Local/community bank balance-sheet loan — flexible underwriting." },
+  fha:          { name: "FHA House Hack", downPayment: 3.5, rate: 6.5,  termYears: 30, description: "Low-down owner-occupied — live in one unit of a 2-4 unit." },
+  seller:       { name: "Seller Finance", downPayment: 10,  rate: 6.5,  termYears: 30, description: "Owner-carry — terms negotiated directly with the seller." },
+  cash:         { name: "Cash",           downPayment: 100, rate: 0,    termYears: 0,  description: "All-cash purchase, no financing costs." }
+};
+
+const DUE_DILIGENCE_CHECKLIST = [
+  { id: "inspection", label: "Professional Inspection", critical: true },
+  { id: "appraisal", label: "Property Appraisal", critical: true },
+  { id: "title", label: "Title Search & Insurance", critical: true },
+  { id: "permits", label: "Permit History Review", critical: false },
+  { id: "comps", label: "Comparable Sales Analysis", critical: true },
+  { id: "rentRoll", label: "Rent Roll & Market Analysis", critical: true },
+  { id: "environmental", label: "Environmental Assessment", critical: false },
+  { id: "survey", label: "Property Survey", critical: false },
+  { id: "hoa", label: "HOA Documents Review", critical: false },
+  { id: "utilities", label: "Utility Transfer & Costs", critical: false }
+];
 
 export const AcquisitionSection = ({ deal, onUpdate, metrics }) => {
   const [acquisitionStrategy, setAcquisitionStrategy] = useState(deal.acquisitionStrategy || "conventional");
   const [dueDiligenceItems, setDueDiligenceItems] = useState(deal.dueDiligenceItems || {});
 
-  const financingOptions = {
-    conventional: { name: "Conventional Loan", downPayment: 25, rate: 7.5, description: "Standard investment property loan" },
-    hardMoney: { name: "Hard Money", downPayment: 20, rate: 12.0, description: "Short-term bridge financing" },
-    cash: { name: "Cash Purchase", downPayment: 100, rate: 0, description: "All-cash acquisition" },
-    portfolio: { name: "Portfolio Lender", downPayment: 20, rate: 8.0, description: "Local bank portfolio loan" },
-    seller: { name: "Seller Financing", downPayment: 10, rate: 6.5, description: "Owner-carry financing" }
+  const applyStrategy = (key) => {
+    const opt = FINANCING_OPTIONS[key];
+    setAcquisitionStrategy(key);
+    onUpdate({
+      acquisitionStrategy: key,
+      downPayment: opt.downPayment,
+      interestRate: opt.rate,
+      loanTermYears: opt.termYears || deal.loanTermYears || 30
+    });
   };
 
-  const dueDiligenceChecklist = [
-    { id: "inspection", label: "Professional Inspection", critical: true },
-    { id: "appraisal", label: "Property Appraisal", critical: true },
-    { id: "title", label: "Title Search & Insurance", critical: true },
-    { id: "permits", label: "Permit History Review", critical: false },
-    { id: "comps", label: "Comparable Sales Analysis", critical: true },
-    { id: "rentRoll", label: "Rent Roll & Market Analysis", critical: true },
-    { id: "environmental", label: "Environmental Assessment", critical: false },
-    { id: "survey", label: "Property Survey", critical: false },
-    { id: "hoa", label: "HOA Documents Review", critical: false },
-    { id: "utilities", label: "Utility Transfer & Costs", critical: false }
-  ];
+  const ddDone = Object.values(dueDiligenceItems).filter(Boolean).length;
 
   return (
     <div>
@@ -62,15 +85,12 @@ export const AcquisitionSection = ({ deal, onUpdate, metrics }) => {
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr", gap: 16, marginTop: 16 }}>
-            <div>
-              <div className="label-xs" style={{ marginBottom: 8 }}>Days on Market</div>
-              <input
-                type="number"
-                value={deal.daysOnMarket || 45}
-                onChange={(e) => onUpdate({ daysOnMarket: parseInt(e.target.value) || 0 })}
-                style={{ width: "100%", padding: "9px 10px", fontSize: 13 }}
-              />
-            </div>
+            <NumberField
+              label="Days on Market"
+              value={deal.daysOnMarket || 45}
+              onChange={(val) => onUpdate({ daysOnMarket: val })}
+              integer
+            />
             <div>
               <div className="label-xs" style={{ marginBottom: 8 }}>Negotiation Discount</div>
               <div style={{ fontSize: 16, fontWeight: 600, color: THEME.green, padding: "9px 10px" }}>
@@ -80,71 +100,95 @@ export const AcquisitionSection = ({ deal, onUpdate, metrics }) => {
           </div>
         </div>
 
+        {/* ── Financing strategy ───────────────────────────────────────── */}
         <div style={{ marginBottom: 24 }}>
-          <h4 style={{ fontSize: 14, marginBottom: 16, color: THEME.text }}>Financing Strategy</h4>
-          <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "repeat(3, 1fr)", gap: 12, marginBottom: 16 }}>
-            {Object.entries(financingOptions).map(([key, option]) => (
-              <button
-                key={key}
-                onClick={() => {
-                  setAcquisitionStrategy(key);
-                  onUpdate({
-                    acquisitionStrategy: key,
-                    downPayment: option.downPayment,
-                    interestRate: option.rate
-                  });
-                }}
-                style={{
-                  padding: 12,
-                  border: `2px solid ${acquisitionStrategy === key ? THEME.accent : THEME.border}`,
-                  borderRadius: 6,
-                  background: acquisitionStrategy === key ? THEME.bgRaised : THEME.bgPanel,
-                  textAlign: "left",
-                  cursor: "pointer"
-                }}
-              >
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{option.name}</div>
-                <div style={{ fontSize: 11, color: THEME.textMuted, marginBottom: 6 }}>{option.description}</div>
-                <div style={{ fontSize: 12 }}>
-                  {option.downPayment}% down • {option.rate}% rate
-                </div>
-              </button>
-            ))}
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
+            <h4 style={{ fontSize: 14, color: THEME.text, margin: 0 }}>Financing Strategy</h4>
+            <span style={{ fontSize: 11, color: THEME.textMuted }}>
+              Pick a loan type — fields auto-fill, then edit to your actual quote.
+            </span>
           </div>
 
+          {/* Single-row pill selector — wraps on small screens */}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+            {Object.entries(FINANCING_OPTIONS).map(([key, option]) => {
+              const active = acquisitionStrategy === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => applyStrategy(key)}
+                  title={option.description}
+                  style={{
+                    padding: "8px 14px", fontSize: 12, fontWeight: 600,
+                    border: `1.5px solid ${active ? THEME.accent : THEME.border}`,
+                    borderRadius: 999,
+                    background: active ? THEME.accent : THEME.bgPanel,
+                    color: active ? "#FFFFFF" : THEME.text,
+                    cursor: "pointer",
+                    display: "inline-flex", alignItems: "center", gap: 6
+                  }}
+                >
+                  {option.name}
+                  <span style={{
+                    fontSize: 10, fontWeight: 600,
+                    color: active ? "rgba(255,255,255,0.85)" : THEME.textMuted
+                  }}>
+                    {option.downPayment}% / {option.rate}%
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Description for the active strategy */}
+          <div style={{
+            padding: "10px 14px", marginBottom: 14,
+            background: THEME.bgRaised, borderRadius: 6,
+            fontSize: 12, color: THEME.textMuted, lineHeight: 1.5
+          }}>
+            {FINANCING_OPTIONS[acquisitionStrategy]?.description}
+          </div>
+
+          {/* Editable fields — pre-filled from the chosen strategy */}
           <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "repeat(4, 1fr)", gap: 16 }}>
             <NumberField
               label="Down Payment %"
               value={deal.downPayment}
               onChange={(val) => onUpdate({ downPayment: val })}
               prefix="%"
+              helper={`Strategy default: ${FINANCING_OPTIONS[acquisitionStrategy]?.downPayment}%`}
             />
             <NumberField
               label="Interest Rate %"
               value={deal.interestRate}
               onChange={(val) => onUpdate({ interestRate: val })}
               prefix="%"
+              helper={`Strategy default: ${FINANCING_OPTIONS[acquisitionStrategy]?.rate}%`}
             />
             <NumberField
               label="Loan Term (Years)"
               value={deal.loanTermYears || 30}
               onChange={(val) => onUpdate({ loanTermYears: val })}
               integer
+              helper={`Strategy default: ${FINANCING_OPTIONS[acquisitionStrategy]?.termYears}yr`}
             />
             <NumberField
               label="Closing Costs"
               value={deal.closingCosts || Math.round(deal.purchasePrice * 0.02)}
               onChange={(val) => onUpdate({ closingCosts: val })}
               prefix="$"
+              helper="Title, escrow, lender fees"
             />
           </div>
         </div>
 
+        {/* ── Due diligence checklist ──────────────────────────────────── */}
         <div>
           <h4 style={{ fontSize: 14, marginBottom: 16, color: THEME.text }}>Due Diligence Checklist</h4>
           <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr" : "repeat(2, 1fr)", gap: 8 }}>
-            {dueDiligenceChecklist.map(item => (
-              <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0" }}>
+            {DUE_DILIGENCE_CHECKLIST.map(item => (
+              <label key={item.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", cursor: "pointer" }}>
                 <input
                   type="checkbox"
                   checked={dueDiligenceItems[item.id] || false}
@@ -162,7 +206,7 @@ export const AcquisitionSection = ({ deal, onUpdate, metrics }) => {
                 }}>
                   {item.label} {item.critical && <span style={{ color: THEME.red }}>*</span>}
                 </span>
-              </div>
+              </label>
             ))}
           </div>
         </div>
@@ -208,9 +252,11 @@ export const AcquisitionSection = ({ deal, onUpdate, metrics }) => {
           }}
         />
         <StatRow
-          label="70% Rule Status"
-          value={metrics.seventyPercentRule ? "PASS" : "FAIL"}
-          valueColor={metrics.seventyPercentRule ? THEME.green : THEME.red}
+          label="70% Rule"
+          value={metrics.seventyPercentRule
+            ? <Check size={18} color={THEME.green} aria-label="Pass" />
+            : <X size={18} color={THEME.red} aria-label="Fail" />}
+          mono={false}
           bold
           tooltip={{
             title: "70% Rule",
@@ -220,8 +266,8 @@ export const AcquisitionSection = ({ deal, onUpdate, metrics }) => {
         />
         <StatRow
           label="Due Diligence Progress"
-          value={`${Object.values(dueDiligenceItems).filter(Boolean).length}/${dueDiligenceChecklist.length} items`}
-          valueColor={Object.values(dueDiligenceItems).filter(Boolean).length >= 6 ? THEME.green : THEME.orange}
+          value={`${ddDone}/${DUE_DILIGENCE_CHECKLIST.length} items`}
+          valueColor={ddDone >= 6 ? THEME.green : THEME.orange}
         />
       </Panel>
     </div>

@@ -153,8 +153,8 @@ export const HomeView = ({ onChangeView, onNewDeal, onOpenCalculator }) => {
           />
           <FeatureCard
             icon={<FileText size={20} />}
-            title="Ari Inspection Summaries"
-            desc="Drop in any home-inspection PDF — Ari reads it cover-to-cover and returns urgent issues, immediate repairs, recommended maintenance, and rough cost estimates. Export to PDF / Excel / Word."
+            title="Ari AI Inspection Summaries"
+            desc="Drop in any home-inspection PDF — Ari AI reads it cover-to-cover and returns urgent issues, immediate repairs, recommended maintenance, and rough cost estimates. Export to PDF / Excel / Word."
             cta="Try the inspector"
             onClick={() => onChangeView("inspections")}
             accent="#DC2626"
@@ -185,7 +185,7 @@ export const HomeView = ({ onChangeView, onNewDeal, onOpenCalculator }) => {
           <FeatureCard
             icon={<MessageSquare size={20} />}
             title="Ari AI Assistant"
-            desc="Ask Ari anything about a market, a strategy, or a specific deal. Live web search built in — gets you current data, not training-set answers from years ago."
+            desc="Ask Ari AI anything about a market, a strategy, or a specific deal. Live web search built in — gets you current data, not training-set answers from years ago."
             cta=""
             onClick={null}
             accent="#F97316"
@@ -260,7 +260,7 @@ export const HomeView = ({ onChangeView, onNewDeal, onOpenCalculator }) => {
           Ready to find your next deal?
         </h3>
         <p style={{ fontSize: 13, color: THEME.textMuted, maxWidth: 520, margin: "0 auto 18px", lineHeight: 1.55 }}>
-          Free plan includes 5 Market Intel clicks and the full Deal Analyzer, Watchlist, Team CRM, and Ari assistant. Upgrade when you outgrow it.
+          Free plan includes 5 Market Intel clicks and the full Deal Analyzer, Watchlist, Team CRM, and Ari AI assistant. Upgrade when you outgrow it.
         </p>
         <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
           <button onClick={() => onChangeView("market")} className="btn-primary" style={{ padding: "10px 18px", fontSize: 13 }}>

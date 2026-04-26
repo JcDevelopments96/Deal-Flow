@@ -5,31 +5,35 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   Search, Hammer, DollarSign, Home, PiggyBank, Target,
   BarChart3, ChevronRight, FileDown, Save, Trash2, FileText,
-  ChevronDown, FileSpreadsheet, FileType
+  ChevronDown, FileSpreadsheet, FileType, Sparkles, Check, X
 } from "lucide-react";
 import { THEME } from "../theme.js";
 import { calcMetrics, fmtUSD, isMobile } from "../utils.js";
-import { NumberField, StatRow, Panel, CalcTooltip } from "../primitives.jsx";
+import { NumberField, StatRow, Panel, CalcTooltip, PercentDollarField } from "../primitives.jsx";
 import { DEAL_STATUSES, DEAL_STATUS_ORDER, getDealStatus, StatusChip } from "../deals.jsx";
 import { AcquisitionSection } from "./AcquisitionSection.jsx";
 import { RehabSection } from "./RehabSection.jsx";
 import { RefinanceSection } from "./RefinanceSection.jsx";
 import { ExitStrategyComparisons } from "./ExitStrategyComparisons.jsx";
 import { CostBreakdown } from "./CostBreakdown.jsx";
+import { StrategyRecommendation } from "./StrategyRecommendation.jsx";
 import { InspectionPanel } from "../inspection/InspectionPanel.jsx";
 
 export const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete, onPdfError, onPdfSuccess, isDirty }) => {
-  const [section, setSection] = useState("acquisition");
+  // Default to "summary" so the user lands on the recommendation + headline
+  // metrics first — only drills into the input tabs when they need to tune.
+  const [section, setSection] = useState("summary");
   const metrics = useMemo(() => calcMetrics(deal), [deal]);
 
   const sections = [
+    { key: "summary",     label: "Summary",     icon: <Sparkles size={14} /> },
     { key: "acquisition", label: "Acquisition", icon: <Search size={14} /> },
-    { key: "rehab", label: "Rehab", icon: <Hammer size={14} /> },
-    { key: "costs", label: "Costs", icon: <DollarSign size={14} /> },
-    { key: "rent", label: "Rent", icon: <Home size={14} /> },
-    { key: "refinance", label: "Refinance", icon: <PiggyBank size={14} /> },
-    { key: "exit", label: "Exit", icon: <Target size={14} /> },
-    { key: "inspection", label: "Inspection", icon: <FileText size={14} /> }
+    { key: "rehab",       label: "Rehab",       icon: <Hammer size={14} /> },
+    { key: "costs",       label: "Costs",       icon: <DollarSign size={14} /> },
+    { key: "rent",        label: "Rent",        icon: <Home size={14} /> },
+    { key: "refinance",   label: "Refinance",   icon: <PiggyBank size={14} /> },
+    { key: "exit",        label: "Exit",        icon: <Target size={14} /> },
+    { key: "inspection",  label: "Inspection",  icon: <FileText size={14} /> }
   ];
 
   // Comprehensive deal exports — PDF/Excel/Word, lazy-loaded so the
@@ -145,7 +149,7 @@ export const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete, onPdfError,
       </div>
 
       <Panel style={{ marginBottom: 24 }} title="Key Metrics" icon={<BarChart3 size={16} />} accent>
-        <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr 1fr" : "repeat(5, 1fr)", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr 1fr" : "repeat(6, 1fr)", gap: 16 }}>
           <div>
             <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4, display: "inline-flex", alignItems: "center" }}>
               MONTHLY CASH FLOW
@@ -204,6 +208,20 @@ export const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete, onPdfError,
           </div>
           <div>
             <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4, display: "inline-flex", alignItems: "center" }}>
+              5-YR IRR
+              <CalcTooltip
+                size={12}
+                title="5-Year Internal Rate of Return"
+                description="Annualized return over a 5-year buy-and-hold including loan paydown, 3% rent growth, 4% appreciation, and a sale at year 5 with 7% selling costs. Tweak assumptions on the Exit tab."
+                formula="IRR of [-Total Invested, Yr 1 CF, Yr 2 CF, …, Yr 5 CF + Sale Proceeds]"
+              />
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: metrics.irr5yr > 12 ? THEME.green : metrics.irr5yr > 0 ? THEME.accent : THEME.red }}>
+              {metrics.irr5yr != null ? `${metrics.irr5yr.toFixed(1)}%` : "—"}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4, display: "inline-flex", alignItems: "center" }}>
               DEAL SCORE
               <CalcTooltip
                 size={12}
@@ -239,6 +257,9 @@ export const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete, onPdfError,
         ))}
       </div>
 
+      {section === "summary" && (
+        <StrategyRecommendation deal={deal} metrics={metrics} onUpdate={onUpdate} />
+      )}
       {section === "acquisition" && <AcquisitionSection deal={deal} onUpdate={onUpdate} metrics={metrics} />}
       {section === "rehab" && <RehabSection deal={deal} onUpdate={onUpdate} />}
       {section === "costs" && <CostBreakdown deal={deal} metrics={metrics} onUpdate={onUpdate} />}
@@ -252,29 +273,32 @@ export const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete, onPdfError,
               prefix="$"
               helper="Market rent for this property"
             />
-            <NumberField
+            <PercentDollarField
               label="Property Tax (Annual)"
               value={deal.propertyTax}
+              base={(deal.rentEstimate || 0) * 12}
+              baseLabel="of annual rent"
               onChange={(val) => onUpdate({ propertyTax: val })}
-              prefix="$"
             />
-            <NumberField
+            <PercentDollarField
               label="Insurance (Annual)"
               value={deal.insurance}
+              base={(deal.rentEstimate || 0) * 12}
+              baseLabel="of annual rent"
               onChange={(val) => onUpdate({ insurance: val })}
-              prefix="$"
             />
-            <NumberField
+            <PercentDollarField
               label="CapEx Reserve (Monthly)"
               value={deal.capex}
+              base={deal.rentEstimate || 0}
               onChange={(val) => onUpdate({ capex: val })}
-              prefix="$"
+              helper="Long-term replacement reserves"
             />
-            <NumberField
+            <PercentDollarField
               label="Repairs & Maintenance (Monthly)"
               value={deal.repairMaintenance}
+              base={deal.rentEstimate || 0}
               onChange={(val) => onUpdate({ repairMaintenance: val })}
-              prefix="$"
             />
             <NumberField
               label="Vacancy %"
@@ -288,11 +312,11 @@ export const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete, onPdfError,
               onChange={(val) => onUpdate({ mgmtFee: val })}
               prefix="%"
             />
-            <NumberField
+            <PercentDollarField
               label="HOA (Monthly)"
               value={deal.hoa}
+              base={deal.rentEstimate || 0}
               onChange={(val) => onUpdate({ hoa: val })}
-              prefix="$"
             />
           </div>
 
@@ -350,9 +374,11 @@ export const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete, onPdfError,
                 formula: "Effective Income − Operating Expenses"
               }}
             />
-            <StatRow label="1% Rule Status"
-              value={metrics.onePercentRule ? "PASS" : "FAIL"}
-              valueColor={metrics.onePercentRule ? THEME.green : THEME.red}
+            <StatRow label="1% Rule"
+              value={metrics.onePercentRule
+                ? <Check size={18} color={THEME.green} aria-label="Pass" />
+                : <X size={18} color={THEME.red} aria-label="Fail" />}
+              mono={false}
               bold
               borderTop
               tooltip={{

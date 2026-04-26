@@ -13,7 +13,7 @@ const STORAGE_KEY = "dealtrack-ari-history-v1";
 
 const GREETING = {
   role: "assistant",
-  content: "Hi, I'm **Ari** — your Deal Docket co-pilot. I can answer anything (real estate or otherwise), search the live web for recent info, and point you to the right section of the app. What's on your mind?"
+  content: "Hi, I'm **Ari AI** — your Deal Docket co-pilot. I can answer anything (real estate or otherwise), search the live web for recent info, and point you to the right section of the app. What's on your mind?"
 };
 
 // Tiny markdown → JSX renderer. Handles bold, bullets, paragraphs, inline
@@ -108,7 +108,7 @@ export const AriChat = () => {
     const text = input.trim();
     if (!text || sending) return;
     if (!saasOn || !saas.user) {
-      setError("Sign in to chat with Ari.");
+      setError("Sign in to chat with Ari AI.");
       return;
     }
     setError(null);
@@ -124,7 +124,7 @@ export const AriChat = () => {
       setHistory(prev => [...prev, { role: "assistant", content: reply, sources: sources || [] }]);
     } catch (e) {
       console.warn("Ari error:", e);
-      setError(e.message || "Ari couldn't reply. Try again in a moment.");
+      setError(e.message || "Ari AI couldn't reply. Try again in a moment.");
       // Keep the user's message in history but rollback the optimistic
       // assistant placeholder if any.
     } finally {
@@ -143,7 +143,7 @@ export const AriChat = () => {
     return (
       <button
         type="button"
-        aria-label="Open Ari chat assistant"
+        aria-label="Open Ari AI chat assistant"
         onClick={() => setOpen(true)}
         style={{
           position: "fixed", bottom: 20, right: 20,
@@ -193,8 +193,8 @@ export const AriChat = () => {
             <Sparkles size={16} />
           </div>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1 }}>Ari</div>
-            <div style={{ fontSize: 10, opacity: 0.7, letterSpacing: "0.06em", marginTop: 2 }}>DEALTRACK ASSISTANT</div>
+            <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1 }}>Ari AI</div>
+            <div style={{ fontSize: 10, opacity: 0.7, letterSpacing: "0.06em", marginTop: 2 }}>DEAL DOCKET ASSISTANT</div>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -203,7 +203,7 @@ export const AriChat = () => {
             style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.75)", cursor: "pointer", fontSize: 11, padding: "4px 8px" }}>
             Reset
           </button>
-          <button type="button" aria-label="Close Ari" onClick={() => setOpen(false)}
+          <button type="button" aria-label="Close Ari AI" onClick={() => setOpen(false)}
             style={{ background: "transparent", border: "none", color: "#FFFFFF", cursor: "pointer", padding: 4 }}>
             <X size={18} />
           </button>
@@ -264,7 +264,7 @@ export const AriChat = () => {
               background: THEME.bg, border: `1px solid ${THEME.border}`,
               fontSize: 12, color: THEME.textMuted
             }}>
-              Ari is thinking…
+              Ari AI is thinking…
             </div>
           </div>
         )}
@@ -290,7 +290,7 @@ export const AriChat = () => {
           ref={inputRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={saasOn && saas.user ? "Ask Ari about a deal, market, or anything…" : "Sign in to chat"}
+          placeholder={saasOn && saas.user ? "Ask Ari AI about a deal, market, or anything…" : "Sign in to chat"}
           disabled={!saasOn || !saas.user || sending}
           style={{
             flex: 1, padding: "9px 12px", fontSize: 13,

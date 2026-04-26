@@ -120,6 +120,86 @@ export const NumberField = ({ label, value, onChange, placeholder, helper, prefi
   );
 };
 
+/**
+ * PercentDollarField — number input that toggles between $ and % of a base.
+ *
+ * Investors split into two camps on operating reserves: some think in dollars
+ * ("$200 / mo for capex"), some think in percent of rent ("10% of gross").
+ * This field lets the user enter in whichever is natural and shows the
+ * converted value as helper text so they always see both sides.
+ *
+ * Storage stays in $ — `value` is always the dollar amount. The toggle is
+ * pure UI state, so saved deals don't drift if the user flips modes mid-edit.
+ *
+ * `base` is the reference amount the % is taken against (typically monthly
+ * rent for capex/repairs/mgmt; annual rent for property tax/insurance).
+ */
+export const PercentDollarField = ({ label, value, base, onChange, helper, baseLabel = "of rent" }) => {
+  const [mode, setMode] = useState("$");
+  const safeBase = Number(base) || 0;
+  const safeValue = Number(value) || 0;
+
+  const pctEquivalent = safeBase > 0 ? (safeValue / safeBase) * 100 : 0;
+  const dollarEquivalent = (pct) => safeBase * (pct / 100);
+
+  const handleChange = (entered) => {
+    const v = Number(entered) || 0;
+    if (mode === "$") {
+      onChange(Math.round(v));
+    } else {
+      onChange(Math.round(dollarEquivalent(v)));
+    }
+  };
+
+  // What value the inner NumberField shows depends on the active mode.
+  const fieldValue = mode === "$"
+    ? safeValue
+    : Number(pctEquivalent.toFixed(2));
+
+  // Helper line always shows the OTHER unit so both sides are visible.
+  const flipHelper = mode === "$"
+    ? (safeBase > 0 ? `≈ ${pctEquivalent.toFixed(1)}% ${baseLabel}` : "Set rent first to see % equivalent")
+    : (safeBase > 0 ? `≈ $${Math.round(safeValue).toLocaleString()} / mo` : "Set rent first to see $ equivalent");
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        marginBottom: 6, gap: 8
+      }}>
+        <span className="label-xs">{label}</span>
+        <div style={{
+          display: "inline-flex", borderRadius: 6, overflow: "hidden",
+          border: `1px solid ${THEME.border}`
+        }}>
+          {["$", "%"].map(m => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              style={{
+                padding: "2px 8px", fontSize: 11, fontWeight: 700,
+                background: mode === m ? THEME.accent : "transparent",
+                color: mode === m ? "#FFFFFF" : THEME.textMuted,
+                border: "none", cursor: "pointer"
+              }}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+      </div>
+      <NumberField
+        label=""
+        value={fieldValue}
+        onChange={handleChange}
+        prefix={mode}
+        helper={helper ? `${helper} · ${flipHelper}` : flipHelper}
+      />
+    </div>
+  );
+};
+
 export const SelectField = ({ label, value, onChange, options }) => (
   <div style={{ marginBottom: 14 }}>
     <div className="label-xs" style={{ marginBottom: 6 }}>{label}</div>

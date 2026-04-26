@@ -115,6 +115,11 @@ export const createBlankDeal = (template = null) => {
     closingCosts: 0, holdingCosts: 0,
     propertyTax: 0, insurance: 0, capex: 0, repairMaintenance: 0,
     vacancy: 8, mgmtFee: 10, hoa: 0,
+    // Short-term rental (Airbnb / VRBO) inputs — feed the STR strategy
+    // card on the Summary tab. Default 65% occupancy is the national
+    // average for active STR markets; nightly rate left blank so the
+    // user has to opt in.
+    airbnbNightlyRate: 0, airbnbOccupancy: 65,
     notes: "",
     status: "lead"
   };
