@@ -322,8 +322,8 @@ create policy wholesale_outreach_self_read on public.wholesale_outreach
 create table if not exists public.inspections (
   id                uuid primary key default gen_random_uuid(),
   user_id           uuid not null references public.users(id) on delete cascade,
-  context           text not null check (context in ('deal','watchlist')),
-  context_id        text not null,                -- deal id (uuid stringified) or listing id
+  context           text not null check (context in ('deal','watchlist','standalone')),
+  context_id        text not null,                -- 'standalone' for one-offs not tied to a deal/listing                -- deal id (uuid stringified) or listing id
   filename          text not null,
   storage_path      text not null,
   property_address  text,
@@ -346,6 +346,20 @@ create policy inspections_self_read on public.inspections
   for select using (
     user_id in (select id from public.users where clerk_user_id = auth.jwt() ->> 'sub')
   );
+
+-- If you already created the inspections table BEFORE the standalone
+-- context existed, the check constraint needs to be replaced. Idempotent:
+do $$ begin
+  if exists (
+    select 1 from pg_constraint where conname = 'inspections_context_check'
+  ) then
+    alter table public.inspections drop constraint inspections_context_check;
+  end if;
+  alter table public.inspections add constraint inspections_context_check
+    check (context in ('deal','watchlist','standalone'));
+exception when others then
+  raise notice 'inspections context constraint update skipped: %', sqlerrm;
+end $$;
 
 -- Storage bucket for the actual PDFs. Private — only owner can read via
 -- a signed URL minted by the API. Run via Supabase SQL editor (or the

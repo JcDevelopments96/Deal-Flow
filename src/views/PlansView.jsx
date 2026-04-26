@@ -261,6 +261,18 @@ export const PlansView = () => {
                 {!isFree && (
                   <li style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: THEME.textMuted }}>
                     <Check size={14} color={THEME.green} />
+                    <span>Wholesale leads + skip trace</span>
+                  </li>
+                )}
+                {!isFree && (
+                  <li style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: THEME.textMuted }}>
+                    <Check size={14} color={THEME.green} />
+                    <span>AI inspection summaries (PDF/Excel/Word export)</span>
+                  </li>
+                )}
+                {!isFree && (
+                  <li style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: THEME.textMuted }}>
+                    <Check size={14} color={THEME.green} />
                     <span>Cancel anytime</span>
                   </li>
                 )}
