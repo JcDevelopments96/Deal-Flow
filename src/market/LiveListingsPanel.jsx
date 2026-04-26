@@ -339,7 +339,35 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
     if (!keys[providerId]) setShowKeyInput(true);
   };
 
-  if (!selectedState) return null;
+  // Pre-state empty state — used to be `return null`, but the parent
+  // now keeps the side-by-side map+listings layout permanent. Render
+  // a clear "pick a state" placeholder so the listings column never
+  // collapses to nothing on first load.
+  if (!selectedState) {
+    return (
+      <Panel
+        title="Live Listings"
+        icon={<Home size={16} />}
+        accent
+        style={{ marginBottom: 24 }}
+      >
+        <div style={{
+          padding: "40px 20px", textAlign: "center",
+          background: THEME.bgPanel, borderRadius: 8,
+          border: `1px dashed ${THEME.border}`
+        }}>
+          <Home size={28} color={THEME.textDim} style={{ marginBottom: 10 }} />
+          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>
+            Pick a state to load listings
+          </div>
+          <div style={{ fontSize: 12, color: THEME.textMuted, lineHeight: 1.5, maxWidth: 340, margin: "0 auto" }}>
+            Use the State filter above, or click any state on the map to drill in.
+            Up to 600 active listings load per query.
+          </div>
+        </div>
+      </Panel>
+    );
+  }
 
   return (
     <Panel
