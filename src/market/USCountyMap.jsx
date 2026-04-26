@@ -10,7 +10,8 @@ import { RotateCcw, ArrowLeft } from "lucide-react";
 import { THEME } from "../theme.js";
 import {
   STATE_FIPS_BY_CODE, STATE_CODE_BY_FIPS, STATE_NAMES, STATE_MAP_VIEW,
-  COUNTIES_TOPOJSON, STATES_TOPOJSON, MAJOR_CITY_LABELS,
+  COUNTIES_TOPOJSON, STATES_TOPOJSON, NATION_TOPOJSON, MAJOR_CITY_LABELS,
+  MAP_PALETTE,
   normalizeCountyName, scoreToHeatFill, scoreToHeatStroke, scoreToT,
   HEAT_SCALE_MIN, HEAT_SCALE_MAX
 } from "./mapUtils.js";
@@ -203,7 +204,11 @@ export const USCountyMap = ({
   return (
     <div>
       <div style={{
-        background: THEME.bgInput,
+        // Water-blue canvas — areas not covered by a land polygon (oceans
+        // outside the country, the Great Lakes carved out as holes in the
+        // nation polygon) render through to this color, giving the map an
+        // atlas-like read instead of a stark white background.
+        background: MAP_PALETTE.water,
         border: `1px solid ${THEME.border}`,
         borderRadius: 6,
         padding: 12,
@@ -212,7 +217,8 @@ export const USCountyMap = ({
       }}>
         <ComposableMap
           projection="geoAlbersUsa"
-          style={{ width: "100%", height: "auto", maxHeight: 480, display: "block" }}
+          style={{ width: "100%", height: "auto", maxHeight: 480, display: "block",
+                   background: MAP_PALETTE.water }}
         >
           <ZoomableGroup
             center={view.center}
@@ -220,6 +226,31 @@ export const USCountyMap = ({
             minZoom={1}
             maxZoom={12}
           >
+            {/* Land base layer — single-polygon US outline rendered FIRST so
+                anywhere without a heat fill still reads as land, not as
+                blank canvas. The Great Lakes are carved out of this
+                polygon as holes, so they show through to the water color
+                automatically. Country borders get a soft stroke for
+                definition. */}
+            <Geographies geography={NATION_TOPOJSON}>
+              {({ geographies }) =>
+                geographies.map(geo => (
+                  <Geography
+                    key={geo.rsmKey}
+                    geography={geo}
+                    fill={MAP_PALETTE.land}
+                    stroke={MAP_PALETTE.landStroke}
+                    strokeWidth={0.6}
+                    style={{
+                      default: { outline: "none" },
+                      hover:   { outline: "none", fill: MAP_PALETTE.land },
+                      pressed: { outline: "none" }
+                    }}
+                  />
+                ))
+              }
+            </Geographies>
+
             {/* National view: 50 state polygons. Cleaner first impression
                 than 3,000+ counties, and clicking a state drills in to
                 the county-level render below. Only renders when no
@@ -232,9 +263,12 @@ export const USCountyMap = ({
                     const sf = String(geo.id || "").padStart(2, "0");
                     const stateCode = STATE_CODE_BY_FIPS[sf];
                     const heat = stateHeat.get(sf);
-                    const fill   = heat ? scoreToHeatFill(heat.t)   : THEME.bgPanel;
-                    const stroke = heat ? scoreToHeatStroke(heat.t) : THEME.border;
-                    const opacity = heat ? 0.88 : 0.85;
+                    // Transparent fill when no heat data so the underlying
+                    // land base shows through (instead of painting over it
+                    // with a flat grey rectangle that hides the atlas feel).
+                    const fill   = heat ? scoreToHeatFill(heat.t)   : "transparent";
+                    const stroke = heat ? scoreToHeatStroke(heat.t) : MAP_PALETTE.landStroke;
+                    const opacity = heat ? 0.78 : 1;
                     return (
                       <Geography
                         key={geo.rsmKey}
@@ -316,10 +350,13 @@ export const USCountyMap = ({
                   // inconsistent, misleading map where a handful of
                   // counties had strong color and everything else was gray.
                   // Nationwide ZHVI coverage replaces it.
-                  let fill = THEME.bgPanel;           // neutral gray, not yellow
-                  let stroke = THEME.border;
-                  let strokeWidth = 0.4;
-                  let opacity = 0.9;
+                  // Transparent default — the land base layer shows through
+                  // for counties without heat/live data, keeping the atlas
+                  // feel even in dense state views.
+                  let fill = "transparent";
+                  let stroke = MAP_PALETTE.landStroke;
+                  let strokeWidth = 0.35;
+                  let opacity = 1;
 
                   if (isInSelectedState && !liveHeat && !staticHeat) {
                     fill = THEME.bgTeal;

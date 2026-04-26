@@ -79,6 +79,21 @@ export const COUNTIES_TOPOJSON = "https://cdn.jsdelivr.net/npm/us-atlas@3/counti
 // counties file, ~50 features instead of ~3,144 so it renders nearly
 // instantly on mobile.
 export const STATES_TOPOJSON   = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json";
+// Single-polygon country outline. Used as a "land" base layer so areas
+// without a heat fill still read as land, not blank canvas. Areas
+// OUTSIDE this polygon are ocean (rendered as the SVG background); the
+// Great Lakes are carved out as holes so they automatically appear in
+// the water color too.
+export const NATION_TOPOJSON   = "https://cdn.jsdelivr.net/npm/us-atlas@3/nation-10m.json";
+
+// Map palette tuned for legibility on the choropleth. Water is a soft
+// sky blue (matches a typical print atlas), land is a warm beige, and
+// borders are a desaturated navy so heat fills pop on top.
+export const MAP_PALETTE = {
+  water: "#CFE5F2",    // ocean + Great Lakes
+  land:  "#F4EEE2",    // base land color where no heat fill applies
+  landStroke: "#C7BFB1"
+};
 
 export const normalizeCountyName = (name) =>
   (name || "").toLowerCase().replace(/\s+county$/i, "").trim();

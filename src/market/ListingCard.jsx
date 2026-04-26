@@ -3,7 +3,7 @@
    overlays (watchlist star, photo count, demo badge), then price + inline
    stats + address + actions below.
    ============================================================================ */
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Building2, Camera, ChevronLeft, ChevronRight, ExternalLink, Star, Plus, TrendingUp, TrendingDown } from "lucide-react";
 import { THEME } from "../theme.js";
 import { fmtUSD } from "../utils.js";
@@ -28,22 +28,45 @@ export const ListingImage = ({ photos, url, demo, photoCount, streetviewUrl, sat
       ? [url]
       : [];
   // Realtor's v3/list endpoint only returns the primary photo, so most
-  // cards arrive with 1 image plus a `photoCount` like 23 telling us
-  // more exist. We lazy-fetch the full gallery on the FIRST arrow click —
-  // each card pays a detail-API call only when the user actually wants
-  // to scroll, never proactively for all cards on screen.
+  // cards arrive with 1 image plus a `photoCount` like 23. We auto-fetch
+  // the full gallery whenever the card scrolls into the viewport using
+  // an IntersectionObserver — by the time the user is looking at the
+  // card, the photos are already loaded (or actively loading). Off-screen
+  // cards never burn a detail API call. Server-side cache (24h per id)
+  // means rapid back-and-forth scrolling doesn't multiply upstream cost.
   const saas = useSaasUser();
   const saasOn = isSaasMode();
   const canLazyLoad = saasOn && !!listingId && photoCount > seedUrls.length;
   const [extraPhotos, setExtraPhotos] = useState([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadAttempted, setLoadAttempted] = useState(false);
+  const containerRef = useRef(null);
   const urls = useMemo(() => {
     if (extraPhotos.length === 0) return seedUrls;
     const merged = [...seedUrls];
     for (const p of extraPhotos) if (!merged.includes(p)) merged.push(p);
     return merged;
   }, [seedUrls, extraPhotos]);
+
+  // Auto-prefetch the full gallery when the card becomes visible. Uses
+  // a 200px rootMargin so the fetch fires slightly before the card
+  // actually scrolls into view — gallery is usually ready by the time
+  // the user gets there.
+  useEffect(() => {
+    if (!canLazyLoad || loadAttempted || !containerRef.current) return;
+    if (typeof IntersectionObserver === "undefined") return; // SSR / very old browser
+
+    const el = containerRef.current;
+    const io = new IntersectionObserver((entries) => {
+      const visible = entries.some(e => e.isIntersecting);
+      if (!visible) return;
+      io.disconnect();
+      ensureFullGallery();
+    }, { rootMargin: "200px 0px", threshold: 0.01 });
+    io.observe(el);
+    return () => io.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canLazyLoad, loadAttempted, listingId]);
 
   // View modes: "photos" (MLS carousel) | "street" (Google Street View) | "aerial" (Satellite).
   // Only show toggle pills for modes we actually have URLs for.
@@ -110,7 +133,7 @@ export const ListingImage = ({ photos, url, demo, photoCount, streetviewUrl, sat
   };
 
   return (
-    <div style={{
+    <div ref={containerRef} style={{
       position: "relative",
       width: "100%",
       aspectRatio: "4 / 3",
