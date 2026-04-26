@@ -154,7 +154,7 @@ export const HomeView = ({ onChangeView, onNewDeal, onOpenCalculator }) => {
           <FeatureCard
             icon={<FileText size={20} />}
             title="AI Inspection Summaries"
-            desc="Drop in any home-inspection PDF — Claude reads it cover-to-cover and returns urgent issues, immediate repairs, recommended maintenance, and rough cost estimates. Export to PDF / Excel / Word."
+            desc="Drop in any home-inspection PDF — our AI reads it cover-to-cover and returns urgent issues, immediate repairs, recommended maintenance, and rough cost estimates. Export to PDF / Excel / Word."
             cta="Try the inspector"
             onClick={() => onChangeView("inspections")}
             accent="#DC2626"
@@ -185,7 +185,7 @@ export const HomeView = ({ onChangeView, onNewDeal, onOpenCalculator }) => {
           <FeatureCard
             icon={<MessageSquare size={20} />}
             title="Ari AI Assistant"
-            desc="Ask anything about a market, a strategy, or a specific deal. Powered by Claude with web search — gets you current data, not training-set answers from years ago."
+            desc="Ask anything about a market, a strategy, or a specific deal. AI-powered with live web search — gets you current data, not training-set answers from years ago."
             cta=""
             onClick={null}
             accent="#F97316"

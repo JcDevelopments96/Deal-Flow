@@ -179,9 +179,9 @@ Rules:
   if (!upstream.ok) {
     const text = await upstream.text().catch(() => "");
     await db.from("inspections")
-      .update({ status: "failed", error_message: `Claude ${upstream.status}: ${text.slice(0, 200)}` })
+      .update({ status: "failed", error_message: `AI provider ${upstream.status}: ${text.slice(0, 200)}` })
       .eq("id", inspectionId);
-    throw new ApiError(502, "claude_error", `Claude API ${upstream.status}: ${text.slice(0, 300)}`);
+    throw new ApiError(502, "ai_provider_error", `AI summarizer returned ${upstream.status}. Try again in a moment.`);
   }
 
   const apiResp = await upstream.json();
@@ -198,10 +198,10 @@ Rules:
     summary = JSON.parse(cleaned);
   } catch {
     await db.from("inspections")
-      .update({ status: "failed", error_message: "Claude returned non-JSON output" })
+      .update({ status: "failed", error_message: "AI returned non-JSON output" })
       .eq("id", inspectionId);
-    throw new ApiError(502, "claude_bad_json",
-      "Claude's response wasn't valid JSON. Try uploading again.");
+    throw new ApiError(502, "ai_bad_json",
+      "The AI summary wasn't formatted correctly. Try uploading again.");
   }
 
   await db.from("inspections")
