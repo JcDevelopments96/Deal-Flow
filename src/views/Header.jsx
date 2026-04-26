@@ -14,7 +14,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   Building2, Layout, Calculator, MapPin, Star, GraduationCap, Plus, Lock,
-  Users, CreditCard, Crown, ChevronDown, Search, Shield
+  Users, CreditCard, Crown, ChevronDown, Search, Shield, Home
 } from "lucide-react";
 import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/react";
 import { THEME } from "../theme.js";
@@ -182,12 +182,13 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
   );
   const wholesaleLocked = isSaasMode() && (!saas.user || usage?.plan === "free");
 
-  // Primary destinations — concrete nouns, no jargon. Team got promoted
-  // from More on the strength of the new Find Local Pros + reviews flow;
-  // Watchlist stays visible (the count badge is a useful "unfinished
-  // work" nudge) but moves to the end so Team sits next to the
-  // discovery flow it pairs with.
+  // Primary destinations — concrete nouns, no jargon. Home is the
+  // explanatory landing page that orients new users; Deals (the deal
+  // pipeline / analyzer hub) sits second since it's the hands-on
+  // workspace returning users want most. Team got promoted from More
+  // on the strength of the new Find Local Pros + reviews flow.
   const primary = [
+    { key: "home",      label: "Home",            icon: <Home size={14} /> },
     { key: "dashboard", label: "Deals",           icon: <Layout size={14} /> },
     { key: "market",    label: "Find Properties", icon: <Search size={14} />, locked: marketLocked },
     { key: "wholesale", label: "Wholesale",       icon: <Crown size={14} />,  locked: wholesaleLocked },
@@ -233,7 +234,7 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
         {/* Brand — wordmark only, no subtitle. The tagline added clutter
             without adding information for returning users. */}
         <button
-          onClick={() => onChangeView("dashboard")}
+          onClick={() => onChangeView("home")}
           style={{ display: "flex", alignItems: "center", gap: 12, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
           aria-label="DealTrack — home"
         >

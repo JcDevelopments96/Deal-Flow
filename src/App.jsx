@@ -30,6 +30,7 @@ import { TeamView } from "./views/TeamView.jsx";
 import { PlansView } from "./views/PlansView.jsx";
 import { WholesaleView } from "./views/WholesaleView.jsx";
 import { TermsView } from "./views/TermsView.jsx";
+import { HomeView } from "./views/HomeView.jsx";
 import { Analyzer } from "./analyzer/Analyzer.jsx";
 import { AdvancedMarketIntel } from "./market/AdvancedMarketIntel.jsx";
 import { ErrorBoundary } from "./ErrorBoundary.jsx";
@@ -48,7 +49,7 @@ import { MortgageCalculatorModal } from "./modals/MortgageCalculatorModal.jsx";
 function BRRRRTrackerInner() {
   const toast = useToast();
   const [deals, setDeals] = useState([]);
-  const [view, setView] = useState("dashboard");
+  const [view, setView] = useState("home");
   const [activeDealId, setActiveDealId] = useState(null);
   const [draftDeal, setDraftDeal] = useState(null);
   const [isDraftDirty, setIsDraftDirty] = useState(false);
@@ -488,6 +489,14 @@ function BRRRRTrackerInner() {
       {view === "education" && <EducationCenter />}
 
       {view === "terms" && <TermsView />}
+
+      {view === "home" && (
+        <HomeView
+          onChangeView={handleChangeView}
+          onNewDeal={handleNewDeal}
+          onOpenCalculator={() => setShowCalculator(true)}
+        />
+      )}
 
       {showTemplatePicker && (
         <TemplatePicker
