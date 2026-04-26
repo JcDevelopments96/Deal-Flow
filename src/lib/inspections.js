@@ -46,6 +46,14 @@ export async function listInspections(getToken, { context, contextId }) {
   return body.inspections || [];
 }
 
+// All inspections for the signed-in user across every context (deal,
+// watchlist, standalone). Used by the dedicated Inspections page so the
+// user can see their full history at a glance.
+export async function listAllInspections(getToken) {
+  const body = await fetchMetered(getToken, "/api/inspection");
+  return body.inspections || [];
+}
+
 export async function fetchInspection(getToken, id) {
   const qs = new URLSearchParams({ id: String(id) });
   const body = await fetchMetered(getToken, `/api/inspection?${qs.toString()}`);

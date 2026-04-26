@@ -18,6 +18,7 @@ import { THEME } from "../theme.js";
 import { Panel } from "../primitives.jsx";
 import { useToast } from "../contexts.jsx";
 import { isSaasMode, useSaasUser } from "../lib/saas.js";
+import { Crown } from "lucide-react";
 import {
   mintInspectionUploadUrl, uploadInspectionFile, summarizeInspection,
   listInspections, deleteInspection
@@ -296,6 +297,9 @@ export const InspectionPanel = ({ context, contextId, propertyAddress }) => {
       // Reload to pick up the canonical row + summary
       await load();
       toast.push("Inspection summary ready", "success");
+      // Notify any cross-context listeners (the standalone Inspections
+      // page rebuilds its grouped history when this fires).
+      try { window.dispatchEvent(new Event("inspections:changed")); } catch {}
     } catch (e) {
       toast.push(e.message || "Upload failed", "error");
       await load(); // surface whatever state landed
@@ -311,6 +315,7 @@ export const InspectionPanel = ({ context, contextId, propertyAddress }) => {
       await deleteInspection(saas.getToken, inspection.id);
       setInspections(prev => prev.filter(i => i.id !== inspection.id));
       toast.push("Inspection deleted", "info");
+      try { window.dispatchEvent(new Event("inspections:changed")); } catch {}
     } catch (e) { toast.push(e.message || "Delete failed", "error"); }
   };
 
@@ -327,6 +332,39 @@ export const InspectionPanel = ({ context, contextId, propertyAddress }) => {
       <Panel title="Inspection Reports" icon={<FileText size={16} />}>
         <div style={{ padding: 20, textAlign: "center", color: THEME.textMuted, fontSize: 13 }}>
           Sign in to upload inspection reports.
+        </div>
+      </Panel>
+    );
+  }
+
+  // Paid-plan gate. Mirrors server-side requirePaidPlan() — read-only
+  // history (already-uploaded inspections) stays visible if the user
+  // had a paid plan in the past, but the upload form is locked.
+  const planKey = saas.usage?.plan;
+  const isPaid = planKey && planKey !== "free";
+  if (!isPaid) {
+    return (
+      <Panel title="Inspection Reports" icon={<FileText size={16} />} accent>
+        <div style={{
+          padding: "28px 20px", textAlign: "center",
+          background: THEME.bgTeal, border: `1px solid ${THEME.teal}`, borderRadius: 10
+        }}>
+          <Crown size={28} color={THEME.accent} style={{ marginBottom: 10 }} />
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>
+            AI Inspection Summaries — paid feature
+          </div>
+          <p style={{ fontSize: 12, color: THEME.textMuted, maxWidth: 460, margin: "0 auto 14px", lineHeight: 1.55 }}>
+            Upload any home-inspection PDF and Claude reads it cover-to-cover —
+            urgent issues, immediate repairs, recommended maintenance, and rough
+            cost estimates. Export the summary to PDF, Excel, or Word.
+            Included on Starter, Pro, and Scale.
+          </p>
+          <button
+            onClick={() => { try { window.location.hash = "#plans"; } catch {} }}
+            className="btn-primary"
+            style={{ padding: "9px 16px", fontSize: 12 }}>
+            <Crown size={13} /> See plans
+          </button>
         </div>
       </Panel>
     );

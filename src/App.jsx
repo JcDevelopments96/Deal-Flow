@@ -31,6 +31,7 @@ import { PlansView } from "./views/PlansView.jsx";
 import { WholesaleView } from "./views/WholesaleView.jsx";
 import { TermsView } from "./views/TermsView.jsx";
 import { HomeView } from "./views/HomeView.jsx";
+import { InspectionsView } from "./views/InspectionsView.jsx";
 import { Analyzer } from "./analyzer/Analyzer.jsx";
 import { AdvancedMarketIntel } from "./market/AdvancedMarketIntel.jsx";
 import { ErrorBoundary } from "./ErrorBoundary.jsx";
@@ -496,6 +497,10 @@ function BRRRRTrackerInner() {
           onNewDeal={handleNewDeal}
           onOpenCalculator={() => setShowCalculator(true)}
         />
+      )}
+
+      {view === "inspections" && (
+        <InspectionsView onChangeView={handleChangeView} />
       )}
 
       {showTemplatePicker && (

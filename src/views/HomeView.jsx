@@ -7,7 +7,7 @@
 import React from "react";
 import {
   Search, Crown, Calculator, Star, Users, MessageSquare, Layout,
-  Building2, MapPin, Sparkles, ArrowRight, Database
+  Building2, MapPin, Sparkles, ArrowRight, Database, FileText
 } from "lucide-react";
 import { THEME } from "../theme.js";
 import { isMobile } from "../utils.js";
@@ -150,6 +150,14 @@ export const HomeView = ({ onChangeView, onNewDeal, onOpenCalculator }) => {
             cta="Hunt off-market deals"
             onClick={() => onChangeView("wholesale")}
             accent="#9333EA"
+          />
+          <FeatureCard
+            icon={<FileText size={20} />}
+            title="AI Inspection Summaries"
+            desc="Drop in any home-inspection PDF — Claude reads it cover-to-cover and returns urgent issues, immediate repairs, recommended maintenance, and rough cost estimates. Export to PDF / Excel / Word."
+            cta="Try the inspector"
+            onClick={() => onChangeView("inspections")}
+            accent="#DC2626"
           />
           <FeatureCard
             icon={<Calculator size={20} />}

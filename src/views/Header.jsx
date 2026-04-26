@@ -14,7 +14,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   Building2, Layout, Calculator, MapPin, Star, GraduationCap, Plus, Lock,
-  Users, CreditCard, Crown, ChevronDown, Search, Shield, Home
+  Users, CreditCard, Crown, ChevronDown, Search, Shield, Home, FileText
 } from "lucide-react";
 import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/react";
 import { THEME } from "../theme.js";
@@ -180,7 +180,8 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
   const marketLocked = isSaasMode() && (
     !saas.user || (usage?.plan === "free" && (usage?.remaining ?? 0) === 0)
   );
-  const wholesaleLocked = isSaasMode() && (!saas.user || usage?.plan === "free");
+  const wholesaleLocked  = isSaasMode() && (!saas.user || usage?.plan === "free");
+  const inspectionLocked = isSaasMode() && (!saas.user || usage?.plan === "free");
 
   // Primary destinations — concrete nouns, no jargon. Home is the
   // explanatory landing page that orients new users; Deals (the deal
@@ -188,26 +189,26 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
   // workspace returning users want most. Team got promoted from More
   // on the strength of the new Find Local Pros + reviews flow.
   const primary = [
-    { key: "home",      label: "Home",            icon: <Home size={14} /> },
-    { key: "dashboard", label: "Deals",           icon: <Layout size={14} /> },
-    { key: "market",    label: "Find Properties", icon: <Search size={14} />, locked: marketLocked },
-    { key: "wholesale", label: "Wholesale",       icon: <Crown size={14} />,  locked: wholesaleLocked },
-    { key: "team",      label: "Team",            icon: <Users size={14} /> },
-    { key: "watchlist", label: "Watchlist",       icon: <Star size={14} /> }
+    { key: "home",        label: "Home",            icon: <Home size={14} /> },
+    { key: "dashboard",   label: "Deals",           icon: <Layout size={14} /> },
+    { key: "market",      label: "Find Properties", icon: <Search size={14} />,    locked: marketLocked },
+    { key: "wholesale",   label: "Wholesale",       icon: <Crown size={14} />,     locked: wholesaleLocked },
+    { key: "inspections", label: "Inspections",     icon: <FileText size={14} />,  locked: inspectionLocked },
+    { key: "team",        label: "Team",            icon: <Users size={14} /> },
+    { key: "watchlist",   label: "Watchlist",       icon: <Star size={14} /> }
   ];
 
-  // Secondary — Learn + Plans + the mortgage Calculator (a tool, not a
-  // destination, so it doesn't deserve top-bar real estate). Terms sits
-  // here too so it's reachable from any view, satisfying the "ToS must
-  // be discoverable" baseline without taking footer real estate.
+  // Secondary — Inspections (one-off PDF analyzer) + Learn + Plans +
+  // the mortgage Calculator (a tool, not a destination). Terms sits
+  // here too so it's reachable from any view.
   const secondary = [
-    { key: "education", label: "Learn",       icon: <GraduationCap size={14} /> },
-    { key: "plans",     label: "Plans",       icon: <CreditCard size={14} /> },
+    { key: "education",   label: "Learn",       icon: <GraduationCap size={14} /> },
+    { key: "plans",       label: "Plans",       icon: <CreditCard size={14} /> },
     ...(onOpenCalculator ? [{
       key: "__calculator", label: "Calculator", icon: <Calculator size={14} />,
       __action: onOpenCalculator
     }] : []),
-    { key: "terms",     label: "Terms",       icon: <Shield size={14} /> }
+    { key: "terms",       label: "Terms",       icon: <Shield size={14} /> }
   ];
 
   // MoreMenu picks call onChangeView for nav items — but the calculator

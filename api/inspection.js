@@ -20,8 +20,22 @@
 import { handler, ApiError } from "./_lib/errors.js";
 import { requireUserId } from "./_lib/auth.js";
 import { adminDb, ensureUser } from "./_lib/db.js";
+import { planFor } from "./_lib/plans.js";
 
 const BUCKET = "inspections";
+
+// Inspection AI summaries hit Anthropic per-PDF (~$0.05-0.20/call) so
+// the upload + summarize path is gated to paid plans. Read paths (list,
+// fetch, delete) stay open for everyone — a free user who upgraded,
+// downgraded, then upgraded again can still see/manage their history.
+const PAID_PLANS = new Set(["starter", "pro", "scale"]);
+function requirePaidPlan(user) {
+  const plan = planFor(user.plan);
+  if (!PAID_PLANS.has(plan.key)) {
+    throw new ApiError(403, "upgrade_required",
+      "Inspection AI summaries are a paid feature — available on Starter, Pro, and Scale.");
+  }
+}
 
 function parseBody(req) {
   return req.body && typeof req.body === "object"
@@ -29,7 +43,7 @@ function parseBody(req) {
     : (typeof req.body === "string" ? JSON.parse(req.body || "{}") : {});
 }
 
-const VALID_CONTEXTS = new Set(["deal", "watchlist"]);
+const VALID_CONTEXTS = new Set(["deal", "watchlist", "standalone"]);
 
 /* ── Mint a signed upload URL ─────────────────────────────────────────── */
 async function handleUploadUrl(body, user) {
@@ -219,8 +233,19 @@ async function handleList(req, user) {
     return { inspection: { ...data, fileUrl: dl?.signedUrl || null } };
   }
 
+  // No context+id → return ALL of the user's inspections, every context.
+  // Used by the standalone Inspections page so the user can see the full
+  // history at a glance grouped by where each was uploaded from.
+  if (!context && !contextId) {
+    const { data, error } = await db
+      .from("inspections").select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+    if (error) throw new ApiError(500, "db_read_failed", error.message);
+    return { inspections: data || [] };
+  }
   if (!context || !contextId) {
-    throw new ApiError(400, "missing_params", "context + contextId required (or pass id=)");
+    throw new ApiError(400, "missing_params", "context + contextId required (or pass id=, or omit both for all-inspections)");
   }
   if (!VALID_CONTEXTS.has(context)) throw new ApiError(400, "bad_context");
   const { data, error } = await db
@@ -264,6 +289,9 @@ export default handler(async (req, res) => {
   } else if (req.method === "DELETE") {
     payload = await handleDelete(req, user);
   } else if (req.method === "POST") {
+    // Both upload-url and summarize touch the paid Anthropic / Storage
+    // pipeline — gate before doing any work.
+    requirePaidPlan(user);
     if (action === "upload-url") payload = await handleUploadUrl(body, user);
     else if (action === "summarize") payload = await handleSummarize(body, user);
     else throw new ApiError(400, "unknown_action", "POST action must be upload-url or summarize");
