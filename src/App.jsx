@@ -524,8 +524,8 @@ function BRRRRTrackerInner() {
         display: "flex", justifyContent: "space-between", alignItems: "center",
         fontSize: 11, color: THEME.textMuted, flexWrap: "wrap", gap: 8
       }}>
-        <div>DealTrack v3.0 Professional</div>
-        <div>© 2026 DealTrack</div>
+        <div>Deal Docket v3.0 Professional</div>
+        <div>© 2026 Deal Docket</div>
       </div>
 
       {/* Ari — Claude-powered floating chat assistant. Always mounted; the

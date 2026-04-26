@@ -323,7 +323,7 @@ async function handleEmail({ leadId, subject, body }, user) {
     "This lead has no email yet — run a skip trace first.");
 
   // CAN-SPAM compliance: footer with physical address + unsubscribe hint
-  const footerText = `\n\n---\nSent by ${user.email || "a DealTrack user"} via DealTrack. Reply STOP or do not respond to opt out.`;
+  const footerText = `\n\n---\nSent by ${user.email || "a Deal Docket user"} via Deal Docket. Reply STOP or do not respond to opt out.`;
   const textBody = body + footerText;
 
   const resp = await fetch("https://api.resend.com/emails", {

@@ -147,7 +147,7 @@ export function exportInspectionPDF(inspection) {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(140);
-    doc.text(`DealTrack Inspection Summary — page ${i} of ${totalPages}`, margin, pageHeight - 24);
+    doc.text(`Deal Docket Inspection Summary — page ${i} of ${totalPages}`, margin, pageHeight - 24);
   }
 
   doc.save(inspectionFilename(inspection, "pdf"));
@@ -158,7 +158,7 @@ export function exportInspectionPDF(inspection) {
 export async function exportInspectionExcel(inspection) {
   const summary = inspection.summary || {};
   const wb = new ExcelJS.Workbook();
-  wb.creator = "DealTrack";
+  wb.creator = "Deal Docket";
   wb.created = new Date();
 
   // Sheet 1: Summary

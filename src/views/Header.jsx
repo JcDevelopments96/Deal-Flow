@@ -236,7 +236,7 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
         <button
           onClick={() => onChangeView("home")}
           style={{ display: "flex", alignItems: "center", gap: 12, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
-          aria-label="DealTrack — home"
+          aria-label="Deal Docket — home"
         >
           <div style={{
             width: 34, height: 34, borderRadius: 8,
@@ -247,7 +247,7 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
           </div>
           {!isMobile() && (
             <div className="serif" style={{ fontSize: 21, fontWeight: 700, lineHeight: 1, color: "#FFFFFF" }}>
-              DealTrack
+              Deal Docket
             </div>
           )}
         </button>

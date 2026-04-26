@@ -108,7 +108,7 @@ export const HomeView = ({ onChangeView, onNewDeal, onOpenCalculator }) => {
           fontSize: isMobile() ? 14 : 16, color: THEME.textMuted,
           maxWidth: 640, margin: "16px auto 0", lineHeight: 1.55
         }}>
-          DealTrack pulls together everything an investor needs in one place — live MLS listings, off-market wholesale leads, a county-level market map, deal analysis, and a vetted local-pro directory. No more juggling six tabs.
+          Deal Docket pulls together everything an investor needs in one place — live MLS listings, off-market wholesale leads, a county-level market map, deal analysis, and a vetted local-pro directory. No more juggling six tabs.
         </p>
         <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 24, flexWrap: "wrap" }}>
           <button
@@ -213,7 +213,7 @@ export const HomeView = ({ onChangeView, onNewDeal, onOpenCalculator }) => {
       {/* DATA SOURCES ─────────────────────────────────────────────────── */}
       <Panel title="Powered by trusted data" icon={<Database size={16} />} style={{ marginBottom: 36 }}>
         <p style={{ fontSize: 13, color: THEME.textMuted, lineHeight: 1.6, marginTop: 0 }}>
-          DealTrack stitches together best-in-class data sources so the numbers you see are the real numbers, not estimates from a single API:
+          Deal Docket stitches together best-in-class data sources so the numbers you see are the real numbers, not estimates from a single API:
         </p>
         <div style={{
           display: "grid",

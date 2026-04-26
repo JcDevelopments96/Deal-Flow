@@ -47,7 +47,7 @@ export const MarketIntelRibbon = () => {
   const copy = isSignedOut
     ? {
         eyebrow: "Paid feature",
-        title: "Market Intel is a DealTrack subscription feature",
+        title: "Market Intel is a Deal Docket subscription feature",
         body: "Sign in or create an account at the top of the page, then pick a plan to unlock live MLS listings, rental comps, and map drill-down.",
         cta: null
       }
