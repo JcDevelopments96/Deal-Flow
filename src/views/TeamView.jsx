@@ -296,6 +296,17 @@ function ProReviewsModal({ pro, getToken, onClose, onAdd, alreadyAdded }) {
   const sources = pro.sources || ["google"];
   const isVerified = sources.length > 1;
 
+  // Merge the enriched contact info from Place Details / Yelp Business
+  // back onto the pro. Search results often arrive without phone, so the
+  // modal usually has BETTER contact info than the card we opened from.
+  const contact = reviews?.contact || {};
+  const enrichedPro = {
+    ...pro,
+    phone:   pro.phone   || contact.phone   || null,
+    website: pro.website || contact.website || null,
+    address: pro.address || contact.address || null
+  };
+
   return (
     <div role="dialog" aria-modal="true" onClick={onClose} style={{
       position: "fixed", inset: 0, background: "rgba(15,23,42,0.6)",
@@ -314,8 +325,8 @@ function ProReviewsModal({ pro, getToken, onClose, onAdd, alreadyAdded }) {
               <h2 className="serif" style={{ fontSize: 20, fontWeight: 700, margin: "0 0 4px" }}>
                 {pro.name}
               </h2>
-              {pro.address && (
-                <div style={{ fontSize: 12, color: THEME.textMuted, lineHeight: 1.4 }}>{pro.address}</div>
+              {enrichedPro.address && (
+                <div style={{ fontSize: 12, color: THEME.textMuted, lineHeight: 1.4 }}>{enrichedPro.address}</div>
               )}
             </div>
             <button onClick={onClose} aria-label="Close"
@@ -340,20 +351,56 @@ function ProReviewsModal({ pro, getToken, onClose, onAdd, alreadyAdded }) {
             )}
           </div>
 
+          {/* Contact info — inline phone + website strip. Only renders
+              once Place Details lands (or the search result already had
+              them). Tappable on mobile. */}
+          {(enrichedPro.phone || enrichedPro.website) && (
+            <div style={{
+              display: "flex", flexDirection: "column", gap: 4, marginTop: 12,
+              padding: "10px 12px", background: THEME.bgPanel,
+              border: `1px solid ${THEME.borderLight}`, borderRadius: 8
+            }}>
+              {enrichedPro.phone && (
+                <a href={`tel:${enrichedPro.phone}`}
+                  style={{ fontSize: 13, fontWeight: 600, color: THEME.accent, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <Phone size={12} /> {enrichedPro.phone}
+                </a>
+              )}
+              {enrichedPro.website && (
+                <a href={enrichedPro.website} target="_blank" rel="noopener noreferrer"
+                  style={{ fontSize: 13, fontWeight: 600, color: THEME.accent, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6, wordBreak: "break-all" }}>
+                  <Globe size={12} /> {enrichedPro.website.replace(/^https?:\/\//, "").slice(0, 50)}
+                </a>
+              )}
+            </div>
+          )}
+
+          {/* Hours — Google Place Details often returns a 7-line schedule */}
+          {Array.isArray(reviews?.contact?.hours) && reviews.contact.hours.length > 0 && (
+            <div style={{ marginTop: 10, fontSize: 11, color: THEME.textMuted, lineHeight: 1.6 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: THEME.textDim, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 4 }}>
+                Hours{reviews.contact.openNow != null ? (reviews.contact.openNow ? " · open now" : " · closed") : ""}
+              </div>
+              {reviews.contact.hours.map((line, i) => (
+                <div key={i}>{line}</div>
+              ))}
+            </div>
+          )}
+
           {/* Quick actions */}
           <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-            {pro.phone && (
-              <a href={`tel:${pro.phone}`} className="btn-secondary" style={{ padding: "6px 11px", fontSize: 11 }}>
+            {enrichedPro.phone && (
+              <a href={`tel:${enrichedPro.phone}`} className="btn-secondary" style={{ padding: "6px 11px", fontSize: 11 }}>
                 <Phone size={11} /> Call
               </a>
             )}
-            {pro.website && (
-              <a href={pro.website} target="_blank" rel="noopener noreferrer" className="btn-secondary" style={{ padding: "6px 11px", fontSize: 11 }}>
+            {enrichedPro.website && (
+              <a href={enrichedPro.website} target="_blank" rel="noopener noreferrer" className="btn-secondary" style={{ padding: "6px 11px", fontSize: 11 }}>
                 <Globe size={11} /> Website
               </a>
             )}
             <button
-              onClick={() => onAdd(pro)}
+              onClick={() => onAdd(enrichedPro)}
               disabled={alreadyAdded}
               className={alreadyAdded ? "btn-secondary" : "btn-primary"}
               style={{ padding: "6px 11px", fontSize: 11 }}>
