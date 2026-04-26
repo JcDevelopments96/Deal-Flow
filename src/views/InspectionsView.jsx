@@ -3,7 +3,7 @@
    of every inspection the user has ever uploaded (across deals, watchlist,
    and standalone). Reuses InspectionPanel for the upload+summary flow with
    context="standalone" so people who aren't analyzing a specific deal can
-   still get an AI summary of any inspection PDF.
+   still get an Ari-generated summary of any inspection PDF.
    ============================================================================ */
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { FileText, Layout, Star, Sparkles } from "lucide-react";
@@ -137,7 +137,7 @@ export const InspectionsView = ({ onChangeView }) => {
         <FileText size={32} color={THEME.textDim} style={{ marginBottom: 12 }} />
         <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Sign in to upload inspection reports</h2>
         <p style={{ fontSize: 13, color: THEME.textMuted }}>
-          Drop a PDF, get an AI summary with urgent issues, repairs, and cost estimates. Free to try.
+          Drop a PDF, Ari returns a summary with urgent issues, repairs, and cost estimates. Free to try.
         </p>
       </div>
     );
@@ -150,7 +150,7 @@ export const InspectionsView = ({ onChangeView }) => {
           Inspection Reports
         </h1>
         <p style={{ fontSize: 13, color: THEME.textMuted, margin: "4px 0 0", lineHeight: 1.55 }}>
-          Upload any home-inspection PDF for an AI summary — urgent issues, immediate repairs,
+          Upload any home-inspection PDF and Ari summarizes it — urgent issues, immediate repairs,
           recommendations, and rough cost estimates. Use this page for one-off reviews, or
           attach inspections to a specific deal in the Deal Analyzer / saved Watchlist item.
         </p>

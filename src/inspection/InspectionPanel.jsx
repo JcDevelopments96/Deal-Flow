@@ -354,7 +354,7 @@ export const InspectionPanel = ({ context, contextId, propertyAddress }) => {
             AI Inspection Summaries — paid feature
           </div>
           <p style={{ fontSize: 12, color: THEME.textMuted, maxWidth: 460, margin: "0 auto 14px", lineHeight: 1.55 }}>
-            Upload any home-inspection PDF and our AI reads it cover-to-cover —
+            Upload any home-inspection PDF and Ari reads it cover-to-cover —
             urgent issues, immediate repairs, recommended maintenance, and rough
             cost estimates. Export the summary to PDF, Excel, or Word.
             Included on Starter, Pro, and Scale.
@@ -389,7 +389,7 @@ export const InspectionPanel = ({ context, contextId, propertyAddress }) => {
         </div>
         <div style={{ fontSize: 12, color: THEME.textMuted, lineHeight: 1.5 }}>
           {uploading
-            ? "Hang tight — the AI summary takes 10-30 seconds."
+            ? "Hang tight — Ari takes 10-30 seconds to read the report."
             : "Drop in a home-inspection PDF (up to 32 MB). We'll generate a summary with urgent issues, recommended repairs, and rough cost estimates."}
         </div>
       </label>

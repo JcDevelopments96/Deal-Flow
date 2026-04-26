@@ -1,20 +1,21 @@
 /* ============================================================================
-   TOP NAVIGATION — brand + 4 primary tabs + "More" dropdown for secondary
-   pages + New Deal action + plan badge + auth slot.
+   TOP NAVIGATION — brand + 5 primary tabs + Tools dropdown + More dropdown
+   + New Deal action + plan badge + auth slot.
 
    Design intent:
    - Labels are concrete nouns (Deals, Find Properties, Wholesale, Watchlist),
      not abstract ones (Dashboard, Market Intel) — readable on first glance.
-   - Top bar holds 4 primary destinations + a single primary CTA. Everything
-     else (Team, Learn, Plans, Calculator) lives in the More menu so the bar
-     stays calm.
+   - Five primary tabs cover the day-to-day flow (find → evaluate → save).
+     Interactive utilities (Inspections, Team, Calculator) live under "Tools";
+     informational pages (Learn, Plans, Terms) live under "More". Splitting
+     the dropdown by *function* keeps the bar scannable as the app grows.
    - The user's current plan shows as a pill next to the avatar — a one-tap
      path to Plans/billing for paid users, an upgrade nudge for free users.
    ============================================================================ */
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Building2, Layout, Calculator, MapPin, Star, GraduationCap, Plus, Lock,
-  Users, CreditCard, Crown, ChevronDown, Search, Shield, Home, FileText
+  Building2, Layout, Calculator, Star, GraduationCap, Plus, Lock,
+  Users, CreditCard, Crown, ChevronDown, Search, Shield, Home, FileText, Sparkles
 } from "lucide-react";
 import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/react";
 import { THEME } from "../theme.js";
@@ -43,7 +44,7 @@ const AuthSlot = () => (
   </div>
 );
 
-/** A single nav button — same styling for primary tabs + items inside the More menu. */
+/** A single nav button — same styling for primary tabs + items inside dropdowns. */
 const NavButton = ({ tab, isActive, onClick, darkMode = true, watchlistCount }) => (
   <button
     onClick={onClick}
@@ -87,8 +88,10 @@ const NavButton = ({ tab, isActive, onClick, darkMode = true, watchlistCount }) 
   </button>
 );
 
-/** "More" dropdown — secondary destinations tucked away so the bar isn't noisy. */
-const MoreMenu = ({ items, activeView, onPick, watchlistCount }) => {
+/** Generic dropdown menu — used for both "Tools" (interactive features) and
+ * "More" (informational pages). Same shape, different `label` + contents,
+ * keeps the top bar from sprawling once the app picks up new features. */
+const DropdownMenu = ({ label, icon, items, activeView, onPick, watchlistCount }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -105,6 +108,7 @@ const MoreMenu = ({ items, activeView, onPick, watchlistCount }) => {
   }, [open]);
 
   const activeInside = items.some(i => i.key === activeView);
+  const hasLockedItem = items.some(i => i.locked);
 
   return (
     <div style={{ position: "relative" }} ref={ref}>
@@ -119,7 +123,9 @@ const MoreMenu = ({ items, activeView, onPick, watchlistCount }) => {
           display: "flex", alignItems: "center", gap: 5, cursor: "pointer"
         }}
       >
-        More
+        {icon}
+        {label}
+        {hasLockedItem && <Lock size={10} color={THEME.orange} aria-label="Some items require a paid plan" />}
         <ChevronDown size={14} style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }} />
       </button>
       {open && (
@@ -183,38 +189,41 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
   const wholesaleLocked  = isSaasMode() && (!saas.user || usage?.plan === "free");
   const inspectionLocked = isSaasMode() && (!saas.user || usage?.plan === "free");
 
-  // Primary destinations — concrete nouns, no jargon. Home is the
-  // explanatory landing page that orients new users; Deals (the deal
-  // pipeline / analyzer hub) sits second since it's the hands-on
-  // workspace returning users want most. Team got promoted from More
-  // on the strength of the new Find Local Pros + reviews flow.
+  // PRIMARY — five destinations the user reaches for daily. Anything
+  // beyond five and the bar starts to feel noisy. These are the shortest
+  // path to "find a property", "evaluate it", and "save what you like".
   const primary = [
     { key: "home",        label: "Home",            icon: <Home size={14} /> },
+    { key: "market",      label: "Find Properties", icon: <Search size={14} />, locked: marketLocked },
+    { key: "wholesale",   label: "Wholesale",       icon: <Crown size={14} />,  locked: wholesaleLocked },
     { key: "dashboard",   label: "Deals",           icon: <Layout size={14} /> },
-    { key: "market",      label: "Find Properties", icon: <Search size={14} />,    locked: marketLocked },
-    { key: "wholesale",   label: "Wholesale",       icon: <Crown size={14} />,     locked: wholesaleLocked },
-    { key: "inspections", label: "Inspections",     icon: <FileText size={14} />,  locked: inspectionLocked },
-    { key: "team",        label: "Team",            icon: <Users size={14} /> },
     { key: "watchlist",   label: "Watchlist",       icon: <Star size={14} /> }
   ];
 
-  // Secondary — Inspections (one-off PDF analyzer) + Learn + Plans +
-  // the mortgage Calculator (a tool, not a destination). Terms sits
-  // here too so it's reachable from any view.
-  const secondary = [
-    { key: "education",   label: "Learn",       icon: <GraduationCap size={14} /> },
-    { key: "plans",       label: "Plans",       icon: <CreditCard size={14} /> },
+  // TOOLS — interactive features that *do* something (analyze a PDF, look
+  // up local pros, run a payment calc). Distinct from "More" so users
+  // can scan the bar and find utilities without hunting through info pages.
+  const tools = [
+    { key: "inspections", label: "Inspections", icon: <FileText size={14} />, locked: inspectionLocked },
+    { key: "team",        label: "Team",        icon: <Users size={14} /> },
     ...(onOpenCalculator ? [{
       key: "__calculator", label: "Calculator", icon: <Calculator size={14} />,
       __action: onOpenCalculator
-    }] : []),
+    }] : [])
+  ];
+
+  // MORE — informational / account pages. Low-frequency stops that
+  // don't deserve top-bar real estate but still need a clear path.
+  const more = [
+    { key: "education",   label: "Learn",       icon: <GraduationCap size={14} /> },
+    { key: "plans",       label: "Plans",       icon: <CreditCard size={14} /> },
     { key: "terms",       label: "Terms",       icon: <Shield size={14} /> }
   ];
 
-  // MoreMenu picks call onChangeView for nav items — but the calculator
+  // Dropdown picks call onChangeView for nav items — but the calculator
   // entry is a tool, not a route. Intercept it.
-  const handleMorePick = (key) => {
-    const item = secondary.find(s => s.key === key);
+  const handleDropdownPick = (items) => (key) => {
+    const item = items.find(s => s.key === key);
     if (item?.__action) item.__action();
     else onChangeView(key);
   };
@@ -253,7 +262,7 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
           )}
         </button>
 
-        {/* Primary tabs + More dropdown + primary CTA + auth */}
+        {/* Primary tabs + Tools/More dropdowns + primary CTA + auth */}
         <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
           {primary.map(tab => (
             <NavButton
@@ -265,13 +274,27 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
               watchlistCount={watchlistCount}
             />
           ))}
-          <MoreMenu items={secondary} activeView={view} onPick={handleMorePick} watchlistCount={watchlistCount} />
+          <DropdownMenu
+            label="Tools"
+            icon={<Sparkles size={13} />}
+            items={tools}
+            activeView={view}
+            onPick={handleDropdownPick(tools)}
+            watchlistCount={watchlistCount}
+          />
+          <DropdownMenu
+            label="More"
+            items={more}
+            activeView={view}
+            onPick={handleDropdownPick(more)}
+            watchlistCount={watchlistCount}
+          />
 
           {/* Divider between nav + actions */}
           <div style={{ width: 1, height: 22, background: "rgba(255,255,255,0.18)", margin: "0 6px" }} aria-hidden="true" />
 
           {/* Single primary CTA — the most common action lives here, alone,
-              so it can't be missed. Calculator moved into More. */}
+              so it can't be missed. Calculator lives under Tools. */}
           <button className="btn-primary" onClick={onNewDeal} aria-label="New deal" style={{ padding: "7px 14px", fontSize: 12 }}>
             <Plus size={14} />
             {!isMobile() && "New Deal"}

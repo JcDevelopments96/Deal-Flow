@@ -33,7 +33,7 @@ function requirePaidPlan(user) {
   const plan = planFor(user.plan);
   if (!PAID_PLANS.has(plan.key)) {
     throw new ApiError(403, "upgrade_required",
-      "Inspection AI summaries are a paid feature — available on Starter, Pro, and Scale.");
+      "Ari's inspection summaries are a paid feature — available on Starter, Pro, and Scale.");
   }
 }
 
@@ -181,7 +181,7 @@ Rules:
     await db.from("inspections")
       .update({ status: "failed", error_message: `AI provider ${upstream.status}: ${text.slice(0, 200)}` })
       .eq("id", inspectionId);
-    throw new ApiError(502, "ai_provider_error", `AI summarizer returned ${upstream.status}. Try again in a moment.`);
+    throw new ApiError(502, "ai_provider_error", `Ari returned an error (${upstream.status}). Try again in a moment.`);
   }
 
   const apiResp = await upstream.json();
@@ -198,10 +198,10 @@ Rules:
     summary = JSON.parse(cleaned);
   } catch {
     await db.from("inspections")
-      .update({ status: "failed", error_message: "AI returned non-JSON output" })
+      .update({ status: "failed", error_message: "Ari returned non-JSON output" })
       .eq("id", inspectionId);
     throw new ApiError(502, "ai_bad_json",
-      "The AI summary wasn't formatted correctly. Try uploading again.");
+      "Ari's response wasn't formatted correctly. Try uploading again.");
   }
 
   await db.from("inspections")

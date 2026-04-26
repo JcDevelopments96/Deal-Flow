@@ -267,7 +267,7 @@ export const PlansView = () => {
                 {!isFree && (
                   <li style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: THEME.textMuted }}>
                     <Check size={14} color={THEME.green} />
-                    <span>AI inspection summaries (PDF/Excel/Word export)</span>
+                    <span>Ari inspection summaries (PDF/Excel/Word export)</span>
                   </li>
                 )}
                 {!isFree && (
