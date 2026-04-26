@@ -2,9 +2,15 @@
    UTILITIES — responsive helpers, number/currency formatting, deal metrics,
    and PDF export.
    ============================================================================ */
+import { jsPDF as jsPDFCtor } from "jspdf";
 
-// Safe PDF library access (avoids crash if script not loaded)
-export const getJsPDF = () => (typeof window !== "undefined" && window.jspdf && window.jspdf.jsPDF)
+// Backwards-compat: kept exported in case a stray caller still imports it.
+// Returns the npm-bundled jsPDF, or falls back to a window-scoped script
+// tag if someone added one. Used to ONLY check `window.jspdf` which broke
+// the export entirely once we switched to the npm import.
+export const getJsPDF = () =>
+  jsPDFCtor
+  || (typeof window !== "undefined" && window.jspdf && window.jspdf.jsPDF)
   || (typeof window !== "undefined" && window.jsPDF)
   || null;
 
