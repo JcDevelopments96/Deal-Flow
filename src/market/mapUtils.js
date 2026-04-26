@@ -83,6 +83,81 @@ export const STATES_TOPOJSON   = "https://cdn.jsdelivr.net/npm/us-atlas@3/states
 export const normalizeCountyName = (name) =>
   (name || "").toLowerCase().replace(/\s+county$/i, "").trim();
 
+// Curated metro labels for the map — drawn similarly to how Zillow shows
+// city names floating above the choropleth. `tier` controls visibility:
+//   1 = top-25 nationwide metros, always visible (national + state view)
+//   2 = mid-tier metros, only shown when zoomed into a state
+// `state` is the 2-letter code; lat/lng are best-known city center.
+export const MAJOR_CITY_LABELS = [
+  // Tier 1 — biggest metros, always visible
+  { name: "New York",      state: "NY", lat: 40.713, lng: -74.006, tier: 1 },
+  { name: "Los Angeles",   state: "CA", lat: 34.052, lng: -118.244, tier: 1 },
+  { name: "Chicago",       state: "IL", lat: 41.878, lng: -87.630, tier: 1 },
+  { name: "Houston",       state: "TX", lat: 29.760, lng: -95.369, tier: 1 },
+  { name: "Phoenix",       state: "AZ", lat: 33.448, lng: -112.074, tier: 1 },
+  { name: "Philadelphia",  state: "PA", lat: 39.953, lng: -75.165, tier: 1 },
+  { name: "San Antonio",   state: "TX", lat: 29.424, lng: -98.495, tier: 1 },
+  { name: "San Diego",     state: "CA", lat: 32.716, lng: -117.161, tier: 1 },
+  { name: "Dallas",        state: "TX", lat: 32.776, lng: -96.797, tier: 1 },
+  { name: "Austin",        state: "TX", lat: 30.267, lng: -97.743, tier: 1 },
+  { name: "Jacksonville",  state: "FL", lat: 30.332, lng: -81.656, tier: 1 },
+  { name: "Fort Worth",    state: "TX", lat: 32.756, lng: -97.331, tier: 1 },
+  { name: "Columbus",      state: "OH", lat: 39.961, lng: -82.999, tier: 1 },
+  { name: "Charlotte",     state: "NC", lat: 35.227, lng: -80.843, tier: 1 },
+  { name: "Indianapolis",  state: "IN", lat: 39.768, lng: -86.158, tier: 1 },
+  { name: "San Francisco", state: "CA", lat: 37.775, lng: -122.419, tier: 1 },
+  { name: "Seattle",       state: "WA", lat: 47.606, lng: -122.332, tier: 1 },
+  { name: "Denver",        state: "CO", lat: 39.739, lng: -104.990, tier: 1 },
+  { name: "Washington",    state: "DC", lat: 38.907, lng: -77.037, tier: 1 },
+  { name: "Boston",        state: "MA", lat: 42.360, lng: -71.058, tier: 1 },
+  { name: "Nashville",     state: "TN", lat: 36.163, lng: -86.781, tier: 1 },
+  { name: "Atlanta",       state: "GA", lat: 33.749, lng: -84.388, tier: 1 },
+  { name: "Miami",         state: "FL", lat: 25.762, lng: -80.192, tier: 1 },
+  { name: "Las Vegas",     state: "NV", lat: 36.170, lng: -115.140, tier: 1 },
+  { name: "Portland",      state: "OR", lat: 45.515, lng: -122.679, tier: 1 },
+  // Tier 2 — visible only inside a selected state
+  { name: "Tampa",         state: "FL", lat: 27.951, lng: -82.458, tier: 2 },
+  { name: "Orlando",       state: "FL", lat: 28.538, lng: -81.379, tier: 2 },
+  { name: "Sarasota",      state: "FL", lat: 27.336, lng: -82.531, tier: 2 },
+  { name: "Fort Myers",    state: "FL", lat: 26.640, lng: -81.872, tier: 2 },
+  { name: "Naples",        state: "FL", lat: 26.142, lng: -81.795, tier: 2 },
+  { name: "Tallahassee",   state: "FL", lat: 30.438, lng: -84.281, tier: 2 },
+  { name: "El Paso",       state: "TX", lat: 31.762, lng: -106.485, tier: 2 },
+  { name: "Sacramento",    state: "CA", lat: 38.582, lng: -121.494, tier: 2 },
+  { name: "San Jose",      state: "CA", lat: 37.339, lng: -121.895, tier: 2 },
+  { name: "Oakland",       state: "CA", lat: 37.804, lng: -122.271, tier: 2 },
+  { name: "Long Beach",    state: "CA", lat: 33.770, lng: -118.193, tier: 2 },
+  { name: "Albuquerque",   state: "NM", lat: 35.085, lng: -106.651, tier: 2 },
+  { name: "Tucson",        state: "AZ", lat: 32.222, lng: -110.926, tier: 2 },
+  { name: "Mesa",          state: "AZ", lat: 33.415, lng: -111.831, tier: 2 },
+  { name: "Kansas City",   state: "MO", lat: 39.099, lng: -94.578, tier: 2 },
+  { name: "Memphis",       state: "TN", lat: 35.149, lng: -90.049, tier: 2 },
+  { name: "Knoxville",     state: "TN", lat: 35.961, lng: -83.921, tier: 2 },
+  { name: "Louisville",    state: "KY", lat: 38.253, lng: -85.759, tier: 2 },
+  { name: "Milwaukee",     state: "WI", lat: 43.039, lng: -87.906, tier: 2 },
+  { name: "Detroit",       state: "MI", lat: 42.331, lng: -83.046, tier: 2 },
+  { name: "Cleveland",     state: "OH", lat: 41.499, lng: -81.694, tier: 2 },
+  { name: "Cincinnati",    state: "OH", lat: 39.103, lng: -84.512, tier: 2 },
+  { name: "Pittsburgh",    state: "PA", lat: 40.441, lng: -79.996, tier: 2 },
+  { name: "Buffalo",       state: "NY", lat: 42.886, lng: -78.879, tier: 2 },
+  { name: "Raleigh",       state: "NC", lat: 35.779, lng: -78.638, tier: 2 },
+  { name: "Greensboro",    state: "NC", lat: 36.073, lng: -79.792, tier: 2 },
+  { name: "Asheville",     state: "NC", lat: 35.595, lng: -82.551, tier: 2 },
+  { name: "Wilmington",    state: "NC", lat: 34.226, lng: -77.945, tier: 2 },
+  { name: "Charleston",    state: "SC", lat: 32.776, lng: -79.931, tier: 2 },
+  { name: "Savannah",      state: "GA", lat: 32.081, lng: -81.091, tier: 2 },
+  { name: "Birmingham",    state: "AL", lat: 33.521, lng: -86.802, tier: 2 },
+  { name: "New Orleans",   state: "LA", lat: 29.951, lng: -90.072, tier: 2 },
+  { name: "Oklahoma City", state: "OK", lat: 35.467, lng: -97.516, tier: 2 },
+  { name: "Tulsa",         state: "OK", lat: 36.154, lng: -95.993, tier: 2 },
+  { name: "Salt Lake City", state: "UT", lat: 40.760, lng: -111.891, tier: 2 },
+  { name: "Boise",         state: "ID", lat: 43.615, lng: -116.202, tier: 2 },
+  { name: "Reno",          state: "NV", lat: 39.530, lng: -119.815, tier: 2 },
+  { name: "Spokane",       state: "WA", lat: 47.659, lng: -117.426, tier: 2 },
+  { name: "Anchorage",     state: "AK", lat: 61.218, lng: -149.900, tier: 2 },
+  { name: "Honolulu",      state: "HI", lat: 21.307, lng: -157.858, tier: 2 }
+];
+
 // Return a red→yellow→green heatmap fill based on normalized score (0..1).
 // Low score = vibrant red, mid = true yellow, high = vibrant green.
 export const scoreToHeatFill = (t) => {
