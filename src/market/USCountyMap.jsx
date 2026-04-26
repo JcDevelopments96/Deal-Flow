@@ -263,12 +263,13 @@ export const USCountyMap = ({
                     const sf = String(geo.id || "").padStart(2, "0");
                     const stateCode = STATE_CODE_BY_FIPS[sf];
                     const heat = stateHeat.get(sf);
-                    // Transparent fill when no heat data so the underlying
-                    // land base shows through (instead of painting over it
-                    // with a flat grey rectangle that hides the atlas feel).
-                    const fill   = heat ? scoreToHeatFill(heat.t)   : "transparent";
+                    // States without heat data get the warm land color so
+                    // the country shape always reads as land — the previous
+                    // "transparent" fall-through left the map blank when
+                    // the base layer hadn't rendered yet.
+                    const fill   = heat ? scoreToHeatFill(heat.t)   : MAP_PALETTE.land;
                     const stroke = heat ? scoreToHeatStroke(heat.t) : MAP_PALETTE.landStroke;
-                    const opacity = heat ? 0.78 : 1;
+                    const opacity = heat ? 0.85 : 1;
                     return (
                       <Geography
                         key={geo.rsmKey}
@@ -350,10 +351,10 @@ export const USCountyMap = ({
                   // inconsistent, misleading map where a handful of
                   // counties had strong color and everything else was gray.
                   // Nationwide ZHVI coverage replaces it.
-                  // Transparent default — the land base layer shows through
-                  // for counties without heat/live data, keeping the atlas
-                  // feel even in dense state views.
-                  let fill = "transparent";
+                  // Counties without heat data get the warm land color so
+                  // the state's overall shape reads as land. Heat-fill
+                  // states + live-data counties paint over this.
+                  let fill = MAP_PALETTE.land;
                   let stroke = MAP_PALETTE.landStroke;
                   let strokeWidth = 0.35;
                   let opacity = 1;
