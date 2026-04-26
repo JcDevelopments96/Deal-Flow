@@ -2,6 +2,9 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { ClerkProvider } from '@clerk/react'
 import App from './App.jsx'
+// Leaflet's stylesheet — required for tiles + controls to render correctly.
+// Loaded once globally so every map mount shares it.
+import 'leaflet/dist/leaflet.css'
 
 // Remove loading placeholder
 const loading = document.getElementById('loading');
