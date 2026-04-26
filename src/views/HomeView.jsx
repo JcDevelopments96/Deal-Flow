@@ -99,7 +99,7 @@ export const HomeView = ({ onChangeView, onNewDeal, onOpenCalculator }) => {
           borderRadius: 999, fontSize: 11, fontWeight: 700,
           letterSpacing: "0.08em", textTransform: "uppercase"
         }}>
-          <Sparkles size={12} /> The investor's end-to-end toolkit
+          <Sparkles size={12} /> The Real Estate Investor's end-to-end toolkit
         </div>
         <h1 className="serif" style={{ fontSize: isMobile() ? 30 : 42, fontWeight: 700, margin: 0, lineHeight: 1.1 }}>
           Find, analyze, and close real estate deals
