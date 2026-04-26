@@ -625,19 +625,24 @@ async function handleFindPros(category, zip, user) {
 const _proReviewsCache = new Map();
 const PRO_REVIEWS_TTL = 24 * 60 * 60 * 1000;
 
-async function fetchGoogleReviews(placeId, key) {
-  if (!placeId || placeId.startsWith("yelp:") || !key) return [];
+// Google Place Details — pulls reviews AND contact info in a single
+// billable call. Place Details charges per call regardless of how many
+// fields you request, so we ask for everything useful at once: phone
+// (Text Search often omits this), website, full address, and reviews.
+// Returns { reviews: [], contact: {} } so callers can use either side.
+async function fetchGooglePlaceDetails(placeId, key) {
+  if (!placeId || placeId.startsWith("yelp:") || !key) return { reviews: [], contact: {} };
   const qs = new URLSearchParams({
     place_id: placeId,
-    fields: "reviews,rating,user_ratings_total",
+    fields: "reviews,rating,user_ratings_total,formatted_phone_number,international_phone_number,website,formatted_address,opening_hours",
     key
   });
   try {
     const res = await fetch(`https://maps.googleapis.com/maps/api/place/details/json?${qs.toString()}`);
-    if (!res.ok) return [];
+    if (!res.ok) return { reviews: [], contact: {} };
     const json = await res.json();
-    const reviews = json?.result?.reviews || [];
-    return reviews.map(r => ({
+    const result = json?.result || {};
+    const reviews = (result.reviews || []).map(r => ({
       source: "google",
       author: r.author_name || "Anonymous",
       authorPhoto: r.profile_photo_url || null,
@@ -646,19 +651,34 @@ async function fetchGoogleReviews(placeId, key) {
       time: r.time ? r.time * 1000 : null, // Google returns unix seconds
       text: r.text || ""
     }));
-  } catch { return []; }
+    const contact = {
+      phone: result.formatted_phone_number || null,
+      phoneIntl: result.international_phone_number || null,
+      website: result.website || null,
+      address: result.formatted_address || null,
+      hours: Array.isArray(result.opening_hours?.weekday_text) ? result.opening_hours.weekday_text : null,
+      openNow: result.opening_hours?.open_now ?? null
+    };
+    return { reviews, contact };
+  } catch { return { reviews: [], contact: {} }; }
 }
 
-async function fetchYelpReviews(yelpId, key) {
-  if (!yelpId || !key) return [];
+// Yelp Fusion — fetches reviews AND business contact details. Same
+// shape contract as the Google helper: { reviews, contact }.
+async function fetchYelpDetails(yelpId, key) {
+  if (!yelpId || !key) return { reviews: [], contact: {} };
   try {
-    const res = await fetch(`https://api.yelp.com/v3/businesses/${encodeURIComponent(yelpId)}/reviews`, {
-      headers: { Authorization: `Bearer ${key}`, accept: "application/json" }
-    });
-    if (!res.ok) return [];
-    const json = await res.json();
-    const reviews = json?.reviews || [];
-    return reviews.map(r => ({
+    const [revRes, bizRes] = await Promise.all([
+      fetch(`https://api.yelp.com/v3/businesses/${encodeURIComponent(yelpId)}/reviews`, {
+        headers: { Authorization: `Bearer ${key}`, accept: "application/json" }
+      }),
+      fetch(`https://api.yelp.com/v3/businesses/${encodeURIComponent(yelpId)}`, {
+        headers: { Authorization: `Bearer ${key}`, accept: "application/json" }
+      })
+    ]);
+    const revJson = revRes.ok ? await revRes.json() : null;
+    const bizJson = bizRes.ok ? await bizRes.json() : null;
+    const reviews = (revJson?.reviews || []).map(r => ({
       source: "yelp",
       author: r.user?.name || "Anonymous",
       authorPhoto: r.user?.image_url || null,
@@ -668,7 +688,18 @@ async function fetchYelpReviews(yelpId, key) {
       text: r.text || "",
       url: r.url || null
     }));
-  } catch { return []; }
+    const contact = bizJson ? {
+      phone: bizJson.display_phone || bizJson.phone || null,
+      website: bizJson.url || null,
+      address: Array.isArray(bizJson.location?.display_address)
+        ? bizJson.location.display_address.join(", ")
+        : null,
+      hours: bizJson.hours?.[0]?.open
+        ? bizJson.hours[0].open.map(o => `${["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][o.day]}: ${o.start.slice(0,2)}:${o.start.slice(2)}–${o.end.slice(0,2)}:${o.end.slice(2)}`)
+        : null
+    } : {};
+    return { reviews, contact };
+  } catch { return { reviews: [], contact: {} }; }
 }
 
 async function handleProReviews(placeId, yelpId) {
@@ -684,20 +715,34 @@ async function handleProReviews(placeId, yelpId) {
     return { ...cached.payload, cached: true };
   }
 
-  const [googleReviews, yelpReviews] = await Promise.all([
-    fetchGoogleReviews(placeId, googleKey),
-    fetchYelpReviews(yelpId, yelpKey)
+  const [googleData, yelpData] = await Promise.all([
+    fetchGooglePlaceDetails(placeId, googleKey),
+    fetchYelpDetails(yelpId, yelpKey)
   ]);
 
-  // Merge then sort newest-first so the freshest signal is on top
-  const all = [...googleReviews, ...yelpReviews]
+  // Merge reviews from both sources, sorted newest-first
+  const allReviews = [...googleData.reviews, ...yelpData.reviews]
     .sort((a, b) => (b.time || 0) - (a.time || 0));
 
+  // Merge contact info — Google's tends to be more reliable for
+  // formatted_phone_number, Yelp's for hours and the canonical
+  // business URL. Take whichever has a value, prefer Google when both
+  // have one (more standardized phone formatting).
+  const contact = {
+    phone:    googleData.contact.phone    || yelpData.contact.phone    || null,
+    phoneIntl: googleData.contact.phoneIntl || null,
+    website:  googleData.contact.website  || yelpData.contact.website  || null,
+    address:  googleData.contact.address  || yelpData.contact.address  || null,
+    hours:    googleData.contact.hours    || yelpData.contact.hours    || null,
+    openNow:  googleData.contact.openNow ?? null
+  };
+
   const payload = {
-    reviews: all,
+    reviews: allReviews,
+    contact,
     sources: {
-      google: googleReviews.length,
-      yelp: yelpReviews.length
+      google: googleData.reviews.length,
+      yelp: yelpData.reviews.length
     }
   };
   _proReviewsCache.set(cacheKey, { at: Date.now(), payload });
