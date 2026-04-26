@@ -314,3 +314,415 @@ export async function exportInspectionWord(inspection) {
   const blob = await Packer.toBlob(doc);
   triggerDownload(blob, inspectionFilename(inspection, "docx"));
 }
+
+/* ============================================================================
+   DEAL ANALYZER EXPORTS — full investment report covering every section of
+   the analyzer (acquisition, rehab line items, operating costs, refinance,
+   exit strategy comparison, notes). Three formats sharing one data shape.
+   ============================================================================ */
+
+const num   = (v) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+const dollar = (v) => `$${num(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+const dollarCents = (v) => `$${num(v).toFixed(0)}`;
+const pct   = (v, d = 1) => `${num(v).toFixed(d)}%`;
+const safe  = (v) => (v == null ? "" : String(v).replace(/[^\x20-\x7E]/g, ""));
+
+// Rehab category groupings — must mirror RehabSection.jsx so the export
+// matches what the user sees on screen.
+const REHAB_GROUPS = [
+  { key: "interior",   name: "Interior",   items: ["kitchen", "bathrooms", "flooring", "paintInterior", "cabinets", "appliances", "lighting"] },
+  { key: "systems",    name: "Major systems", items: ["electrical", "plumbing", "hvac"] },
+  { key: "structural", name: "Structural / exterior", items: ["roofing", "windows", "siding", "landscaping", "driveway"] },
+  { key: "other",      name: "Permits & contingency", items: ["permits", "dumpster", "contingency"] }
+];
+
+const REHAB_LABEL = {
+  kitchen: "Kitchen", bathrooms: "Bathrooms", flooring: "Flooring",
+  paintInterior: "Interior paint", cabinets: "Cabinets", appliances: "Appliances",
+  lighting: "Lighting", electrical: "Electrical", plumbing: "Plumbing",
+  hvac: "HVAC", roofing: "Roofing", windows: "Windows", siding: "Siding",
+  landscaping: "Landscaping", driveway: "Driveway", permits: "Permits",
+  dumpster: "Dumpster / debris", contingency: "Contingency reserve"
+};
+
+const dealFilename = (deal, ext) => {
+  const slug = safe(deal?.address || deal?.title).replace(/[^a-zA-Z0-9 -]/g, "").trim().slice(0, 60) || "Property";
+  const date = new Date().toISOString().slice(0, 10);
+  return `DealReport — ${slug} — ${date}.${ext}`;
+};
+
+// Compose all the rows we want to render. Each format consumes this same
+// payload so PDF / Excel / Word stay in sync without copy-paste.
+function dealReportPayload(deal = {}, metrics = {}) {
+  const m = metrics || {};
+  const downCash = num(deal.purchasePrice) * num(deal.downPayment) / 100;
+  const loan = num(deal.purchasePrice) - downCash;
+
+  const rehabLineItems = [];
+  const rd = deal.rehabDetails || {};
+  for (const grp of REHAB_GROUPS) {
+    for (const key of grp.items) {
+      const item = rd[key] || {};
+      rehabLineItems.push({
+        group: grp.name,
+        category: REHAB_LABEL[key] || key,
+        cost: num(item.cost),
+        weeks: num(item.weeks),
+        priority: safe(item.priority) || "—",
+        contractor: safe(item.contractor),
+        notes: safe(item.notes)
+      });
+    }
+  }
+  const rehabFromLineItems = rehabLineItems.reduce((s, r) => s + r.cost, 0);
+  const rehabTotal = rehabFromLineItems > 0 ? rehabFromLineItems : num(deal.rehabBudget);
+
+  return {
+    property: {
+      address: safe(deal.address) || "—",
+      cityState: [safe(deal.city), safe(deal.state)].filter(Boolean).join(", ") || "—",
+      neighborhood: safe(deal.neighborhood),
+      type: safe(deal.propertyType) || "—",
+      beds: num(deal.bedrooms),
+      baths: num(deal.bathrooms),
+      sqft: num(deal.sqft),
+      status: safe(deal.status)
+    },
+    summary: [
+      ["Purchase Price",     dollar(deal.purchasePrice)],
+      ["ARV",                dollar(deal.arv)],
+      ["Rehab Budget",       dollar(rehabTotal)],
+      ["All-In Cost",        dollar(m.totalAllIn || (num(deal.purchasePrice) + rehabTotal + num(deal.closingCosts) + num(deal.holdingCosts)))],
+      ["Monthly Rent",       dollar(deal.rentEstimate)],
+      ["Monthly Cash Flow",  dollarCents(m.monthlyCashFlow)],
+      ["Cap Rate",           pct(m.capRate)],
+      ["Cash on Cash",       pct(m.cashOnCash)],
+      ["Total ROI",          pct(m.totalROI)],
+      ["1% Rule",            m.onePercentRule ? "Yes" : "No"],
+      ["70% Rule",           m.seventyPercentRule ? "Pass" : "Fail"],
+      ["Deal Score",         `${Math.round(num(m.score))}/100  (${safe(m.grade) || "—"})`]
+    ],
+    acquisition: [
+      ["Purchase Price",       dollar(deal.purchasePrice)],
+      ["Down Payment %",       pct(deal.downPayment, 0)],
+      ["Down Payment ($)",     dollar(downCash)],
+      ["Loan Amount",          dollar(loan)],
+      ["Interest Rate",        pct(deal.interestRate, 2)],
+      ["Loan Term (years)",    String(num(deal.loanTermYears) || 30)],
+      ["Closing Costs",        dollar(deal.closingCosts)],
+      ["Holding Costs",        dollar(deal.holdingCosts)],
+      ["Rehab Months",         String(num(deal.rehabMonths))]
+    ],
+    rehab: { lineItems: rehabLineItems, total: rehabTotal },
+    operating: [
+      ["Monthly P&I",          dollarCents(m.monthlyPI)],
+      ["Monthly Costs (T+I+Mgmt+Reserves)", dollarCents(m.monthlyCosts)],
+      ["Property Tax (annual)",  dollar(deal.propertyTax)],
+      ["Insurance (annual)",     dollar(deal.insurance)],
+      ["Capex Reserve (monthly)", dollar(deal.capex)],
+      ["Repairs/Maintenance (monthly)", dollar(deal.repairMaintenance)],
+      ["HOA (monthly)",          dollar(deal.hoa)],
+      ["Vacancy %",              pct(deal.vacancy, 0)],
+      ["Mgmt Fee %",             pct(deal.mgmtFee, 0)]
+    ],
+    refinance: [
+      ["Projected New Loan",   dollar(m.projectedNewLoan)],
+      ["Refi Origination",     dollar(m.refiOrigination)],
+      ["Refi Closing Costs",   dollar(m.totalRefiClosingCosts)],
+      ["Cash Recouped",        dollar((m.projectedNewLoan || 0) - (m.totalRefiClosingCosts || 0) - (loan))],
+      ["All-In to ARV %",      pct(m.allInToArv)]
+    ],
+    notes: safe(deal.notes)
+  };
+}
+
+/* ── Deal PDF ────────────────────────────────────────────────────────── */
+
+export function exportDealPDF(deal, metrics) {
+  const data = dealReportPayload(deal, metrics);
+  const doc = new jsPDF({ unit: "pt", format: "letter" });
+  const margin = 48;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const contentWidth = pageWidth - margin * 2;
+  let y = margin;
+
+  const addPage = () => { doc.addPage(); y = margin; };
+  const ensure = (h) => { if (y + h > pageHeight - margin) addPage(); };
+
+  const heading = (text, size = 14, color = [13, 148, 136]) => {
+    ensure(size + 8);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(size);
+    doc.setTextColor(...color);
+    doc.text(text, margin, y);
+    y += size + 6;
+    doc.setTextColor(0);
+  };
+
+  const drawTable = (rows, opts = {}) => {
+    const cols = opts.cols || [{ w: contentWidth * 0.55 }, { w: contentWidth * 0.45 }];
+    const rowH = opts.rowH || 16;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+    rows.forEach(r => {
+      ensure(rowH);
+      let x = margin;
+      r.forEach((cell, i) => {
+        doc.setTextColor(opts.zebra && i === 0 ? 80 : 30);
+        doc.setFont("helvetica", opts.bold === i ? "bold" : "normal");
+        const lines = doc.splitTextToSize(String(cell), cols[i].w - 4);
+        doc.text(lines, x, y);
+        x += cols[i].w;
+      });
+      y += rowH;
+    });
+    y += 4;
+  };
+
+  // ── Page 1: Title + Property + Summary
+  doc.setFont("helvetica", "bold"); doc.setFontSize(22);
+  doc.setTextColor(234, 88, 12);
+  doc.text("Deal Docket Investment Report", margin, y); y += 22;
+  doc.setDrawColor(234, 88, 12); doc.setLineWidth(0.8);
+  doc.line(margin, y, margin + 70, y); y += 14;
+
+  doc.setTextColor(30, 41, 59); doc.setFontSize(15);
+  doc.text(data.property.address, margin, y); y += 16;
+  doc.setFontSize(11); doc.setTextColor(100);
+  doc.text(`${data.property.cityState}${data.property.neighborhood ? "  ·  " + data.property.neighborhood : ""}`, margin, y); y += 14;
+  doc.text(
+    `${data.property.type}  ·  ${data.property.beds} bd / ${data.property.baths} ba  ·  ${data.property.sqft.toLocaleString()} sqft`,
+    margin, y);
+  y += 22;
+
+  heading("Investment summary");
+  drawTable(data.summary, { bold: 0 });
+
+  // ── Page 2: Acquisition
+  addPage();
+  heading("Acquisition & financing");
+  drawTable(data.acquisition, { bold: 0 });
+
+  // ── Page 3: Rehab
+  addPage();
+  heading("Rehab budget breakdown");
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+  doc.setTextColor(80);
+  doc.text(`Rehab total: ${dollar(data.rehab.total)}`, margin, y); y += 18;
+
+  let lastGroup = null;
+  for (const item of data.rehab.lineItems) {
+    if (item.group !== lastGroup) {
+      ensure(20);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(11);
+      doc.setTextColor(13, 148, 136);
+      doc.text(item.group, margin, y); y += 14;
+      doc.setTextColor(30, 41, 59); doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+      lastGroup = item.group;
+    }
+    if (item.cost === 0 && !item.notes && !item.contractor) continue;
+    ensure(14);
+    const left = `  • ${item.category}${item.priority !== "—" ? ` (${item.priority})` : ""}`;
+    const right = `${dollar(item.cost)}${item.weeks ? `  ·  ${item.weeks}w` : ""}${item.contractor ? `  ·  ${item.contractor}` : ""}`;
+    doc.text(left, margin, y);
+    doc.text(right, margin + contentWidth * 0.55, y);
+    y += 13;
+    if (item.notes) {
+      ensure(12);
+      doc.setTextColor(120);
+      doc.text(`     ${item.notes}`, margin, y);
+      doc.setTextColor(30, 41, 59);
+      y += 12;
+    }
+  }
+
+  // ── Page 4: Operating
+  addPage();
+  heading("Operating costs & monthly cash flow");
+  drawTable(data.operating, { bold: 0 });
+
+  // ── Page 5: Refinance
+  addPage();
+  heading("Refinance projection (BRRRR)");
+  drawTable(data.refinance, { bold: 0 });
+
+  // ── Notes (if any)
+  if (data.notes) {
+    addPage();
+    heading("Notes");
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+    const wrapped = doc.splitTextToSize(data.notes, contentWidth);
+    doc.text(wrapped, margin, y);
+  }
+
+  // Footer
+  const total = doc.getNumberOfPages();
+  for (let i = 1; i <= total; i++) {
+    doc.setPage(i);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8);
+    doc.setTextColor(140);
+    doc.text(`Deal Docket — ${data.property.address} — page ${i} / ${total}`, margin, pageHeight - 24);
+  }
+
+  doc.save(dealFilename(deal, "pdf"));
+}
+
+/* ── Deal Excel ──────────────────────────────────────────────────────── */
+
+export async function exportDealExcel(deal, metrics) {
+  const data = dealReportPayload(deal, metrics);
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Deal Docket"; wb.created = new Date();
+
+  const headerStyle = { font: { bold: true, size: 13 } };
+  const labelStyle = { font: { bold: true, color: { argb: "FF334155" } } };
+
+  const writeKv = (sheet, title, rows) => {
+    sheet.columns = [{ width: 38 }, { width: 28 }];
+    sheet.addRow([title]).font = { bold: true, size: 16, color: { argb: "FFEA580C" } };
+    sheet.addRow([]);
+    rows.forEach(([k, v]) => {
+      const r = sheet.addRow([k, v]);
+      r.getCell(1).font = labelStyle.font;
+    });
+  };
+
+  // Sheet 1: Summary
+  const s1 = wb.addWorksheet("Summary");
+  s1.addRow(["Deal Docket Investment Report"]).font = { size: 18, bold: true, color: { argb: "FFEA580C" } };
+  s1.addRow([]);
+  s1.addRow(["Address", data.property.address]).font = labelStyle.font;
+  s1.addRow(["City / State", data.property.cityState]);
+  s1.addRow(["Neighborhood", data.property.neighborhood || "—"]);
+  s1.addRow(["Type", data.property.type]);
+  s1.addRow(["Beds / Baths", `${data.property.beds} / ${data.property.baths}`]);
+  s1.addRow(["Sqft", data.property.sqft]);
+  s1.addRow([]);
+  data.summary.forEach(([k, v]) => {
+    const r = s1.addRow([k, v]);
+    r.getCell(1).font = labelStyle.font;
+  });
+  s1.columns = [{ width: 32 }, { width: 24 }];
+
+  writeKv(wb.addWorksheet("Acquisition"), "Acquisition & financing", data.acquisition);
+
+  // Rehab sheet — full table
+  const sR = wb.addWorksheet("Rehab");
+  sR.columns = [
+    { header: "Group",      key: "group",      width: 22 },
+    { header: "Item",       key: "category",   width: 28 },
+    { header: "Cost",       key: "cost",       width: 14 },
+    { header: "Weeks",      key: "weeks",      width: 8 },
+    { header: "Priority",   key: "priority",   width: 12 },
+    { header: "Contractor", key: "contractor", width: 24 },
+    { header: "Notes",      key: "notes",      width: 40 }
+  ];
+  sR.getRow(1).font = { bold: true };
+  sR.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE5E7EB" } };
+  data.rehab.lineItems.forEach(item => sR.addRow(item));
+  sR.addRow([]);
+  const totalRow = sR.addRow({ group: "TOTAL", cost: data.rehab.total });
+  totalRow.font = { bold: true };
+  sR.autoFilter = { from: "A1", to: "G1" };
+
+  writeKv(wb.addWorksheet("Operating"), "Operating costs & cash flow", data.operating);
+  writeKv(wb.addWorksheet("Refinance"), "Refinance projection", data.refinance);
+
+  if (data.notes) {
+    const sN = wb.addWorksheet("Notes");
+    sN.columns = [{ width: 100 }];
+    sN.addRow(["Notes"]).font = headerStyle.font;
+    sN.addRow([data.notes]).getCell(1).alignment = { wrapText: true, vertical: "top" };
+  }
+
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  triggerDownload(blob, dealFilename(deal, "xlsx"));
+}
+
+/* ── Deal Word ───────────────────────────────────────────────────────── */
+
+export async function exportDealWord(deal, metrics) {
+  const data = dealReportPayload(deal, metrics);
+  const children = [];
+
+  children.push(new Paragraph({ text: "Deal Docket Investment Report", heading: HeadingLevel.HEADING_1 }));
+  children.push(new Paragraph({ text: data.property.address, heading: HeadingLevel.HEADING_2 }));
+  children.push(new Paragraph({ text: data.property.cityState, alignment: AlignmentType.LEFT }));
+  if (data.property.neighborhood) {
+    children.push(new Paragraph({ children: [new TextRun({ text: data.property.neighborhood, italics: true, color: "555555" })] }));
+  }
+  children.push(new Paragraph({ children: [new TextRun({
+    text: `${data.property.type}  ·  ${data.property.beds} bd / ${data.property.baths} ba  ·  ${data.property.sqft.toLocaleString()} sqft`,
+    color: "666666"
+  })] }));
+  children.push(new Paragraph({ text: "" }));
+
+  const kvTable = (rows) => new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: rows.map(([k, v]) => new TableRow({
+      children: [
+        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: k, bold: true })] })] }),
+        new TableCell({ children: [new Paragraph(String(v))] })
+      ]
+    })),
+    borders: {
+      top:    { style: BorderStyle.SINGLE, size: 4, color: "D1D5DB" },
+      bottom: { style: BorderStyle.SINGLE, size: 4, color: "D1D5DB" },
+      left:   { style: BorderStyle.SINGLE, size: 4, color: "D1D5DB" },
+      right:  { style: BorderStyle.SINGLE, size: 4, color: "D1D5DB" },
+      insideHorizontal: { style: BorderStyle.SINGLE, size: 4, color: "E5E7EB" },
+      insideVertical:   { style: BorderStyle.SINGLE, size: 4, color: "E5E7EB" }
+    }
+  });
+
+  children.push(new Paragraph({ text: "Investment summary", heading: HeadingLevel.HEADING_2 }));
+  children.push(kvTable(data.summary));
+  children.push(new Paragraph({ text: "" }));
+
+  children.push(new Paragraph({ text: "Acquisition & financing", heading: HeadingLevel.HEADING_2 }));
+  children.push(kvTable(data.acquisition));
+  children.push(new Paragraph({ text: "" }));
+
+  children.push(new Paragraph({ text: "Rehab budget breakdown", heading: HeadingLevel.HEADING_2 }));
+  children.push(new Paragraph({ children: [new TextRun({ text: `Total: ${dollar(data.rehab.total)}`, bold: true })] }));
+  let last = null;
+  for (const item of data.rehab.lineItems) {
+    if (item.cost === 0 && !item.notes && !item.contractor) continue;
+    if (item.group !== last) {
+      children.push(new Paragraph({ text: item.group, heading: HeadingLevel.HEADING_3 }));
+      last = item.group;
+    }
+    const bits = [`${dollar(item.cost)}`];
+    if (item.weeks) bits.push(`${item.weeks} wk`);
+    if (item.priority !== "—") bits.push(item.priority);
+    if (item.contractor) bits.push(item.contractor);
+    children.push(new Paragraph({
+      children: [
+        new TextRun({ text: `${item.category}: `, bold: true }),
+        new TextRun({ text: bits.join(" · ") })
+      ],
+      bullet: { level: 0 }
+    }));
+    if (item.notes) {
+      children.push(new Paragraph({ children: [new TextRun({ text: `    ${item.notes}`, italics: true, color: "777777" })] }));
+    }
+  }
+  children.push(new Paragraph({ text: "" }));
+
+  children.push(new Paragraph({ text: "Operating costs & cash flow", heading: HeadingLevel.HEADING_2 }));
+  children.push(kvTable(data.operating));
+  children.push(new Paragraph({ text: "" }));
+
+  children.push(new Paragraph({ text: "Refinance projection", heading: HeadingLevel.HEADING_2 }));
+  children.push(kvTable(data.refinance));
+  children.push(new Paragraph({ text: "" }));
+
+  if (data.notes) {
+    children.push(new Paragraph({ text: "Notes", heading: HeadingLevel.HEADING_2 }));
+    children.push(new Paragraph({ text: data.notes }));
+  }
+
+  const docx = new Document({ sections: [{ children }] });
+  const blob = await Packer.toBlob(docx);
+  triggerDownload(blob, dealFilename(deal, "docx"));
+}

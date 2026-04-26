@@ -1,10 +1,11 @@
 /* ============================================================================
    ANALYZER — the deep-dive deal view with six tabbed sections.
    ============================================================================ */
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   Search, Hammer, DollarSign, Home, PiggyBank, Target,
-  BarChart3, ChevronRight, FileDown, Save, Trash2, FileText
+  BarChart3, ChevronRight, FileDown, Save, Trash2, FileText,
+  ChevronDown, FileSpreadsheet, FileType
 } from "lucide-react";
 import { THEME } from "../theme.js";
 import { calcMetrics, fmtUSD, isMobile, generatePDFReport } from "../utils.js";
@@ -31,12 +32,26 @@ export const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete, onPdfError,
     { key: "inspection", label: "Inspection", icon: <FileText size={14} /> }
   ];
 
-  const handleExportPDF = async () => {
-    const result = await generatePDFReport(deal, metrics, "investor");
-    if (!result.success) {
-      onPdfError?.(result.error || "PDF generation failed.");
-    } else {
-      onPdfSuccess?.(`PDF exported — ${result.filename}`);
+  // Comprehensive deal exports — PDF/Excel/Word, lazy-loaded so the
+  // exceljs+docx libs (~350KB) don't ship in the main bundle.
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportRef = useRef(null);
+  useEffect(() => {
+    if (!exportOpen) return;
+    const close = (e) => { if (exportRef.current && !exportRef.current.contains(e.target)) setExportOpen(false); };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [exportOpen]);
+
+  const runExport = (fnName) => async () => {
+    setExportOpen(false);
+    try {
+      const mod = await import("../lib/exports.js");
+      await mod[fnName](deal, metrics);
+      onPdfSuccess?.(`Exported as ${fnName.endsWith("PDF") ? "PDF" : fnName.endsWith("Excel") ? "Excel" : "Word"}`);
+    } catch (err) {
+      console.error("Deal export failed:", err);
+      onPdfError?.(err?.message || "Export failed — try again or check the console.");
     }
   };
 
@@ -83,10 +98,40 @@ export const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete, onPdfError,
               ))}
             </select>
           </label>
-          <button className="btn-accent-orange" onClick={handleExportPDF}>
-            <FileDown size={14} />
-            Export PDF
-          </button>
+          <div ref={exportRef} style={{ position: "relative", display: "inline-block" }}>
+            <button className="btn-accent-orange" onClick={() => setExportOpen(o => !o)}>
+              <FileDown size={14} />
+              Export <ChevronDown size={12} />
+            </button>
+            {exportOpen && (
+              <div role="menu" style={{
+                position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 100,
+                background: THEME.bg, border: `1px solid ${THEME.border}`,
+                borderRadius: 6, boxShadow: "0 8px 24px rgba(15,23,42,0.12)",
+                minWidth: 170, padding: 4
+              }}>
+                {[
+                  { label: "PDF",   icon: <FileDown size={13} />,        fn: "exportDealPDF"   },
+                  { label: "Excel", icon: <FileSpreadsheet size={13} />, fn: "exportDealExcel" },
+                  { label: "Word",  icon: <FileType size={13} />,        fn: "exportDealWord"  }
+                ].map(opt => (
+                  <button key={opt.label}
+                    onClick={runExport(opt.fn)}
+                    style={{
+                      width: "100%", textAlign: "left",
+                      padding: "7px 10px", fontSize: 12,
+                      background: "transparent", border: "none", borderRadius: 4,
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
+                      color: THEME.text
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = THEME.bgPanel; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+                    {opt.icon} {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button className="btn-primary" onClick={onSave}>
             <Save size={14} />
             Save Deal
