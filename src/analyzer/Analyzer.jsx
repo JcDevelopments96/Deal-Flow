@@ -8,7 +8,7 @@ import {
   ChevronDown, FileSpreadsheet, FileType
 } from "lucide-react";
 import { THEME } from "../theme.js";
-import { calcMetrics, fmtUSD, isMobile, generatePDFReport } from "../utils.js";
+import { calcMetrics, fmtUSD, isMobile } from "../utils.js";
 import { NumberField, StatRow, Panel, CalcTooltip } from "../primitives.jsx";
 import { DEAL_STATUSES, DEAL_STATUS_ORDER, getDealStatus, StatusChip } from "../deals.jsx";
 import { AcquisitionSection } from "./AcquisitionSection.jsx";
