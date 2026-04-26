@@ -1,7 +1,7 @@
 {
-  "name": "DealTrack - BRRRR Investment Tracker",
-  "short_name": "DealTrack",
-  "description": "DealTrack professional BRRRR real estate investment tracker for South East Florida",
+  "name": "Deal Docket — Real Estate Investment Platform",
+  "short_name": "Deal Docket",
+  "description": "The real estate investor's end-to-end toolkit — listings, wholesale leads, deal analysis, AI inspections, and a local-pro directory.",
   "theme_color": "#0D9488",
   "background_color": "#FFFFFF",
   "display": "standalone",

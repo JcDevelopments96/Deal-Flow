@@ -394,7 +394,7 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
             background: liveMode ? THEME.greenDim : THEME.bgOrange,
             color: liveMode ? THEME.green : THEME.orange
           }}>
-            {liveMode ? `Live · ${saasOn ? "DealTrack" : activeProvider.name}` : "Demo"}
+            {liveMode ? `Live · ${saasOn ? "Deal Docket" : activeProvider.name}` : "Demo"}
           </span>
           {!saasOn && (
             <button

@@ -1,4 +1,4 @@
-# DealTrack — robots.txt
+# Deal Docket — robots.txt
 #
 # Allow normal search engines so the marketing landing can be indexed.
 # Block AI training crawlers from ingesting the app for model training.

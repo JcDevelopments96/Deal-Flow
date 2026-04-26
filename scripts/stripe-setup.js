@@ -1,5 +1,5 @@
 /* ============================================================================
-   ONE-SHOT STRIPE SETUP — creates DealTrack's products and prices in
+   ONE-SHOT STRIPE SETUP — creates Deal Docket's products and prices in
    either test or live Stripe mode, then prints the env-var lines you need
    to paste into Vercel.
 
@@ -42,21 +42,21 @@ const stripe = new Stripe(KEY, { apiVersion: "2024-06-20" });
 const PLANS = [
   {
     key: "starter",
-    name: "DealTrack Starter",
+    name: "Deal Docket Starter",
     description: "100 Market Intel clicks/mo · Wholesale, Watchlist, Team CRM included",
     monthly: 2900,    // $29.00 in cents
     annual:  29000    // $290.00 in cents (~17% off — 2 months free)
   },
   {
     key: "pro",
-    name: "DealTrack Pro",
+    name: "Deal Docket Pro",
     description: "500 Market Intel clicks/mo · Most popular for active investors",
     monthly: 7900,    // $79.00
     annual:  79000    // $790.00
   },
   {
     key: "scale",
-    name: "DealTrack Scale",
+    name: "Deal Docket Scale",
     description: "2,500 Market Intel clicks/mo · Unlimited Ari assistant",
     monthly: 19900,   // $199.00
     annual:  199000   // $1,990.00

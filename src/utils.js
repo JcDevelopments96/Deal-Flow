@@ -111,7 +111,7 @@ export const generatePDFReport = async (deal, metrics /* , type = "investor" */)
     // Title — orange accent for a subtle warm note in an otherwise teal report
     pdf.setFontSize(24);
     pdf.setTextColor(234, 88, 12); // Orange-600
-    pdf.text("DealTrack Investment Report", margin, 30);
+    pdf.text("Deal Docket Investment Report", margin, 30);
 
     // Thin orange rule under the title — a small, deliberate highlight
     pdf.setDrawColor(234, 88, 12);
@@ -154,7 +154,7 @@ export const generatePDFReport = async (deal, metrics /* , type = "investor" */)
       y += 12;
     });
 
-    const filename = `DealTrack-${deal.address?.replace(/[^a-zA-Z0-9]/g, '-') || 'Property'}-${Date.now()}.pdf`;
+    const filename = `DealDocket-${deal.address?.replace(/[^a-zA-Z0-9]/g, '-') || 'Property'}-${Date.now()}.pdf`;
     pdf.save(filename);
 
     return { success: true, filename };

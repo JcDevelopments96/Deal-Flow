@@ -807,7 +807,7 @@ async function handleStr(address, lat, lng) {
         headers: {
           "Content-Type": "application/json",
           "accept": "application/json",
-          "User-Agent": "Mozilla/5.0 (compatible; DealTrack)"
+          "User-Agent": "Mozilla/5.0 (compatible; DealDocket)"
         },
         ...(c.body ? { body: c.body } : {})
       });

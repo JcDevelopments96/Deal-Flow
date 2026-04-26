@@ -1,5 +1,5 @@
 -- ============================================================================
--- DealTrack SaaS — Supabase (Postgres) schema
+-- Deal Docket SaaS — Supabase (Postgres) schema
 --
 -- Paste this into Supabase SQL Editor and run. Re-running is idempotent.
 --
