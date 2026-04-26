@@ -209,34 +209,77 @@ export const USCountyMap = ({
   }, [countiesGeo, selectedState]);
 
   /* ── GeoJSON layer styling ─────────────────────────────────────────── */
+  // FIPS padding is defensive — us-atlas uses string ids ("01", "01001")
+  // but I want the matcher to work even if a future bundle returns
+  // numeric ids (1, 1001) which would be missing leading zeros.
   const stateStyle = (feature) => {
     const sf = String(feature.id).padStart(2, "0");
     const heat = stateHeat.get(sf);
     if (!heat) {
-      // Subtle outline only — let the OSM tiles show through
       return { fillColor: "transparent", fillOpacity: 0, color: "#475569", weight: 1.2 };
     }
     return {
       fillColor: scoreToHeatFill(heat.t),
-      fillOpacity: 0.55,
+      fillOpacity: 0.65,
       color: scoreToHeatStroke(heat.t),
       weight: 1
     };
   };
 
   const countyStyle = (feature) => {
-    const fips = String(feature.id);
+    const fips = String(feature.id).padStart(5, "0");
     const heat = countyHeat.get(fips);
     if (!heat) {
       return { fillColor: "transparent", fillOpacity: 0, color: "#94a3b8", weight: 0.6 };
     }
     return {
       fillColor: scoreToHeatFill(heat.t),
-      fillOpacity: 0.55,
+      fillOpacity: 0.65,
       color: scoreToHeatStroke(heat.t),
       weight: 0.8
     };
   };
+
+  // ✱ Refs to the live Leaflet GeoJSON layers. react-leaflet's GeoJSON
+  // captures `style` at mount only, so updates to stateHeat / countyHeat
+  // would never recolor the polygons without imperatively walking the
+  // layer and calling setStyle. This effect runs on every heat change
+  // and re-applies the latest fills.
+  const stateLayerRef = useRef(null);
+  const countyLayerRef = useRef(null);
+
+  // Hover handlers (mouseout) need to restore the latest "rest" style,
+  // not the one captured at mount. These refs let them read the current
+  // closure of stateStyle / countyStyle without re-binding listeners.
+  const stateStyleRef = useRef(stateStyle);
+  const countyStyleRef = useRef(countyStyle);
+  stateStyleRef.current = stateStyle;
+  countyStyleRef.current = countyStyle;
+  // Hover handlers also peek at the live heat maps so they can pick the
+  // correct fillColor/Opacity even when ZHVI lands AFTER the user has
+  // already started moving their cursor around.
+  const stateHeatRef = useRef(stateHeat);
+  const countyHeatRef = useRef(countyHeat);
+  stateHeatRef.current = stateHeat;
+  countyHeatRef.current = countyHeat;
+
+  useEffect(() => {
+    const layer = stateLayerRef.current;
+    if (!layer || typeof layer.eachLayer !== "function") return;
+    layer.eachLayer(sub => {
+      if (sub.feature) sub.setStyle(stateStyle(sub.feature));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stateHeat]);
+
+  useEffect(() => {
+    const layer = countyLayerRef.current;
+    if (!layer || typeof layer.eachLayer !== "function") return;
+    layer.eachLayer(sub => {
+      if (sub.feature) sub.setStyle(countyStyle(sub.feature));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countyHeat]);
 
   /* ── GeoJSON click + hover handlers ────────────────────────────────── */
   const onEachState = (feature, layer) => {
@@ -257,8 +300,17 @@ export const USCountyMap = ({
           __pickState: true
         });
       },
-      mouseover: (e) => e.target.setStyle({ weight: 2.5, color: THEME.accent, fillOpacity: heat ? 0.75 : 0.15, fillColor: heat ? scoreToHeatFill(heat.t) : THEME.accent }),
-      mouseout:  (e) => e.target.setStyle(stateStyle(feature))
+      mouseover: (e) => {
+        const latest = stateHeatRef.current.get(sf);
+        e.target.setStyle({
+          weight: 2.5, color: THEME.accent,
+          fillOpacity: latest ? 0.85 : 0.18,
+          fillColor: latest ? scoreToHeatFill(latest.t) : THEME.accent
+        });
+      },
+      // Restore via the LATEST closure of stateStyle — captures any
+      // heat-data update that landed between mount and now.
+      mouseout:  (e) => e.target.setStyle(stateStyleRef.current(feature))
     });
   };
 
@@ -279,8 +331,15 @@ export const USCountyMap = ({
           synthetic: true, stateFips: sf, countyFips: fips.slice(2)
         });
       },
-      mouseover: (e) => e.target.setStyle({ weight: 2, color: THEME.accent, fillOpacity: heat ? 0.75 : 0.18, fillColor: heat ? scoreToHeatFill(heat.t) : THEME.accent }),
-      mouseout:  (e) => e.target.setStyle(countyStyle(feature))
+      mouseover: (e) => {
+        const latest = countyHeatRef.current.get(fips);
+        e.target.setStyle({
+          weight: 2, color: THEME.accent,
+          fillOpacity: latest ? 0.85 : 0.2,
+          fillColor: latest ? scoreToHeatFill(latest.t) : THEME.accent
+        });
+      },
+      mouseout:  (e) => e.target.setStyle(countyStyleRef.current(feature))
     });
   };
 
@@ -323,10 +382,13 @@ export const USCountyMap = ({
 
         <MapViewController selectedState={selectedState} />
 
-        {/* National view: state polygons + ZHVI heat */}
+        {/* National view: state polygons + ZHVI heat. The ref lets the
+            heat effect above re-style polygons whenever ZHVI lands —
+            react-leaflet's `style` prop alone won't update them. */}
         {!inStateView && statesGeo && (
           <GeoJSON
-            key={`states-${stateHeat.size}`}
+            ref={stateLayerRef}
+            key="states-layer"
             data={statesGeo}
             style={stateStyle}
             onEachFeature={onEachState}
@@ -336,7 +398,8 @@ export const USCountyMap = ({
         {/* State view: county polygons for the selected state */}
         {inStateView && stateCountiesGeo && (
           <GeoJSON
-            key={`counties-${selectedState}-${countyHeat.size}`}
+            ref={countyLayerRef}
+            key={`counties-${selectedState}`}
             data={stateCountiesGeo}
             style={countyStyle}
             onEachFeature={onEachCounty}
