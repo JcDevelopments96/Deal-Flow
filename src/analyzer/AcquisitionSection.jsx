@@ -9,14 +9,19 @@ import React, { useState } from "react";
 import { Search, Calculator, Check, X } from "lucide-react";
 import { THEME } from "../theme.js";
 import { fmtUSD, isMobile } from "../utils.js";
-import { NumberField, StatRow, Panel } from "../primitives.jsx";
+import { NumberField, StatRow, Panel, PercentDollarField } from "../primitives.jsx";
 
 // Typical investor-loan starting points — meant as a quick set-up, not as
 // a quoted rate. Updated April 2026; user should override with their actual
 // loan estimate. Term defaults are how each loan type is most commonly
 // structured (HM short, conventional 30, etc.).
+//
+// Conventional rate (7.25%) reflects the current 30-yr fixed for investment
+// properties — investor rates run ~0.5-1% above the owner-occupied headline
+// rate (~6.0% as of April 2026). Update when the broader rate environment
+// shifts noticeably.
 const FINANCING_OPTIONS = {
-  conventional: { name: "Conventional",   downPayment: 25,  rate: 7.0,  termYears: 30, description: "Fannie/Freddie investor loan — standard 30-yr financing." },
+  conventional: { name: "Conventional",   downPayment: 20,  rate: 7.25, termYears: 30, description: "Fannie/Freddie investor loan — standard 30-yr financing. Rate reflects current investor 30-yr fixed." },
   dscr:         { name: "DSCR Loan",      downPayment: 20,  rate: 7.75, termYears: 30, description: "Qualifies on the property's rent, not your W2 — popular for pros." },
   hardMoney:    { name: "Hard Money",     downPayment: 20,  rate: 11.0, termYears: 1,  description: "Short-term bridge, interest-only, fast close. Refi out within 12 mo." },
   portfolio:    { name: "Portfolio Bank", downPayment: 20,  rate: 8.0,  termYears: 25, description: "Local/community bank balance-sheet loan — flexible underwriting." },
@@ -173,12 +178,16 @@ export const AcquisitionSection = ({ deal, onUpdate, metrics }) => {
               integer
               helper={`Strategy default: ${FINANCING_OPTIONS[acquisitionStrategy]?.termYears}yr`}
             />
-            <NumberField
+            {/* Closing costs run ~2-5% of purchase nationally; 3% is the
+                modal buyer-side number. Toggle lets the user enter $ or %
+                — value is stored as $ so historical deals don't shift. */}
+            <PercentDollarField
               label="Closing Costs"
-              value={deal.closingCosts || Math.round(deal.purchasePrice * 0.02)}
+              value={deal.closingCosts || Math.round((deal.purchasePrice || 0) * 0.03)}
+              base={deal.purchasePrice || 0}
+              baseLabel="of purchase"
               onChange={(val) => onUpdate({ closingCosts: val })}
-              prefix="$"
-              helper="Title, escrow, lender fees"
+              helper="Title, escrow, lender fees · typical 2-3%"
             />
           </div>
         </div>
