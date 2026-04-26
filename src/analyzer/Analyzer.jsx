@@ -20,20 +20,23 @@ import { StrategyRecommendation } from "./StrategyRecommendation.jsx";
 import { InspectionPanel } from "../inspection/InspectionPanel.jsx";
 
 export const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete, onPdfError, onPdfSuccess, isDirty }) => {
-  // Default to "summary" so the user lands on the recommendation + headline
-  // metrics first — only drills into the input tabs when they need to tune.
-  const [section, setSection] = useState("summary");
+  // Workflow follows the actual investor process: enter terms → plan rehab
+  // → reconcile costs → set rents → refinance → choose an exit. Inspection
+  // and Summary live at the end — Inspection is reference-only, Summary is
+  // the recap once all the inputs are in. Defaulting to Acquisition keeps
+  // a fresh deal pointing at the first thing you actually fill in.
+  const [section, setSection] = useState("acquisition");
   const metrics = useMemo(() => calcMetrics(deal), [deal]);
 
   const sections = [
-    { key: "summary",     label: "Summary",     icon: <Sparkles size={14} /> },
     { key: "acquisition", label: "Acquisition", icon: <Search size={14} /> },
     { key: "rehab",       label: "Rehab",       icon: <Hammer size={14} /> },
     { key: "costs",       label: "Costs",       icon: <DollarSign size={14} /> },
     { key: "rent",        label: "Rent",        icon: <Home size={14} /> },
     { key: "refinance",   label: "Refinance",   icon: <PiggyBank size={14} /> },
     { key: "exit",        label: "Exit",        icon: <Target size={14} /> },
-    { key: "inspection",  label: "Inspection",  icon: <FileText size={14} /> }
+    { key: "inspection",  label: "Inspection",  icon: <FileText size={14} /> },
+    { key: "summary",     label: "Summary",     icon: <Sparkles size={14} /> }
   ];
 
   // Comprehensive deal exports — PDF/Excel/Word, lazy-loaded so the
@@ -149,7 +152,7 @@ export const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete, onPdfError,
       </div>
 
       <Panel style={{ marginBottom: 24 }} title="Key Metrics" icon={<BarChart3 size={16} />} accent>
-        <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr 1fr" : "repeat(6, 1fr)", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile() ? "1fr 1fr" : "repeat(5, 1fr)", gap: 16 }}>
           <div>
             <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4, display: "inline-flex", alignItems: "center" }}>
               MONTHLY CASH FLOW
@@ -208,20 +211,6 @@ export const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete, onPdfError,
           </div>
           <div>
             <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4, display: "inline-flex", alignItems: "center" }}>
-              5-YR IRR
-              <CalcTooltip
-                size={12}
-                title="5-Year Internal Rate of Return"
-                description="Annualized return over a 5-year buy-and-hold including loan paydown, 3% rent growth, 4% appreciation, and a sale at year 5 with 7% selling costs. Tweak assumptions on the Exit tab."
-                formula="IRR of [-Total Invested, Yr 1 CF, Yr 2 CF, …, Yr 5 CF + Sale Proceeds]"
-              />
-            </div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: metrics.irr5yr > 12 ? THEME.green : metrics.irr5yr > 0 ? THEME.accent : THEME.red }}>
-              {metrics.irr5yr != null ? `${metrics.irr5yr.toFixed(1)}%` : "—"}
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4, display: "inline-flex", alignItems: "center" }}>
               DEAL SCORE
               <CalcTooltip
                 size={12}
@@ -230,30 +219,50 @@ export const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete, onPdfError,
                 formula="70%·25 + 1%·15 + CF>0·20 + CoC>8%·15 + Cap>6%·10 + CF>$200·10 + CoC>12%·5"
               />
             </div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: THEME.accent }}>
+            <div style={{
+              fontSize: 22, fontWeight: 700,
+              color: metrics.score >= 80 ? THEME.green
+                   : metrics.score >= 70 ? THEME.teal
+                   : metrics.score >= 60 ? THEME.accent
+                   : metrics.score >= 50 ? THEME.orange
+                                         : THEME.red
+            }}>
               {metrics.score}/100 <span style={{ fontSize: 14 }}>({metrics.grade})</span>
             </div>
           </div>
         </div>
       </Panel>
 
-      <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
-        {sections.map(s => (
-          <button
-            key={s.key}
-            onClick={() => setSection(s.key)}
-            style={{
-              padding: "10px 16px", fontSize: 13, fontWeight: 600,
-              background: section === s.key ? THEME.accent : THEME.bgPanel,
-              color: section === s.key ? THEME.bg : THEME.text,
-              border: `1px solid ${section === s.key ? THEME.accent : THEME.border}`,
-              borderRadius: 6,
-              display: "flex", alignItems: "center", gap: 6, cursor: "pointer"
-            }}
-          >
-            {s.icon}
-            {s.label}
-          </button>
+      {/* Workflow strip — chevrons between tabs make the sequence obvious
+          ("do these in order"). Tabs still wrap on small screens; chevrons
+          wrap with them, which is fine — they're muted and small. */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
+        {sections.map((s, i) => (
+          <React.Fragment key={s.key}>
+            <button
+              onClick={() => setSection(s.key)}
+              style={{
+                padding: "10px 14px", fontSize: 13, fontWeight: 600,
+                background: section === s.key ? THEME.accent : THEME.bgPanel,
+                color: section === s.key ? THEME.bg : THEME.text,
+                border: `1px solid ${section === s.key ? THEME.accent : THEME.border}`,
+                borderRadius: 6,
+                display: "flex", alignItems: "center", gap: 6, cursor: "pointer"
+              }}
+            >
+              <span style={{
+                fontSize: 10, fontWeight: 700, opacity: 0.7,
+                color: section === s.key ? THEME.bg : THEME.textMuted
+              }}>
+                {i + 1}
+              </span>
+              {s.icon}
+              {s.label}
+            </button>
+            {i < sections.length - 1 && (
+              <ChevronRight size={14} color={THEME.textDim} aria-hidden="true" style={{ flexShrink: 0 }} />
+            )}
+          </React.Fragment>
         ))}
       </div>
 
