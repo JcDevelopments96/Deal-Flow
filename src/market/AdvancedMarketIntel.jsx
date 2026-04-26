@@ -1658,9 +1658,14 @@ export const AdvancedMarketIntel = () => {
         </div>
       </Panel>
 
-      {/* 2 + 3. MAP (left) + LIVE LISTINGS (right) side-by-side once a state is active.
-              Map is sticky so it stays in view while the listings column scrolls. */}
-      {liveListingsState ? (
+      {/* 2 + 3. MAP (left) + LIVE LISTINGS (right) — always side-by-side.
+              Used to collapse to a full-width map when no state was
+              selected; that hid the listings column behind a wall. The
+              listings panel renders its own "pick a state" placeholder
+              so this layout works whether or not a state is active.
+              Map is sticky so it stays in view while the listings
+              column scrolls. */}
+      {(
         <div style={{
           display: "grid",
           gridTemplateColumns: isMobile() ? "1fr" : "minmax(420px, 1fr) minmax(380px, 1fr)",
@@ -1675,7 +1680,9 @@ export const AdvancedMarketIntel = () => {
               accent
             >
               <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 14 }}>
-                Color-coded by median home value (Zillow ZHVI) · red pins mark each loaded listing · click any county to drill in.
+                {liveListingsState
+                  ? "Color-coded by median home value (Zillow ZHVI) · red pins mark each loaded listing · click any county to drill in."
+                  : "Counties are colored by median home value (Zillow ZHVI). Pick a state above or click any state on the map to load live listings."}
               </div>
               <USCountyMap
                 allMarkets={allMarkets}
@@ -1885,30 +1892,6 @@ export const AdvancedMarketIntel = () => {
             />
           </div>
         </div>
-      ) : (
-        <Panel
-          title="Market Map — US Counties"
-          icon={<MapPin size={16} />}
-          accent
-          style={{ marginBottom: 24 }}
-        >
-          <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 14 }}>
-            Counties are colored by median home value (Zillow ZHVI). Pick a state above or click any county to load live listings.
-          </div>
-          <USCountyMap
-            allMarkets={allMarkets}
-            selectedState={mapFocusState}
-            highlightedMarket={mapHighlight}
-            onCountyClick={handleMapCountyClick}
-            liveCountyStats={liveCityStats?.byCounty || null}
-                staticCountyStats={mapCountyIndexes}
-            metric={mapMetric}
-            listings={liveListings}
-            onListingClick={(l) => setPinnedListingId(l.id)}
-            pinnedListingId={pinnedListingId}
-            onResetView={handleResetView}
-          />
-        </Panel>
       )}
 
       {/* 4. SEARCH / STATE RESULT CARDS */}
