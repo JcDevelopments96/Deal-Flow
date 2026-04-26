@@ -23,17 +23,21 @@ import { requireUserId } from "../_lib/auth.js";
 const CACHE_MS = 24 * 60 * 60 * 1000;
 const _cache = new Map();
 
-// Reuse the same rdcpix.com URL rewrite we use in the sale-listings normalizer,
-// but bump the resolution even higher for the detail modal hero (retina-ready).
+// Same rdcpix.com URL rewrite as the sale-listings normalizer, with a
+// higher target resolution for the detail-modal hero (retina-ready).
+// Bumped char class to alphanumeric so URLs ending in <digit><suffix>.jpg
+// (about a third of Realtor's hash IDs) finally upgrade instead of
+// silently rendering at thumbnail resolution.
 function upgradeRealtorPhoto(url, { width = 1600, height = 1200, quality = 85 } = {}) {
   if (typeof url !== "string" || !url || !url.includes("rdcpix.com")) return url;
   const tag = `-w${width}_h${height}_q${quality}`;
-  return url
-    .replace(/-w\d+_h\d+(_q\d+)?(\.jpg)/i, `${tag}$2`)
-    .replace(/([a-z])s(\.jpg)(\?|$)/i, `$1od${tag}$2$3`)
-    .replace(/([a-z])c(\.jpg)(\?|$)/i, `$1od${tag}$2$3`)
-    .replace(/([a-z])m(\.jpg)(\?|$)/i, `$1od${tag}$2$3`)
-    .replace(/([a-z])t(\.jpg)(\?|$)/i, `$1od${tag}$2$3`);
+  if (/-w\d+_h\d+/i.test(url)) {
+    return url.replace(/-w\d+_h\d+(_q\d+)?(\.(?:jpe?g|png|webp))/i, `${tag}$2`);
+  }
+  return url.replace(
+    /([a-zA-Z0-9])([smcto])(\.(?:jpe?g|png|webp))(\?|$)/i,
+    `$1od${tag}$3$4`
+  );
 }
 
 export default handler(async (req, res) => {

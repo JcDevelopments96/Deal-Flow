@@ -4,23 +4,35 @@
    which provider served the data.
    ============================================================================ */
 
-// Realtor's `primary_photo.href` is a low-res thumbnail (~640x480) which
+// Realtor's primary_photo.href is a low-res thumbnail (~480x360) which
 // looks blurry in a 4:3 card. Their CDN (rdcpix.com) supports on-the-fly
-// resizing via path suffixes — we rewrite "xxxs.jpg" → "xxxod-w1024_h768.jpg"
-// to get a crisp image at card size without wasting bandwidth on 4K originals.
-// Safe to call on non-Realtor URLs (no-op if the pattern doesn't match).
+// resizing via path suffixes — we rewrite "xxxs.jpg" → "xxxod-w1536_h1024_q90.jpg"
+// to get a crisp image at card size + 2x retina without wasting bandwidth
+// on 4K originals. Safe to call on non-Realtor URLs (no-op if the pattern
+// doesn't match).
+const REALTOR_TARGET = "od-w1536_h1024_q90"; // 1536x1024 @ q90 — 2x retina headroom
+
 const upgradeRealtorPhoto = (url) => {
   if (typeof url !== "string" || !url) return url;
   if (!url.includes("rdcpix.com")) return url;
-  // Common suffixes: s.jpg (small), c.jpg (cropped), m.jpg (medium), t.jpg (tiny).
-  // Replace any of them with the resize directive. Also handle URLs that
-  // already have a dimension suffix — upgrade width to 1024.
-  return url
-    .replace(/-w\d+_h\d+(_q\d+)?(\.jpg)/i, "-w1024_h768_q80$2")
-    .replace(/([a-z])s(\.jpg)(\?|$)/i, "$1od-w1024_h768_q80$2$3")
-    .replace(/([a-z])c(\.jpg)(\?|$)/i, "$1od-w1024_h768_q80$2$3")
-    .replace(/([a-z])m(\.jpg)(\?|$)/i, "$1od-w1024_h768_q80$2$3")
-    .replace(/([a-z])t(\.jpg)(\?|$)/i, "$1od-w1024_h768_q80$2$3");
+
+  // Case 1: URL already has dimension hints baked in (newer Realtor format).
+  // Just bump the dimensions + quality to our target.
+  if (/-w\d+_h\d+/i.test(url)) {
+    return url.replace(/-w\d+_h\d+(_q\d+)?(\.(?:jpe?g|png|webp))/i, `-${REALTOR_TARGET}$2`);
+  }
+
+  // Case 2: URL ends in a single-letter size suffix before the extension.
+  // s = small, c = cropped, m = medium, t = tiny, o = original.
+  // The character immediately before the suffix is part of Realtor's photo
+  // hash and can be a letter OR a digit — the old regex only allowed
+  // letters, so any URL ending in <digit><suffix>.jpg (about a third of
+  // Realtor's IDs) was silently left at thumbnail size. Allowing
+  // alphanumeric closes that gap.
+  return url.replace(
+    /([a-zA-Z0-9])([smcto])(\.(?:jpe?g|png|webp))(\?|$)/i,
+    `$1${REALTOR_TARGET}$3$4`
+  );
 };
 
 const pushUnique = (arr, url) => {
