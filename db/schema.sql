@@ -312,6 +312,50 @@ create policy wholesale_outreach_self_read on public.wholesale_outreach
 
 
 -- ────────────────────────────────────────────────────────────────────────
+-- inspections (uploaded inspection PDFs + AI-generated summaries)
+--
+-- Tied to either a Deal (analyzer) or a Watchlist listing — `context`
+-- discriminates. The PDF itself lives in Supabase Storage at
+-- `inspections/{user_id}/{inspection_id}/{filename}`; this table stores
+-- the metadata + the structured summary Claude produced.
+-- ────────────────────────────────────────────────────────────────────────
+create table if not exists public.inspections (
+  id                uuid primary key default gen_random_uuid(),
+  user_id           uuid not null references public.users(id) on delete cascade,
+  context           text not null check (context in ('deal','watchlist')),
+  context_id        text not null,                -- deal id (uuid stringified) or listing id
+  filename          text not null,
+  storage_path      text not null,
+  property_address  text,
+  status            text not null default 'pending'
+                    check (status in ('pending','processing','complete','failed')),
+  summary           jsonb,                        -- { overview, urgent[], immediate[], recommended[], deferred[], goodCondition[], totalEstCostMin, totalEstCostMax }
+  error_message     text,
+  file_size_bytes   integer,
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now()
+);
+
+create index if not exists inspections_user_context_idx
+  on public.inspections(user_id, context, context_id, created_at desc);
+
+alter table public.inspections enable row level security;
+
+drop policy if exists inspections_self_read on public.inspections;
+create policy inspections_self_read on public.inspections
+  for select using (
+    user_id in (select id from public.users where clerk_user_id = auth.jwt() ->> 'sub')
+  );
+
+-- Storage bucket for the actual PDFs. Private — only owner can read via
+-- a signed URL minted by the API. Run via Supabase SQL editor (or the
+-- Storage UI) since the storage schema may not exist locally.
+-- insert into storage.buckets (id, name, public)
+--   values ('inspections', 'inspections', false)
+--   on conflict (id) do nothing;
+
+
+-- ────────────────────────────────────────────────────────────────────────
 -- market_indexes (snapshot of public research data — Zillow + Redfin)
 --
 -- Populated by scripts/ingest-market-data.js (monthly cron / manual run).

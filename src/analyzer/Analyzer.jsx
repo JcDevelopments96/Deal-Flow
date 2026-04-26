@@ -4,7 +4,7 @@
 import React, { useState, useMemo } from "react";
 import {
   Search, Hammer, DollarSign, Home, PiggyBank, Target,
-  BarChart3, ChevronRight, FileDown, Save, Trash2
+  BarChart3, ChevronRight, FileDown, Save, Trash2, FileText
 } from "lucide-react";
 import { THEME } from "../theme.js";
 import { calcMetrics, fmtUSD, isMobile, generatePDFReport } from "../utils.js";
@@ -15,6 +15,7 @@ import { RehabSection } from "./RehabSection.jsx";
 import { RefinanceSection } from "./RefinanceSection.jsx";
 import { ExitStrategyComparisons } from "./ExitStrategyComparisons.jsx";
 import { CostBreakdown } from "./CostBreakdown.jsx";
+import { InspectionPanel } from "../inspection/InspectionPanel.jsx";
 
 export const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete, onPdfError, onPdfSuccess, isDirty }) => {
   const [section, setSection] = useState("acquisition");
@@ -26,7 +27,8 @@ export const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete, onPdfError,
     { key: "costs", label: "Costs", icon: <DollarSign size={14} /> },
     { key: "rent", label: "Rent", icon: <Home size={14} /> },
     { key: "refinance", label: "Refinance", icon: <PiggyBank size={14} /> },
-    { key: "exit", label: "Exit", icon: <Target size={14} /> }
+    { key: "exit", label: "Exit", icon: <Target size={14} /> },
+    { key: "inspection", label: "Inspection", icon: <FileText size={14} /> }
   ];
 
   const handleExportPDF = async () => {
@@ -319,6 +321,13 @@ export const Analyzer = ({ deal, onUpdate, onSave, onBack, onDelete, onPdfError,
       )}
       {section === "refinance" && <RefinanceSection deal={deal} onUpdate={onUpdate} metrics={metrics} />}
       {section === "exit" && <ExitStrategyComparisons deal={deal} metrics={metrics} />}
+      {section === "inspection" && (
+        <InspectionPanel
+          context="deal"
+          contextId={deal.id}
+          propertyAddress={deal.address || deal.title || null}
+        />
+      )}
     </div>
   );
 };

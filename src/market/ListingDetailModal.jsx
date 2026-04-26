@@ -8,6 +8,7 @@ import { THEME } from "../theme.js";
 import { fmtUSD } from "../utils.js";
 import { useAppActions } from "../contexts.jsx";
 import { isSaasMode, useSaasUser, fetchFloodZone, fetchWalkScore, fetchListingDetail, fetchPropertyPhotos, fetchNearby, fetchStrEstimate } from "../lib/saas.js";
+import { InspectionPanel } from "../inspection/InspectionPanel.jsx";
 import { estimateCashflow } from "./cashflow.js";
 
 export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr, mortgageRate, countyStats }) => {
@@ -685,6 +686,20 @@ export const ListingDetailModal = ({ listing, type = "sale", onClose, countyFmr,
               </div>
             )}
           </div>
+
+          {/* Inspection report — only after the listing is on the watchlist
+              so we have a stable contextId. For non-watched listings the
+              user can still upload via Analyzer once they "Analyze this
+              Deal" (which also creates a Deal record with a stable id). */}
+          {watched && (
+            <div style={{ marginBottom: 16 }}>
+              <InspectionPanel
+                context="watchlist"
+                contextId={listing.id}
+                propertyAddress={listing.formattedAddress}
+              />
+            </div>
+          )}
 
           {/* Actions */}
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
