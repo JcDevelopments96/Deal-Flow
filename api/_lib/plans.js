@@ -19,8 +19,9 @@ export const PLANS = {
     priceMonthly: 0,
     priceAnnual: 0,
     includedClicks: 10,          // taste of every paid feature; deal cap is the upgrade gate
-    aiMessages: 10,              // soft cap on Ari conversations (not yet enforced server-side)
+    aiMessages: 2,               // soft cap on Ari conversations (not yet enforced server-side)
     dealCap: 1,                  // saved-deal limit — second deal triggers the upgrade modal
+    inspectionCap: 1,            // lifetime inspection limit — caps Anthropic spend per free user
     overageCostCents: null,      // free plan blocks at quota → 402 → upgrade modal
     priceIdEnv: null,
     priceIdEnvAnnual: null
@@ -106,6 +107,7 @@ export function publicPlans() {
       includedClicks: plan.includedClicks,
       aiMessages: plan.aiMessages,
       dealCap: plan.dealCap ?? null,
+      inspectionCap: plan.inspectionCap ?? null,
       overageCostCents: plan.overageCostCents,
       mostPopular: !!plan.mostPopular,
       stripePriceId: resolveStripePriceId(key, "monthly"),

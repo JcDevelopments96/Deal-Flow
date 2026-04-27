@@ -20,7 +20,8 @@ const STATIC_PLANS = [
   {
     key: "free", name: "Free",
     priceMonthly: 0, priceAnnual: 0,
-    includedClicks: 5, aiMessages: 10,
+    includedClicks: 10, aiMessages: 2,
+    dealCap: 1, inspectionCap: 1,
     overageCostCents: null, mostPopular: false,
     stripePriceId: null, stripePriceIdAnnual: null
   },
@@ -300,24 +301,32 @@ export const PlansView = () => {
                 </li>
                 <li style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: THEME.textMuted }}>
                   <Check size={14} color={THEME.green} />
-                  <span>Ari inspection summaries (PDF/Excel/Word)</span>
-                </li>
-                <li style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: THEME.textMuted }}>
-                  <Check size={14} color={THEME.green} />
                   <span>Full Analyzer, Watchlist, Team, Ari AI</span>
                 </li>
-                {/* Saved-deal cap on free is THE upgrade trigger; paid
-                    cards advertise unlimited as the headline benefit. */}
+                {/* Free plan caps are THE upgrade trigger; paid cards
+                    advertise unlimited so the diff is obvious. */}
                 {isFree ? (
-                  <li style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: THEME.orange }}>
-                    <Check size={14} color={THEME.orange} />
-                    <span><strong>Caps at 1 saved deal</strong></span>
-                  </li>
+                  <>
+                    <li style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: THEME.orange }}>
+                      <Check size={14} color={THEME.orange} />
+                      <span><strong>1 saved deal</strong></span>
+                    </li>
+                    <li style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: THEME.orange }}>
+                      <Check size={14} color={THEME.orange} />
+                      <span><strong>1 Ari AI inspection report</strong></span>
+                    </li>
+                  </>
                 ) : (
-                  <li style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: THEME.textMuted }}>
-                    <Check size={14} color={THEME.green} />
-                    <span><strong>Unlimited saved deals</strong></span>
-                  </li>
+                  <>
+                    <li style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: THEME.textMuted }}>
+                      <Check size={14} color={THEME.green} />
+                      <span><strong>Unlimited saved deals</strong></span>
+                    </li>
+                    <li style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: THEME.textMuted }}>
+                      <Check size={14} color={THEME.green} />
+                      <span><strong>Unlimited Ari AI inspections</strong></span>
+                    </li>
+                  </>
                 )}
                 {!isFree && (
                   <li style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: THEME.textMuted }}>

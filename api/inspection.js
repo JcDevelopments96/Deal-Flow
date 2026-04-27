@@ -20,14 +20,30 @@
 import { handler, ApiError } from "./_lib/errors.js";
 import { requireUserId } from "./_lib/auth.js";
 import { adminDb, ensureUser } from "./_lib/db.js";
+import { planFor } from "./_lib/plans.js";
 
 const BUCKET = "inspections";
 
 // Inspection AI summaries hit Anthropic per-PDF (~$0.05-0.20/call). All
-// plans get access — free users can run inspections too, but the
-// saved-deal cap is the primary upgrade trigger. Per-call costs stay
-// bounded by the user funnel since most free users upgrade or churn
-// before running many inspections.
+// plans get access, but free users are capped at a lifetime quota (1)
+// to bound exposure. Paid plans get unlimited.
+
+/** Throws 403 if the user is at their plan's lifetime inspection cap.
+ *  Counts ALL inspection rows for the user — soft-deleted summaries
+ *  still count, since the model call already happened. */
+async function enforceInspectionCap(db, user) {
+  const plan = planFor(user.plan);
+  const cap = plan.inspectionCap;
+  if (cap == null) return;                  // unlimited (paid plans)
+  const { count, error } = await db
+    .from("inspections").select("id", { count: "exact", head: true })
+    .eq("user_id", user.id);
+  if (error) throw new ApiError(500, "db_read_failed", error.message);
+  if ((count || 0) >= cap) {
+    throw new ApiError(403, "inspection_cap_reached",
+      `Free plan includes ${cap} inspection report. Upgrade to Starter, Pro, or Scale for unlimited reports.`);
+  }
+}
 
 function parseBody(req) {
   return req.body && typeof req.body === "object"
@@ -53,6 +69,10 @@ async function handleUploadUrl(body, user) {
   }
 
   const db = adminDb();
+  // Enforce lifetime inspection cap before minting an upload URL — that
+  // way free users at the cap don't even get a signed URL, so they
+  // can't bypass the gate and trigger Claude billing on /summarize.
+  await enforceInspectionCap(db, user);
 
   // Create the inspections row first so we have an id for the storage path
   const { data: row, error: insErr } = await db.from("inspections").insert({

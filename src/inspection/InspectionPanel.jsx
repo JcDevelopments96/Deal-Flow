@@ -336,11 +336,37 @@ export const InspectionPanel = ({ context, contextId, propertyAddress }) => {
     );
   }
 
-  // No plan gate — inspections are open to all plans now. Saved-deal
-  // cap is the primary upgrade trigger.
+  // No plan gate — inspections are open to all plans. Free users get
+  // one (server-enforced lifetime cap); the banner below sets that
+  // expectation before they upload.
+  const inspectionCap = saas.usage?.inspectionCap;
+  const showFreeNote = inspectionCap != null && saas.usage?.plan === "free";
 
   return (
     <Panel title="Inspection Reports" icon={<FileText size={16} />} accent>
+      {showFreeNote && (
+        <div style={{
+          marginBottom: 14, padding: "10px 14px",
+          background: THEME.bgRaised,
+          border: `1px solid ${THEME.border}`,
+          borderRadius: 8,
+          fontSize: 12, color: THEME.textMuted,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          gap: 12, flexWrap: "wrap"
+        }}>
+          <span>
+            <strong style={{ color: THEME.text }}>Free plan: {inspectionCap} inspection report.</strong>{" "}
+            Upgrade for unlimited reports.
+          </span>
+          <button
+            onClick={() => { try { window.location.hash = "#plans"; } catch {} }}
+            className="btn-secondary"
+            style={{ padding: "5px 12px", fontSize: 11 }}
+          >
+            See plans
+          </button>
+        </div>
+      )}
       {/* Upload zone */}
       <label style={{
         display: "block", padding: 20, marginBottom: 18,

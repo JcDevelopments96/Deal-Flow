@@ -109,12 +109,12 @@ const ProUpsell = ({ onChangeView }) => {
     {
       icon: <MessageSquare size={18} />,
       title: "200 Ari AI messages / mo",
-      desc: "20× the free plan. Ask Ari about deals, markets, strategy — with live web search built in."
+      desc: "100× the free plan's 2 messages. Ask Ari about deals, markets, strategy — with live web search built in."
     },
     {
-      icon: <Sparkles size={18} />,
-      title: "Everything else stays open",
-      desc: "Off-Market lead finder, Ari AI inspection summaries, the full deal analyzer, watchlist, and team CRM are all included on free too — Pro just removes the meters and the deal cap."
+      icon: <FileText size={18} />,
+      title: "Unlimited Ari AI inspections",
+      desc: "Free plan includes 1 inspection report total. Pro removes the cap so you can run a fresh inspection summary on every deal you analyze."
     }
   ];
 
@@ -154,7 +154,7 @@ const ProUpsell = ({ onChangeView }) => {
         fontSize: 14, color: "rgba(255,255,255,0.7)",
         maxWidth: 620, margin: "0 0 24px", lineHeight: 1.55
       }}>
-        Free plan gets you the whole toolkit — Off-Market leads, Ari AI inspections, the full analyzer — but caps at <strong style={{ color: "#FFFFFF" }}>1 saved deal</strong> and 10 Market Intel clicks. Upgrade to keep every deal you analyze.
+        Free plan gets you the whole toolkit — Off-Market leads, Ari AI inspections, the full analyzer — but caps at <strong style={{ color: "#FFFFFF" }}>1 saved deal, 1 inspection, 2 Ari messages, and 10 Market Intel clicks</strong>. Upgrade to remove the meters and keep every deal you analyze.
       </p>
 
       <div style={{
