@@ -11,6 +11,7 @@ import { THEME } from "../theme.js";
 import { calcMetrics, fmtUSD, isMobile } from "../utils.js";
 import { DEAL_STATUSES, DEAL_STATUS_ORDER, getDealStatus, StatusChip } from "../deals.jsx";
 import { CompareModal } from "../modals/CompareModal.jsx";
+import { useSaasUser } from "../lib/saas.js";
 
 export const DASHBOARD_SORT_OPTIONS = [
   { key: "updated", label: "Last Updated" },
@@ -21,6 +22,14 @@ export const DASHBOARD_SORT_OPTIONS = [
 ];
 
 export const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal, onChangeView, recentIds = [] }) => {
+  const saas = useSaasUser();
+  // At-cap state — free user has saved as many deals as their plan
+  // permits. Drives the upgrade nudge above the grid (the same cap also
+  // gates "+ New Deal" via the modal in App.jsx).
+  const dealCap = saas.usage?.dealCap;
+  const isFree = saas.usage?.plan === "free";
+  const atCap = isFree && dealCap != null && deals.length >= dealCap;
+
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortKey, setSortKey] = useState("updated");
@@ -196,6 +205,48 @@ export const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal, onChange
 
   return (
     <div style={{ maxWidth: 1400, margin: "0 auto", padding: isMobile() ? "16px" : "24px 28px" }}>
+      {/* At-cap conversion banner — only renders when a free user has
+          hit their saved-deal cap. The "+ New Deal" button still pops
+          the upgrade modal on click; this banner just makes the
+          situation visible up-front so they don't keep clicking and
+          getting blocked. */}
+      {atCap && (
+        <div style={{
+          marginBottom: 20, padding: "14px 18px",
+          background: `linear-gradient(135deg, ${THEME.bgOrange} 0%, ${THEME.bgRaised} 100%)`,
+          border: `1px solid ${THEME.orange}`,
+          borderLeft: `5px solid ${THEME.orange}`,
+          borderRadius: 8,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          gap: 14, flexWrap: "wrap"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 240 }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 8, flexShrink: 0,
+              background: THEME.orange, color: "#FFFFFF",
+              display: "flex", alignItems: "center", justifyContent: "center"
+            }}>
+              <Crown size={18} />
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: THEME.text, marginBottom: 2 }}>
+                You've saved your free deal
+              </div>
+              <div style={{ fontSize: 12, color: THEME.textMuted, lineHeight: 1.5 }}>
+                Start a 7-day Pro trial to keep saving every property you analyze. Cancel anytime, $0 today.
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => onChangeView?.("plans")}
+            className="btn-accent-orange"
+            style={{ padding: "9px 16px", fontSize: 13, flexShrink: 0 }}
+          >
+            Start 7-day trial <ArrowRight size={13} />
+          </button>
+        </div>
+      )}
+
       <div style={{
         display: "flex", justifyContent: "space-between", alignItems: "center",
         marginBottom: 20, flexWrap: "wrap", gap: 12

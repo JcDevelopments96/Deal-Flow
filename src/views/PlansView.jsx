@@ -268,6 +268,21 @@ export const PlansView = () => {
                 {isFree && <div style={{ fontSize: 11, color: THEME.textMuted, marginTop: 4 }}>No credit card required</div>}
               </div>
 
+              {/* ROI framing — paid card only. Buyers don't pay for
+                  features, they pay for outcomes. Skipping one bad deal
+                  more than covers the annual subscription. */}
+              {!isFree && (
+                <div style={{
+                  padding: "8px 10px", marginTop: 4,
+                  background: `${THEME.green}15`,
+                  border: `1px solid ${THEME.green}40`,
+                  borderRadius: 6,
+                  fontSize: 11, color: THEME.text, lineHeight: 1.45
+                }}>
+                  Pays for itself the first time it stops you from buying a bad deal.
+                </div>
+              )}
+
               <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 7 }}>
                 <li style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
                   <Check size={14} color={THEME.green} />
