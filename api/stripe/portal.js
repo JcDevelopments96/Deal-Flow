@@ -49,9 +49,13 @@ export default handler(async (req, res) => {
     // next checkout creates a fresh customer on the current account.
     if (err?.code === "resource_missing" && err?.param === "customer") {
       console.warn("[stripe:portal] healing stale customer id", customerId);
+      // Clear the stale customer id AND reset plan to free — there's no
+      // live subscription on this Stripe account so the previous "pro"
+      // status (from a different account / mode) doesn't apply. Webhook
+      // will flip them back to pro after they complete a fresh checkout.
       await adminDb()
         .from("users")
-        .update({ stripe_customer_id: null })
+        .update({ stripe_customer_id: null, plan: "free" })
         .eq("id", user.id);
       throw new ApiError(409, "stale_customer",
         "Your account was migrated to a new billing system. Pick a plan to start a fresh subscription.");
