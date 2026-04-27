@@ -311,7 +311,7 @@ export const HomeView = ({ onChangeView, onNewDeal, onOpenCalculator }) => {
           }}>
             {[
               { label: "Monthly cash flow", value: "+$487", color: THEME.green },
-              { label: "Cash-on-cash", value: "11.4%", color: THEME.accent },
+              { label: "Cash-on-cash", value: "11.4%", color: "#FFFFFF" },
               { label: "Cap rate", value: "7.8%", color: THEME.teal },
               { label: "Deal score", value: "82 / A", color: THEME.green }
             ].map(m => (
