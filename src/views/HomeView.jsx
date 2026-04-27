@@ -8,7 +8,7 @@ import React from "react";
 import {
   Search, Crown, Calculator, Star, Users, MessageSquare, Layout,
   Building2, MapPin, Sparkles, ArrowRight, Database, FileText,
-  Check, Zap, Layers, TrendingUp
+  Check, Zap, Layers, TrendingUp, GraduationCap
 } from "lucide-react";
 import { THEME } from "../theme.js";
 import { isMobile } from "../utils.js";
@@ -314,6 +314,14 @@ export const HomeView = ({ onChangeView, onNewDeal, onOpenCalculator }) => {
             cta=""
             onClick={null}
             accent="#F97316"
+          />
+          <FeatureCard
+            icon={<GraduationCap size={20} />}
+            title="Learn"
+            desc="BRRRR walkthroughs, financing strategies, market analysis, risk frameworks, and a searchable glossary. Built-in curriculum so you don't have to bounce between YouTube and 12 podcast episodes."
+            cta="Start learning"
+            onClick={() => onChangeView("education")}
+            accent="#16A34A"
           />
         </div>
       </div>
