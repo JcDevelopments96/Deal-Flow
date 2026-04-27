@@ -2,14 +2,14 @@
    WATCHLIST VIEW — saved listings from Market Intel, click to re-open detail.
    ============================================================================ */
 import React, { useState, useMemo } from "react";
-import { X, Star, Building2 } from "lucide-react";
+import { X, Star, Building2, Search, Crown, ArrowRight } from "lucide-react";
 import { THEME } from "../theme.js";
 import { isMobile } from "../utils.js";
 import { useAppActions } from "../contexts.jsx";
 import { ListingCard } from "../market/ListingCard.jsx";
 import { ListingDetailModal } from "../market/ListingDetailModal.jsx";
 
-export const WatchlistView = () => {
+export const WatchlistView = ({ onChangeView }) => {
   const { watchlist, removeWatch, useListingAsDeal } = useAppActions();
   const [detail, setDetail] = useState(null);
   const [filter, setFilter] = useState("");
@@ -47,24 +47,80 @@ export const WatchlistView = () => {
       </div>
 
       {watchlist.length === 0 ? (
-        <div style={{
-          maxWidth: 520, margin: "60px auto 0", padding: 40, textAlign: "center",
-          background: THEME.bgPanel, border: `1px solid ${THEME.border}`, borderRadius: 12
-        }}>
-          <div style={{
-            width: 64, height: 64, margin: "0 auto 16px",
-            borderRadius: "50%", background: THEME.bgRaised,
-            display: "flex", alignItems: "center", justifyContent: "center"
-          }}>
-            <Star size={28} color={THEME.accent} />
+        <div style={{ maxWidth: 720, margin: "32px auto 0" }}>
+          <div style={{ textAlign: "center", marginBottom: 24 }}>
+            <div style={{
+              width: 56, height: 56, margin: "0 auto 14px",
+              borderRadius: 12, background: THEME.bgRaised,
+              display: "flex", alignItems: "center", justifyContent: "center"
+            }}>
+              <Star size={26} color={THEME.accent} />
+            </div>
+            <h3 className="serif" style={{ fontSize: 22, margin: "0 0 6px", fontWeight: 700 }}>
+              Nothing saved yet
+            </h3>
+            <p style={{ fontSize: 13, color: THEME.textMuted, lineHeight: 1.5, maxWidth: 480, margin: "0 auto" }}>
+              Tap the star on any listing or off-market lead and it'll land here. Two ways to get started:
+            </p>
           </div>
-          <h3 className="serif" style={{ fontSize: 20, margin: "0 0 8px" }}>
-            No saved properties yet
-          </h3>
-          <p style={{ fontSize: 13, color: THEME.textMuted, lineHeight: 1.5, marginBottom: 0 }}>
-            Head to <strong>Market Intel</strong>, click the star on any listing, and it'll land here.
-            Your watchlist is stored locally in this browser.
-          </p>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: isMobile() ? "1fr" : "1fr 1fr",
+            gap: 12
+          }}>
+            {[
+              {
+                key: "market", icon: <Search size={20} />, color: THEME.accent,
+                title: "Browse on-market listings",
+                desc: "Open Find Properties, click any pin, then star the ones worth tracking.",
+                cta: "Open the map"
+              },
+              {
+                key: "wholesale", icon: <Crown size={20} />, color: "#9333EA",
+                title: "Hunt off-market leads",
+                desc: "Search by ZIP for absentee owners and pre-foreclosures, then star the ones worth pursuing.",
+                cta: "Open Off-Market"
+              }
+            ].map(c => (
+              <button
+                key={c.key}
+                onClick={() => onChangeView?.(c.key)}
+                style={{
+                  textAlign: "left", padding: 18,
+                  background: THEME.bgPanel,
+                  border: `1px solid ${THEME.border}`, borderRadius: 10,
+                  cursor: "pointer", display: "flex", flexDirection: "column", gap: 8,
+                  transition: "border-color 0.15s, transform 0.15s, box-shadow 0.15s"
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = c.color;
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow = "0 6px 20px rgba(15,23,42,0.10)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = THEME.border;
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                <div style={{
+                  width: 36, height: 36, borderRadius: 9,
+                  background: c.color, color: "#FFFFFF",
+                  display: "flex", alignItems: "center", justifyContent: "center"
+                }}>
+                  {c.icon}
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: THEME.text }}>{c.title}</div>
+                <div style={{ fontSize: 12, color: THEME.textMuted, lineHeight: 1.5, flex: 1 }}>{c.desc}</div>
+                <div style={{
+                  fontSize: 12, fontWeight: 700, color: c.color,
+                  display: "inline-flex", alignItems: "center", gap: 4
+                }}>
+                  {c.cta} <ArrowRight size={12} />
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       ) : filtered.length === 0 ? (
         <div style={{ padding: 40, textAlign: "center", color: THEME.textMuted, fontSize: 13 }}>

@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { THEME } from "../theme.js";
 import { fmtUSD, isMobile } from "../utils.js";
-import { Panel } from "../primitives.jsx";
+import { Panel, Skeleton } from "../primitives.jsx";
 import {
   PROVIDERS,
   buildDemoListings,
@@ -543,8 +543,24 @@ export const LiveListingsPanel = ({ selectedState, selectedCity, stateName, stat
       )}
 
       {loading && (
-        <div style={{ textAlign: "center", padding: 30, color: THEME.textMuted, fontSize: 13 }}>
-          <RefreshCw size={16} className="mono" style={{ animation: "spin 1s linear infinite" }} /> Loading…
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+          gap: 14
+        }}>
+          {[0, 1, 2, 3, 4, 5].map(i => (
+            <div key={i} style={{
+              padding: 12,
+              background: THEME.bgPanel,
+              border: `1px solid ${THEME.border}`,
+              borderRadius: 8
+            }}>
+              <Skeleton height={140} borderRadius={6} style={{ marginBottom: 10 }} />
+              <Skeleton height={14} width="80%" style={{ marginBottom: 8 }} />
+              <Skeleton height={11} width="55%" style={{ marginBottom: 14 }} />
+              <Skeleton height={20} width="40%" />
+            </div>
+          ))}
         </div>
       )}
 

@@ -265,6 +265,25 @@ export const Panel = ({ title, icon, children, accent, action, style = {} }) => 
 );
 
 /**
+ * Skeleton — shimmer loading placeholder. Use as a stand-in for content
+ * that's loading: card grids, listing rows, dashboard tiles. Reads as a
+ * dim rectangle with a gentle pulse so users see the layout taking shape
+ * before the data arrives. Pulse animation lives in the global stylesheet
+ * (theme.js) under @keyframes skeleton-pulse — tuned to a 1.2s sine.
+ */
+export const Skeleton = ({ width = "100%", height = 14, borderRadius = 4, style = {} }) => (
+  <div
+    aria-hidden="true"
+    style={{
+      width, height, borderRadius,
+      background: THEME.bgRaised,
+      animation: "skeleton-pulse 1.2s ease-in-out infinite",
+      ...style
+    }}
+  />
+);
+
+/**
  * CalcTooltip — hover an info icon to reveal the formula behind a calculated value.
  * Keyboard-accessible (tabIndex=0 on wrapper, body revealed on :focus-within).
  */

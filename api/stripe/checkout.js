@@ -9,6 +9,11 @@
  * user there. On success they come back to /?billing=success; on cancel
  * to /?billing=cancel.
  *
+ * 7-day free trial is granted on every checkout — unconditionally for
+ * simplicity. Stripe handles the no-charge-during-trial flow; the
+ * subscription auto-converts to paid on day 8 unless the user cancels.
+ * Cards are required upfront so conversion is automatic.
+ *
  * The subscription row is created on our side from the Stripe webhook
  * (subscription.created / subscription.updated) — not here.
  */
@@ -57,6 +62,13 @@ export default handler(async (req, res) => {
     // the Price itself is metered so no extra line item needed.
     allow_promotion_codes: true,
     subscription_data: {
+      trial_period_days: 7,                    // 7-day free trial on Pro
+      trial_settings: {
+        // If they don't have a card on file when the trial ends, just
+        // pause the subscription — never auto-charge a card we don't
+        // have, and never silently lock them out either.
+        end_behavior: { missing_payment_method: "pause" }
+      },
       metadata: {
         supabase_user_id: user.id,
         clerk_user_id: user.clerk_user_id,

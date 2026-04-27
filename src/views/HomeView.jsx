@@ -141,7 +141,7 @@ const ProUpsell = ({ onChangeView }) => {
           letterSpacing: "0.08em", textTransform: "uppercase",
           color: THEME.accent
         }}>
-          Pro · $49/mo · everything unlimited
+          Pro · $49/mo · 7-day free trial
         </span>
       </div>
       <h2 className="serif" style={{
@@ -197,7 +197,7 @@ const ProUpsell = ({ onChangeView }) => {
             display: "inline-flex", alignItems: "center", gap: 6
           }}
         >
-          See plans <ArrowRight size={14} />
+          Start 7-day free trial <ArrowRight size={14} />
         </button>
         <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
           Cancel anytime · Annual ($490/yr) = 2 months free
@@ -214,40 +214,138 @@ export const HomeView = ({ onChangeView, onNewDeal, onOpenCalculator }) => {
   const saas = useSaasUser();
   const showUpsell = !isSaasMode() || !saas.user || saas.usage?.plan === "free";
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto", padding: isMobile() ? "16px" : "32px 28px" }}>
+    <div style={{ maxWidth: 1180, margin: "0 auto", padding: isMobile() ? "16px" : "32px 28px" }}>
       {/* HERO ─────────────────────────────────────────────────────────── */}
-      <div style={{ textAlign: "center", marginBottom: 40 }}>
-        <div style={{
-          display: "inline-flex", alignItems: "center", gap: 6,
-          padding: "5px 12px", marginBottom: 18,
-          background: THEME.bgRaised, color: THEME.accent,
-          borderRadius: 999, fontSize: 11, fontWeight: 700,
-          letterSpacing: "0.08em", textTransform: "uppercase"
-        }}>
-          <Sparkles size={12} /> The Real Estate Investor's end-to-end toolkit
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: isMobile() ? "1fr" : "1.1fr 1fr",
+        gap: 36, alignItems: "center",
+        marginBottom: 48
+      }}>
+        {/* Left: copy + CTAs */}
+        <div style={{ textAlign: isMobile() ? "center" : "left" }}>
+          <div style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            padding: "5px 12px", marginBottom: 18,
+            background: THEME.bgRaised, color: THEME.accent,
+            borderRadius: 999, fontSize: 11, fontWeight: 700,
+            letterSpacing: "0.08em", textTransform: "uppercase"
+          }}>
+            <Sparkles size={12} /> The Real Estate Investor's end-to-end toolkit
+          </div>
+          <h1 className="serif" style={{ fontSize: isMobile() ? 30 : 44, fontWeight: 700, margin: 0, lineHeight: 1.1 }}>
+            Stop juggling six tabs to analyze a single deal.
+          </h1>
+          <p style={{
+            fontSize: isMobile() ? 14 : 16, color: THEME.textMuted,
+            margin: "16px 0 0", lineHeight: 1.55,
+            maxWidth: isMobile() ? 640 : "none"
+          }}>
+            Deal Docket puts live MLS listings, off-market lead finder, deal analyzer, AI inspection summaries, and your local pro roster in one place. Plug in a property and get a clear answer — flip, BRRRR, long-term rental, or short-term — in 60 seconds.
+          </p>
+          <div style={{
+            display: "flex", gap: 10, marginTop: 24,
+            flexWrap: "wrap",
+            justifyContent: isMobile() ? "center" : "flex-start"
+          }}>
+            <button
+              onClick={() => onChangeView("market")}
+              className="btn-primary"
+              style={{ padding: "12px 22px", fontSize: 14 }}>
+              <Search size={15} /> Find a property
+            </button>
+            <button
+              onClick={onNewDeal}
+              className="btn-secondary"
+              style={{ padding: "12px 22px", fontSize: 14 }}>
+              <Calculator size={15} /> Analyze a deal
+            </button>
+          </div>
         </div>
-        <h1 className="serif" style={{ fontSize: isMobile() ? 30 : 42, fontWeight: 700, margin: 0, lineHeight: 1.1 }}>
-          Find, analyze, and close real estate deals
-        </h1>
-        <p style={{
-          fontSize: isMobile() ? 14 : 16, color: THEME.textMuted,
-          maxWidth: 640, margin: "16px auto 0", lineHeight: 1.55
+
+        {/* Right: preview card showing what the analyzer outputs.
+            Concrete sample metrics make the value prop tangible — way
+            stronger than copy alone for signed-out conversion. */}
+        <div style={{
+          background: `linear-gradient(135deg, ${THEME.navy} 0%, #1A2332 100%)`,
+          color: "#FFFFFF",
+          borderRadius: 14,
+          padding: 22,
+          boxShadow: "0 14px 40px rgba(15,23,42,0.18)",
+          position: "relative", overflow: "hidden"
         }}>
-          Deal Docket pulls together everything an investor needs in one place — live MLS listings, off-market wholesale leads, a county-level market map, deal analysis, and a vetted local-pro directory. No more juggling six tabs.
-        </p>
-        <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 24, flexWrap: "wrap" }}>
-          <button
-            onClick={() => onChangeView("market")}
-            className="btn-primary"
-            style={{ padding: "12px 22px", fontSize: 14 }}>
-            <Search size={15} /> Find a property
-          </button>
-          <button
-            onClick={onNewDeal}
-            className="btn-secondary"
-            style={{ padding: "12px 22px", fontSize: 14 }}>
-            <Calculator size={15} /> Analyze a deal
-          </button>
+          {/* Mock app chrome */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 6,
+            paddingBottom: 12, marginBottom: 14,
+            borderBottom: "1px solid rgba(255,255,255,0.10)"
+          }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#EF4444" }} />
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#F59E0B" }} />
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10B981" }} />
+            <div style={{
+              marginLeft: 8, padding: "2px 9px", borderRadius: 4,
+              background: "rgba(255,255,255,0.08)",
+              fontSize: 10, color: "rgba(255,255,255,0.7)",
+              letterSpacing: "0.04em"
+            }}>
+              123 Main St · Columbus, OH
+            </div>
+          </div>
+
+          {/* Strategy recommendation pill */}
+          <div style={{
+            display: "inline-flex", alignItems: "center", gap: 5,
+            padding: "3px 9px", marginBottom: 12,
+            background: `${THEME.accent}26`, color: THEME.accent,
+            borderRadius: 999, fontSize: 10, fontWeight: 700,
+            letterSpacing: "0.06em", textTransform: "uppercase"
+          }}>
+            <Sparkles size={11} /> Best fit: BRRRR
+          </div>
+
+          {/* Sample metrics grid */}
+          <div style={{
+            display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10,
+            marginBottom: 12
+          }}>
+            {[
+              { label: "Monthly cash flow", value: "+$487", color: THEME.green },
+              { label: "Cash-on-cash", value: "11.4%", color: THEME.accent },
+              { label: "Cap rate", value: "7.8%", color: THEME.teal },
+              { label: "Deal score", value: "82 / A", color: THEME.green }
+            ].map(m => (
+              <div key={m.label} style={{
+                padding: "10px 12px",
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 8
+              }}>
+                <div style={{
+                  fontSize: 9, color: "rgba(255,255,255,0.6)",
+                  letterSpacing: "0.06em", textTransform: "uppercase",
+                  marginBottom: 4
+                }}>
+                  {m.label}
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: m.color }}>
+                  {m.value}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Bottom verdict */}
+          <div style={{
+            padding: "10px 12px",
+            background: "rgba(13,148,136,0.12)",
+            border: `1px solid ${THEME.accent}55`,
+            borderRadius: 8,
+            fontSize: 11, lineHeight: 1.55,
+            color: "rgba(255,255,255,0.85)"
+          }}>
+            <strong style={{ color: "#FFFFFF" }}>62% All-In ÷ ARV</strong> means the refi pulls back ~$48K of your $52K invested — solid recycle for the next deal.
+          </div>
         </div>
       </div>
 

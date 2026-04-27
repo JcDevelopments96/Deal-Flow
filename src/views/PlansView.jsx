@@ -339,7 +339,7 @@ export const PlansView = () => {
                       justifyContent: "center", cursor: "pointer"
                     }}
                   >
-                    <CreditCard size={13} /> Sign up &amp; choose {plan.name}
+                    <CreditCard size={13} /> Start 7-day free trial
                   </button>
                 </SignUpButton>
               )}
@@ -358,7 +358,7 @@ export const PlansView = () => {
                   {isCurrent ? "Current plan" :
                    isWorking ? "Redirecting…" :
                    !stripePriceId ? `${cadence === "annual" ? "Annual" : "Monthly"} not configured` :
-                   <><CreditCard size={13} /> Choose {plan.name}</>}
+                   <><CreditCard size={13} /> Start 7-day free trial</>}
                 </button>
               )}
               {isFree && (

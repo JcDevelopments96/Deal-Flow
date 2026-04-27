@@ -7,7 +7,7 @@
      - src/theme.js / utils.js / primitives.jsx / contexts.jsx / deals.jsx
      - src/analyzer/ / src/market/ / src/views/ / src/modals/
    ============================================================================ */
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from "react";
 import { Plus } from "lucide-react";
 
 import { THEME, STYLE_TAG } from "./theme.js";
@@ -25,7 +25,6 @@ import {
 import { Header } from "./views/Header.jsx";
 import { Dashboard } from "./views/Dashboard.jsx";
 import { WatchlistView } from "./views/WatchlistView.jsx";
-import { EducationCenter } from "./views/EducationCenter.jsx";
 import { TeamView } from "./views/TeamView.jsx";
 import { PlansView } from "./views/PlansView.jsx";
 import { WholesaleView } from "./views/WholesaleView.jsx";
@@ -33,14 +32,38 @@ import { TermsView } from "./views/TermsView.jsx";
 import { HomeView } from "./views/HomeView.jsx";
 import { InspectionsView } from "./views/InspectionsView.jsx";
 import { Analyzer } from "./analyzer/Analyzer.jsx";
-import { AdvancedMarketIntel } from "./market/AdvancedMarketIntel.jsx";
 import { ErrorBoundary } from "./ErrorBoundary.jsx";
 import { AriChat } from "./AriChat.jsx";
 import { MarketIntelRibbon } from "./market/MarketIntelRibbon.jsx";
+
+// Heavy views — lazy-loaded so leaflet (~150KB) and the curriculum data
+// stay out of the main bundle. Code-split on first navigation to the view.
+const AdvancedMarketIntel = lazy(() =>
+  import("./market/AdvancedMarketIntel.jsx").then(m => ({ default: m.AdvancedMarketIntel }))
+);
+const EducationCenter = lazy(() =>
+  import("./views/EducationCenter.jsx").then(m => ({ default: m.EducationCenter }))
+);
+
+// Cheap fallback while a lazy chunk is fetching — matches the rest of
+// the app's loading aesthetic (pulse-animated muted text).
+const ViewLoading = () => (
+  <div style={{
+    maxWidth: 1400, margin: "0 auto",
+    padding: "60px 28px", textAlign: "center",
+    fontSize: 12, color: "#8A93A0",
+    letterSpacing: "0.15em", textTransform: "uppercase",
+    animation: "skeleton-pulse 1.2s ease-in-out infinite"
+  }}>
+    Loading…
+  </div>
+);
 import { TemplatePicker } from "./modals/TemplatePicker.jsx";
 import { UnsavedChangesModal } from "./modals/UnsavedChangesModal.jsx";
 import { MortgageCalculatorModal } from "./modals/MortgageCalculatorModal.jsx";
 import { UpgradeModal } from "./modals/UpgradeModal.jsx";
+import { Footer } from "./views/Footer.jsx";
+import { FirstRunWizard, isFirstRunComplete, markFirstRunComplete } from "./modals/FirstRunWizard.jsx";
 
 // Alias for semantic naming
 
@@ -59,6 +82,7 @@ function BRRRRTrackerInner() {
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [showCalculator, setShowCalculator] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const [showFirstRun, setShowFirstRun] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [watchlist, setWatchlist] = useState([]);
   const [recentIds, setRecentIds] = useState([]); // most-recently-opened deal IDs (max 5)
@@ -101,6 +125,16 @@ function BRRRRTrackerInner() {
   const saas = useSaasUser();
   const saasOn = isSaasMode();
   const saasUserId = saas.user?.id || null;
+
+  // First-run wizard — fires once per user on first sign-in. We key the
+  // localStorage flag on the user id so a fresh account on the same
+  // browser still gets the walkthrough. Standalone (no auth) gets the
+  // walkthrough once per browser via the "anon" key.
+  useEffect(() => {
+    if (saasOn && !saas.user) return;          // wait for auth to resolve
+    if (isFirstRunComplete(saasUserId)) return;
+    setShowFirstRun(true);
+  }, [saasOn, saas.user, saasUserId]);
 
   // Load watchlist from localStorage once on mount (standalone/initial render).
   useEffect(() => {
@@ -495,10 +529,14 @@ function BRRRRTrackerInner() {
             Research investment markets across the US
           </div>
         </div>
-        <ErrorBoundary><AdvancedMarketIntel /></ErrorBoundary>
+        <ErrorBoundary>
+          <Suspense fallback={<ViewLoading />}>
+            <AdvancedMarketIntel />
+          </Suspense>
+        </ErrorBoundary>
       </div>}
 
-      {view === "watchlist" && <WatchlistView />}
+      {view === "watchlist" && <WatchlistView onChangeView={setView} />}
 
       {view === "team" && <TeamView />}
 
@@ -506,7 +544,11 @@ function BRRRRTrackerInner() {
 
       {view === "wholesale" && <WholesaleView />}
 
-      {view === "education" && <EducationCenter />}
+      {view === "education" && (
+        <Suspense fallback={<ViewLoading />}>
+          <EducationCenter />
+        </Suspense>
+      )}
 
       {view === "terms" && <TermsView />}
 
@@ -551,16 +593,26 @@ function BRRRRTrackerInner() {
         />
       )}
 
-      <div style={{
-        maxWidth: 1400, margin: "0 auto",
-        padding: "24px 28px", borderTop: `1px solid ${THEME.border}`,
-        marginTop: 60,
-        display: "flex", justifyContent: "space-between", alignItems: "center",
-        fontSize: 11, color: THEME.textMuted, flexWrap: "wrap", gap: 8
-      }}>
-        <div>Deal Docket v3.0 Professional</div>
-        <div>© 2026 Deal Docket</div>
-      </div>
+      {showFirstRun && (
+        <FirstRunWizard
+          userName={saas.clerkUser?.firstName || ""}
+          onPick={(key) => {
+            markFirstRunComplete(saasUserId);
+            setShowFirstRun(false);
+            if (key === "__newDeal") {
+              handleNewDeal();
+            } else {
+              setView(key);
+            }
+          }}
+          onSkip={() => {
+            markFirstRunComplete(saasUserId);
+            setShowFirstRun(false);
+          }}
+        />
+      )}
+
+      <Footer onChangeView={setView} />
 
       {/* Ari — Claude-powered floating chat assistant. Always mounted; the
           widget itself decides whether to render the launcher or panel. */}
