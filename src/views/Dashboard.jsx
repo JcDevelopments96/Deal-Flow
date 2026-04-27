@@ -4,7 +4,8 @@
    ============================================================================ */
 import React, { useState, useMemo, useCallback } from "react";
 import {
-  Building2, Search, Plus, Trash2, Clock, Layers, ArrowRight, CheckCircle2
+  Building2, Search, Plus, Trash2, Clock, Layers, ArrowRight, CheckCircle2,
+  Crown, Calculator
 } from "lucide-react";
 import { THEME } from "../theme.js";
 import { calcMetrics, fmtUSD, isMobile } from "../utils.js";
@@ -19,7 +20,7 @@ export const DASHBOARD_SORT_OPTIONS = [
   { key: "coc", label: "Cash-on-Cash %" }
 ];
 
-export const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal, recentIds = [] }) => {
+export const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal, onChangeView, recentIds = [] }) => {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortKey, setSortKey] = useState("updated");
@@ -76,28 +77,119 @@ export const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal, recentId
   }, [deals, query, statusFilter, sortKey]);
 
   if (!deals.length) {
+    // Three-card start prompt — gives a brand-new user something to do.
+    // The single "Analyze Your First Deal" CTA was a dead-end if the
+    // user didn't have a property in mind yet. These three cards map
+    // to the actual entry points for sourcing a deal.
+    const startCards = [
+      {
+        key: "find",
+        icon: <Search size={22} />,
+        title: "Find a property",
+        desc: "Browse live MLS listings on the county-level map. Click any pin for full details, flood zone, schools, and rent estimates.",
+        cta: "Open the map",
+        color: THEME.accent,
+        action: () => onChangeView?.("market")
+      },
+      {
+        key: "wholesale",
+        icon: <Crown size={22} />,
+        title: "Hunt off-market leads",
+        desc: "Search by city or ZIP for absentee owners, long-time holders, and pre-foreclosure properties. Skip-trace built in.",
+        cta: "Open Wholesale",
+        color: "#9333EA",
+        action: () => onChangeView?.("wholesale")
+      },
+      {
+        key: "analyze",
+        icon: <Calculator size={22} />,
+        title: "Analyze a property",
+        desc: "Already have a property in mind? Plug in the numbers and get cash flow, ROI, IRR, and a strategy recommendation.",
+        cta: "New deal",
+        color: THEME.teal,
+        action: onNewDeal
+      }
+    ];
+
     return (
       <div style={{
-        maxWidth: 1200, margin: "0 auto", padding: "60px 28px", textAlign: "center"
+        maxWidth: 1100, margin: "0 auto",
+        padding: isMobile() ? "32px 16px" : "56px 28px"
       }}>
-        <div style={{
-          width: 72, height: 72, margin: "0 auto 20px",
-          borderRadius: "50%", background: THEME.bgRaised,
-          display: "flex", alignItems: "center", justifyContent: "center"
-        }}>
-          <Building2 size={32} color={THEME.accent} />
+        <div style={{ textAlign: "center", marginBottom: 36 }}>
+          <div style={{
+            width: 64, height: 64, margin: "0 auto 18px",
+            borderRadius: 14, background: THEME.bgRaised,
+            display: "flex", alignItems: "center", justifyContent: "center"
+          }}>
+            <Building2 size={28} color={THEME.accent} />
+          </div>
+          <h2 className="serif" style={{ fontSize: isMobile() ? 24 : 30, fontWeight: 700, margin: "0 0 8px" }}>
+            Welcome to Deal Docket
+          </h2>
+          <p style={{
+            fontSize: 14, color: THEME.textMuted,
+            maxWidth: 540, margin: "0 auto", lineHeight: 1.55
+          }}>
+            You haven't saved any deals yet. Pick one of the three ways most investors get started below — or jump straight into the analyzer if you already have a property in mind.
+          </p>
         </div>
-        <h2 className="serif" style={{ fontSize: 28, marginBottom: 8 }}>
-          No Deals Yet
-        </h2>
-        <p style={{ fontSize: 14, color: THEME.textMuted, maxWidth: 420, margin: "0 auto 24px" }}>
-          Start analyzing your first investment opportunity. Use the templates to jumpstart your analysis
-          or build a deal from scratch.
-        </p>
-        <button className="btn-primary" onClick={onNewDeal} style={{ padding: "12px 20px", fontSize: 14 }}>
-          <Plus size={16} />
-          Analyze Your First Deal
-        </button>
+
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: isMobile() ? "1fr" : "repeat(3, 1fr)",
+          gap: 14
+        }}>
+          {startCards.map(card => (
+            <button
+              key={card.key}
+              onClick={card.action}
+              style={{
+                textAlign: "left",
+                padding: 20,
+                background: THEME.bg,
+                border: `1px solid ${THEME.border}`,
+                borderRadius: 10,
+                cursor: "pointer",
+                display: "flex", flexDirection: "column", gap: 10,
+                height: "100%",
+                transition: "border-color 0.15s, transform 0.15s, box-shadow 0.15s"
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = card.color;
+                e.currentTarget.style.boxShadow = "0 6px 20px rgba(15,23,42,0.10)";
+                e.currentTarget.style.transform = "translateY(-2px)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = THEME.border;
+                e.currentTarget.style.boxShadow = "none";
+                e.currentTarget.style.transform = "translateY(0)";
+              }}
+            >
+              <div style={{
+                width: 40, height: 40, borderRadius: 10,
+                background: card.color, color: "#FFFFFF",
+                display: "flex", alignItems: "center", justifyContent: "center"
+              }}>
+                {card.icon}
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: THEME.text, marginTop: 4 }}>
+                {card.title}
+              </div>
+              <div style={{ fontSize: 13, color: THEME.textMuted, lineHeight: 1.55, flex: 1 }}>
+                {card.desc}
+              </div>
+              <div style={{
+                fontSize: 12, fontWeight: 700,
+                color: card.color,
+                display: "inline-flex", alignItems: "center", gap: 4,
+                marginTop: 4
+              }}>
+                {card.cta} <ArrowRight size={12} />
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
     );
   }

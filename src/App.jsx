@@ -436,6 +436,7 @@ function BRRRRTrackerInner() {
           onOpenDeal={handleOpenDeal}
           onNewDeal={handleNewDeal}
           onDeleteDeal={handleDeleteDeal}
+          onChangeView={setView}
         />
       )}
 
