@@ -1,22 +1,19 @@
 /* ============================================================================
-   ONE-SHOT STRIPE SETUP — creates Deal Docket's products and prices in
-   either test or live Stripe mode, then prints the env-var lines you need
-   to paste into Vercel.
+   ONE-SHOT STRIPE SETUP — creates Deal Docket's Pro product + prices and
+   the webhook endpoint in either test or live Stripe mode, then prints
+   the four env-var lines you need to paste into Vercel.
 
-   USAGE (live):
-     STRIPE_SECRET_KEY=sk_live_xxx node scripts/stripe-setup.js
-
-   USAGE (test):
+   USAGE (test, recommended first):
      STRIPE_SECRET_KEY=sk_test_xxx node scripts/stripe-setup.js
 
-   The script is IDEMPOTENT — it keys products by metadata.dealtrack_key
-   so re-running it won't create duplicates. Prices are immutable in
-   Stripe, so if you change a price amount you'll get a NEW price ID and
-   the old one stays inactive (Stripe doesn't let you delete prices).
+   USAGE (live, after test passes):
+     STRIPE_SECRET_KEY=sk_live_xxx node scripts/stripe-setup.js
 
-   Make sure you're in the right Stripe mode before running:
-     - sk_live_… touches real money. Triple-check before hitting enter.
-     - sk_test_… is sandbox; safe to re-run.
+   Idempotent — re-running won't create duplicates. Products are looked up
+   by metadata.dealtrack_key, prices by amount + interval, the webhook by
+   URL. The webhook signing secret is only revealed by Stripe at creation
+   time; if a webhook already exists at our URL, the script reminds you
+   that the saved secret in Vercel is still valid (no need to re-paste).
    ============================================================================ */
 
 import Stripe from "stripe";
@@ -24,7 +21,8 @@ import Stripe from "stripe";
 const KEY = process.env.STRIPE_SECRET_KEY;
 if (!KEY) {
   console.error("❌  Missing STRIPE_SECRET_KEY env var.");
-  console.error("    Run with: STRIPE_SECRET_KEY=sk_live_... node scripts/stripe-setup.js");
+  console.error("    Run with: STRIPE_SECRET_KEY=sk_test_... node scripts/stripe-setup.js");
+  console.error("    Find it at https://dashboard.stripe.com/test/apikeys (test) or /apikeys (live).");
   process.exit(1);
 }
 const isLive = KEY.startsWith("sk_live_");
@@ -38,33 +36,30 @@ if (isLive) {
 
 const stripe = new Stripe(KEY, { apiVersion: "2024-06-20" });
 
-// Plan catalog — keep in sync with api/_lib/plans.js
+// Single Pro plan — matches api/_lib/plans.js. Free is handled in-app
+// (no Stripe product needed for $0). If you ever add a Team / Scale tier
+// back, drop another entry into this array.
 const PLANS = [
-  {
-    key: "starter",
-    name: "Deal Docket Starter",
-    description: "100 Market Intel clicks/mo · Wholesale, Watchlist, Team CRM included",
-    monthly: 2900,    // $29.00 in cents
-    annual:  29000    // $290.00 in cents (~17% off — 2 months free)
-  },
   {
     key: "pro",
     name: "Deal Docket Pro",
-    description: "500 Market Intel clicks/mo · Most popular for active investors",
-    monthly: 7900,    // $79.00
-    annual:  79000    // $790.00
-  },
-  {
-    key: "scale",
-    name: "Deal Docket Scale",
-    description: "2,500 Market Intel clicks/mo · Unlimited Ari assistant",
-    monthly: 19900,   // $199.00
-    annual:  199000   // $1,990.00
+    description: "All-in-one toolkit for real estate investors — unlimited deals + inspections, off-market lead finder, BRRRR analyzer, AI inspection summaries. 7-day free trial.",
+    monthly: 4900,     // $49.00
+    annual:  49000     // $490.00 — 2 months free
   }
 ];
 
+const WEBHOOK_URL = "https://dealdocket.ai/api/stripe/webhook";
+const WEBHOOK_EVENTS = [
+  "checkout.session.completed",
+  "customer.subscription.created",
+  "customer.subscription.updated",
+  "customer.subscription.deleted",
+  "invoice.payment_succeeded",
+  "invoice.payment_failed"
+];
+
 async function findOrCreateProduct(plan) {
-  // Look for existing product with our metadata key (idempotent re-runs).
   const search = await stripe.products.search({
     query: `active:'true' AND metadata['dealtrack_key']:'${plan.key}'`,
     limit: 5
@@ -83,7 +78,6 @@ async function findOrCreateProduct(plan) {
 }
 
 async function findOrCreatePrice(product, { unit_amount, interval, lookup_key }) {
-  // Try to find a matching active price first
   const list = await stripe.prices.list({
     product: product.id,
     active: true,
@@ -103,11 +97,28 @@ async function findOrCreatePrice(product, { unit_amount, interval, lookup_key })
     unit_amount,
     currency: "usd",
     recurring: { interval },
-    lookup_key, // human-friendly handle for finding later
+    lookup_key,
     metadata: { dealtrack_key: lookup_key }
   });
   console.log(`     ✓  Created price ${created.id} ($${unit_amount/100} / ${interval})`);
   return created;
+}
+
+async function findOrCreateWebhook() {
+  // Look for an existing webhook pointing at our URL.
+  const list = await stripe.webhookEndpoints.list({ limit: 100 });
+  const existing = list.data.find(w => w.url === WEBHOOK_URL);
+  if (existing) {
+    console.log(`   ↺  Reusing existing webhook ${existing.id} (${WEBHOOK_URL})`);
+    return { endpoint: existing, secretRevealed: false };
+  }
+  const created = await stripe.webhookEndpoints.create({
+    url: WEBHOOK_URL,
+    enabled_events: WEBHOOK_EVENTS,
+    description: "Deal Docket — subscription + checkout events"
+  });
+  console.log(`   ✓  Created webhook ${created.id} (${WEBHOOK_URL})`);
+  return { endpoint: created, secretRevealed: true };
 }
 
 console.log(`\n🟪  STRIPE SETUP — ${mode} mode\n`);
@@ -136,28 +147,39 @@ for (const plan of PLANS) {
   console.log("");
 }
 
+console.log(`▸  Webhook endpoint`);
+const { endpoint: webhook, secretRevealed } = await findOrCreateWebhook();
+if (secretRevealed) {
+  envLines["STRIPE_WEBHOOK_SECRET"] = webhook.secret;
+}
+console.log("");
+
 console.log("=".repeat(72));
 console.log(`✅  Done. Paste these into Vercel → Settings → Environment Variables`);
-console.log(`    (Environment: PRODUCTION). Then Redeploy with cache disabled.\n`);
+console.log(`    (Environment: ${isLive ? "PRODUCTION" : "PREVIEW + DEVELOPMENT"}).`);
+console.log(`    Then redeploy.\n`);
+
+console.log(`STRIPE_SECRET_KEY=${KEY.slice(0, 12)}…   (paste the FULL key from your dashboard)`);
 for (const [k, v] of Object.entries(envLines)) {
   console.log(`${k}=${v}`);
+}
+if (!secretRevealed) {
+  console.log(``);
+  console.log(`ℹ️   STRIPE_WEBHOOK_SECRET wasn't reprinted because the webhook already`);
+  console.log(`    existed (Stripe only reveals signing secrets at creation time).`);
+  console.log(`    If you don't have it saved in Vercel from before, delete the`);
+  console.log(`    endpoint at https://dashboard.stripe.com/${isLive ? "" : "test/"}webhooks`);
+  console.log(`    and re-run this script — it'll create a fresh one and print`);
+  console.log(`    the new secret.`);
 }
 console.log("");
 
 if (isLive) {
-  console.log("📌  Don't forget the rest of the live-mode swap:");
-  console.log("    1. Set STRIPE_SECRET_KEY in Vercel to your sk_live_… key");
-  console.log("    2. In Stripe → Developers → Webhooks → Add endpoint:");
-  console.log("       URL:    https://<your-prod-domain>/api/stripe/webhook");
-  console.log("       Events: checkout.session.completed,");
-  console.log("               customer.subscription.created,");
-  console.log("               customer.subscription.updated,");
-  console.log("               customer.subscription.deleted,");
-  console.log("               invoice.payment_succeeded,");
-  console.log("               invoice.payment_failed");
-  console.log("       Then copy the whsec_… signing secret into Vercel as");
-  console.log("       STRIPE_WEBHOOK_SECRET.");
+  console.log("📌  Live-mode checklist:");
+  console.log("    1. Verify the env var values above in Vercel (Production scope)");
+  console.log("    2. Redeploy from the Vercel dashboard so changes take effect");
   console.log("    3. Stripe → Settings → Billing → Customer portal → Activate (live)");
   console.log("       Allow: cancel · update payment · update plan · view invoices");
+  console.log("    4. Test the full flow end-to-end with a real card on a free account");
   console.log("");
 }
