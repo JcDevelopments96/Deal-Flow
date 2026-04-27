@@ -40,6 +40,7 @@ import { MarketIntelRibbon } from "./market/MarketIntelRibbon.jsx";
 import { TemplatePicker } from "./modals/TemplatePicker.jsx";
 import { UnsavedChangesModal } from "./modals/UnsavedChangesModal.jsx";
 import { MortgageCalculatorModal } from "./modals/MortgageCalculatorModal.jsx";
+import { UpgradeModal } from "./modals/UpgradeModal.jsx";
 
 // Alias for semantic naming
 
@@ -57,6 +58,7 @@ function BRRRRTrackerInner() {
   const [pendingNav, setPendingNav] = useState(null); // { type: "view"|"back", payload }
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [showCalculator, setShowCalculator] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [watchlist, setWatchlist] = useState([]);
   const [recentIds, setRecentIds] = useState([]); // most-recently-opened deal IDs (max 5)
@@ -228,8 +230,16 @@ function BRRRRTrackerInner() {
   }, [deals, activeDealId, draftDeal]);
 
   const handleNewDeal = useCallback(() => {
+    // Free plan caps at 1 saved deal — second New Deal click drops the
+    // upgrade modal instead of the template picker. Cap comes from
+    // /api/me as `usage.dealCap` (null for paid plans = unlimited).
+    const cap = saas.usage?.dealCap;
+    if (saasOn && cap != null && deals.length >= cap) {
+      setShowUpgrade(true);
+      return;
+    }
     setShowTemplatePicker(true);
-  }, []);
+  }, [saasOn, saas.usage, deals.length]);
 
   const handleTemplateSelect = useCallback((templateKey) => {
     const fresh = createBlankDeal(templateKey);
@@ -265,13 +275,21 @@ function BRRRRTrackerInner() {
 
   const handleSaveDeal = useCallback(() => {
     if (draftDeal) {
+      // Belt-and-suspenders: handleNewDeal already blocks at the
+      // template picker, but a user could in theory keep a draft
+      // around from before they hit the cap. Re-check on save.
+      const cap = saas.usage?.dealCap;
+      if (saasOn && cap != null && deals.length >= cap) {
+        setShowUpgrade(true);
+        return;
+      }
       setDeals(prev => [draftDeal, ...prev]);
       setActiveDealId(draftDeal.id);
       setDraftDeal(null);
     }
     setIsDraftDirty(false);
     toast.push("Deal saved", "success");
-  }, [draftDeal, toast]);
+  }, [draftDeal, deals.length, saasOn, saas.usage, toast]);
 
   const handleDeleteDeal = useCallback((dealId) => {
     setDeals(prev => prev.filter(d => d.id !== dealId));
@@ -521,6 +539,16 @@ function BRRRRTrackerInner() {
 
       {showCalculator && (
         <MortgageCalculatorModal onClose={() => setShowCalculator(false)} />
+      )}
+
+      {showUpgrade && (
+        <UpgradeModal
+          plans={saas.plans}
+          currentPlan={saas.usage?.plan}
+          getToken={saas.getToken}
+          reason={`Free plan saves up to ${saas.usage?.dealCap ?? 1} deal. Upgrade to save unlimited deals — keep every analysis you run.`}
+          onClose={() => setShowUpgrade(false)}
+        />
       )}
 
       <div style={{

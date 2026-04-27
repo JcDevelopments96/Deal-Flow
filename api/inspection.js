@@ -20,22 +20,14 @@
 import { handler, ApiError } from "./_lib/errors.js";
 import { requireUserId } from "./_lib/auth.js";
 import { adminDb, ensureUser } from "./_lib/db.js";
-import { planFor } from "./_lib/plans.js";
 
 const BUCKET = "inspections";
 
-// Inspection AI summaries hit Anthropic per-PDF (~$0.05-0.20/call) so
-// the upload + summarize path is gated to paid plans. Read paths (list,
-// fetch, delete) stay open for everyone — a free user who upgraded,
-// downgraded, then upgraded again can still see/manage their history.
-const PAID_PLANS = new Set(["starter", "pro", "scale"]);
-function requirePaidPlan(user) {
-  const plan = planFor(user.plan);
-  if (!PAID_PLANS.has(plan.key)) {
-    throw new ApiError(403, "upgrade_required",
-      "Ari's inspection summaries are a paid feature — available on Starter, Pro, and Scale.");
-  }
-}
+// Inspection AI summaries hit Anthropic per-PDF (~$0.05-0.20/call). All
+// plans get access — free users can run inspections too, but the
+// saved-deal cap is the primary upgrade trigger. Per-call costs stay
+// bounded by the user funnel since most free users upgrade or churn
+// before running many inspections.
 
 function parseBody(req) {
   return req.body && typeof req.body === "object"
@@ -289,9 +281,8 @@ export default handler(async (req, res) => {
   } else if (req.method === "DELETE") {
     payload = await handleDelete(req, user);
   } else if (req.method === "POST") {
-    // Both upload-url and summarize touch the paid Anthropic / Storage
-    // pipeline — gate before doing any work.
-    requirePaidPlan(user);
+    // Open to all plans — free users get inspections too. Saved-deal cap
+    // is the primary upgrade trigger.
     if (action === "upload-url") payload = await handleUploadUrl(body, user);
     else if (action === "summarize") payload = await handleSummarize(body, user);
     else throw new ApiError(400, "unknown_action", "POST action must be upload-url or summarize");

@@ -97,24 +97,24 @@ const Step = ({ num, title, desc }) => (
 const ProUpsell = ({ onChangeView }) => {
   const features = [
     {
-      icon: <Crown size={18} />,
-      title: "Off-market wholesale leads",
-      desc: "Search absentee owners, long-time holders, and pre-foreclosure properties by city or ZIP. Skip-trace + email outreach in-app."
-    },
-    {
-      icon: <FileText size={18} />,
-      title: "Ari AI inspection summaries",
-      desc: "Drop in any home-inspection PDF — Ari AI returns urgent issues, repair estimates, and a verdict in 30 seconds."
+      icon: <Layers size={18} />,
+      title: "Save unlimited deals",
+      desc: "Free plan caps at 1 saved deal — Pro lets you keep every property you analyze, compare them side-by-side, and track them through the pipeline."
     },
     {
       icon: <TrendingUp size={18} />,
       title: "500 Market Intel clicks / mo",
-      desc: "Free plan caps at 5. Pro lets you research without watching the meter — flat $0.10 per click after that."
+      desc: "Free plan gives you 10 to try things out. Pro lets you research without watching the meter — flat $0.10 per click after that."
     },
     {
       icon: <MessageSquare size={18} />,
       title: "200 Ari AI messages / mo",
       desc: "20× the free plan. Ask Ari about deals, markets, strategy — with live web search built in."
+    },
+    {
+      icon: <Sparkles size={18} />,
+      title: "Everything else stays open",
+      desc: "Off-Market lead finder, Ari AI inspection summaries, the full deal analyzer, watchlist, and team CRM are all included on free too — Pro just removes the meters and the deal cap."
     }
   ];
 
@@ -152,9 +152,9 @@ const ProUpsell = ({ onChangeView }) => {
       </h2>
       <p style={{
         fontSize: 14, color: "rgba(255,255,255,0.7)",
-        maxWidth: 600, margin: "0 0 24px", lineHeight: 1.55
+        maxWidth: 620, margin: "0 0 24px", lineHeight: 1.55
       }}>
-        Most of Deal Docket works on the free plan. The pieces below are where Pro pays for itself the first time you close a wholesale deal or skip a bad inspection.
+        Free plan gets you the whole toolkit — Off-Market leads, Ari AI inspections, the full analyzer — but caps at <strong style={{ color: "#FFFFFF" }}>1 saved deal</strong> and 10 Market Intel clicks. Upgrade to keep every deal you analyze.
       </p>
 
       <div style={{

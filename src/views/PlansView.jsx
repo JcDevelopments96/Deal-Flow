@@ -296,18 +296,27 @@ export const PlansView = () => {
                 )}
                 <li style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: THEME.textMuted }}>
                   <Check size={14} color={THEME.green} />
+                  <span>Off-Market leads + skip trace</span>
+                </li>
+                <li style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: THEME.textMuted }}>
+                  <Check size={14} color={THEME.green} />
+                  <span>Ari inspection summaries (PDF/Excel/Word)</span>
+                </li>
+                <li style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: THEME.textMuted }}>
+                  <Check size={14} color={THEME.green} />
                   <span>Full Analyzer, Watchlist, Team, Ari AI</span>
                 </li>
-                {!isFree && (
-                  <li style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: THEME.textMuted }}>
-                    <Check size={14} color={THEME.green} />
-                    <span>Wholesale leads + skip trace</span>
+                {/* Saved-deal cap on free is THE upgrade trigger; paid
+                    cards advertise unlimited as the headline benefit. */}
+                {isFree ? (
+                  <li style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: THEME.orange }}>
+                    <Check size={14} color={THEME.orange} />
+                    <span><strong>Caps at 1 saved deal</strong></span>
                   </li>
-                )}
-                {!isFree && (
+                ) : (
                   <li style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: THEME.textMuted }}>
                     <Check size={14} color={THEME.green} />
-                    <span>Ari inspection summaries (PDF/Excel/Word export)</span>
+                    <span><strong>Unlimited saved deals</strong></span>
                   </li>
                 )}
                 {!isFree && (

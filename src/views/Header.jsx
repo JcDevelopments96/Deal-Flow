@@ -454,11 +454,15 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
     if (!mobile && drawerOpen) setDrawerOpen(false);
   }, [mobile, drawerOpen]);
 
+  // Free users now get full access to every feature — the saved-deal
+  // cap is the upgrade trigger, not feature gating. Market clicks still
+  // run dry at the monthly quota; we keep the lock icon on Find
+  // Properties so users see they're at the meter, not behind a paywall.
   const marketLocked = isSaasMode() && (
     !saas.user || (usage?.plan === "free" && (usage?.remaining ?? 0) === 0)
   );
-  const wholesaleLocked  = isSaasMode() && (!saas.user || usage?.plan === "free");
-  const inspectionLocked = isSaasMode() && (!saas.user || usage?.plan === "free");
+  const wholesaleLocked  = false;
+  const inspectionLocked = false;
 
   const primary = [
     { key: "market",      label: "Find Properties", icon: <Search size={14} />, locked: marketLocked },

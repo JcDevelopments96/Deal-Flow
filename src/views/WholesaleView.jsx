@@ -663,9 +663,6 @@ export const WholesaleView = () => {
   const saasOn = isSaasMode();
   const toast = useToast();
   const { toggleWatch, isWatched } = useAppActions();
-  const plan = saas.usage?.plan;
-  const isPaid = plan && plan !== "free";
-
   const [zip, setZip] = useState("");
   const [searchState, setSearchState] = useState("");
   const [searchCity, setSearchCity] = useState("");
@@ -685,13 +682,13 @@ export const WholesaleView = () => {
   const [statusFilter, setStatusFilter] = useState("all");
 
   const loadLeads = useCallback(async () => {
-    if (!saasOn || !saas.user || !isPaid) { setLeads([]); setLoadingLeads(false); return; }
+    if (!saasOn || !saas.user) { setLeads([]); setLoadingLeads(false); return; }
     try {
       setLoadingLeads(true);
       const list = await listWholesaleLeads(saas.getToken);
       setLeads(list);
     } catch (e) { console.warn(e); } finally { setLoadingLeads(false); }
-  }, [saasOn, saas.user, saas.getToken, isPaid]);
+  }, [saasOn, saas.user, saas.getToken]);
   useEffect(() => { loadLeads(); }, [loadLeads]);
 
   const setBusy = (id, on) => setBusyIds(prev => {
@@ -799,23 +796,9 @@ export const WholesaleView = () => {
     );
   }
 
-  if (saasOn && !isPaid) {
-    return (
-      <div style={{ maxWidth: 700, margin: "60px auto", padding: 32, textAlign: "center",
-        border: `2px solid ${THEME.accent}`, borderRadius: 12, background: THEME.bgTeal }}>
-        <Crown size={40} color={THEME.accent} style={{ marginBottom: 14 }} />
-        <h2 style={{ fontSize: 24, fontWeight: 700, marginBottom: 10 }}>Wholesaling is a premium feature</h2>
-        <p style={{ fontSize: 14, color: THEME.textMuted, maxWidth: 500, margin: "0 auto 20px", lineHeight: 1.6 }}>
-          Find absentee owners, long-time holders, and distressed properties by ZIP. Skip-trace for phone/email.
-          Send outreach emails in-app. All included on <strong>Starter, Pro, and Scale</strong>.
-        </p>
-        <a href="#" onClick={(e) => { e.preventDefault(); window.location.hash = ""; }} className="btn-primary"
-          style={{ padding: "10px 20px", fontSize: 13 }}>
-          <Crown size={14} /> See plans
-        </a>
-      </div>
-    );
-  }
+  // Off-Market is open to all plans — free users get the same access,
+  // metered against the shared 10-click monthly bucket. Saved-deal cap
+  // is the upgrade trigger, not feature gating.
 
   /* ── Main UI ─────────────────────────────────────────────────────── */
   return (

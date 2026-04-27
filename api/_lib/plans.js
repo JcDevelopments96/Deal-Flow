@@ -3,7 +3,8 @@
  * via /api/me — never trust the client's claimed plan.
  *
  * Pricing model (April 2026 redesign):
- *   - Free includes 5 Market Intel clicks/mo so users get a taste before paywall
+ *   - Free includes 10 Market Intel clicks/mo + access to Off-Market + Inspections,
+ *     but caps at a single saved deal — the deal cap is the primary upgrade trigger
  *   - Flat $0.10 overage across all paid tiers (was tiered $0.05/$0.10/$0.15)
  *   - Annual cadence at ~17% discount (2 months free) sold via separate Stripe Price
  *
@@ -17,8 +18,9 @@ export const PLANS = {
     name: "Free",
     priceMonthly: 0,
     priceAnnual: 0,
-    includedClicks: 5,           // tiny taste — was 0; lets users browse a few markets before paywall
+    includedClicks: 10,          // taste of every paid feature; deal cap is the upgrade gate
     aiMessages: 10,              // soft cap on Ari conversations (not yet enforced server-side)
+    dealCap: 1,                  // saved-deal limit — second deal triggers the upgrade modal
     overageCostCents: null,      // free plan blocks at quota → 402 → upgrade modal
     priceIdEnv: null,
     priceIdEnvAnnual: null
@@ -103,6 +105,7 @@ export function publicPlans() {
       priceAnnual: plan.priceAnnual,
       includedClicks: plan.includedClicks,
       aiMessages: plan.aiMessages,
+      dealCap: plan.dealCap ?? null,
       overageCostCents: plan.overageCostCents,
       mostPopular: !!plan.mostPopular,
       stripePriceId: resolveStripePriceId(key, "monthly"),

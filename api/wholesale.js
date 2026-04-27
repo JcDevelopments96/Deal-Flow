@@ -24,26 +24,18 @@
 import { handler, ApiError } from "./_lib/errors.js";
 import { requireUserId } from "./_lib/auth.js";
 import { adminDb, ensureUser } from "./_lib/db.js";
-import { planFor } from "./_lib/plans.js";
 import { streetViewUrl as sharedStreetViewUrl, satelliteUrl as sharedSatelliteUrl } from "./_lib/googlePhotos.js";
 
 const TABLE = "wholesale_leads";
 const OUTREACH_TABLE = "wholesale_outreach";
 
-const PAID_PLANS = new Set(["starter", "pro", "scale"]);
-
+// Off-Market is open to all plans — free users get the same access, just
+// metered against the shared 10-click monthly bucket. Saved-deal cap is
+// the primary upgrade trigger.
 function parseBody(req) {
   return req.body && typeof req.body === "object"
     ? req.body
     : (typeof req.body === "string" ? JSON.parse(req.body || "{}") : {});
-}
-
-function requirePaidPlan(user) {
-  const plan = planFor(user.plan);
-  if (!PAID_PLANS.has(plan.key)) {
-    throw new ApiError(403, "upgrade_required",
-      "Wholesaling is a paid feature — available on Starter, Pro, and Scale.");
-  }
 }
 
 // Shared server-side Google Maps URL builders — larger size here than the
@@ -389,7 +381,6 @@ async function handleIntegrationStatus(user) {
 export default handler(async (req, res) => {
   const { clerkUserId, email } = await requireUserId(req);
   const user = await ensureUser({ clerkUserId, email });
-  requirePaidPlan(user);
 
   const action = (req.query?.action || "").toString();
   const id = req.query?.id ? String(req.query.id) : null;

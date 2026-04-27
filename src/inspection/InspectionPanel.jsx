@@ -18,7 +18,6 @@ import { THEME } from "../theme.js";
 import { Panel } from "../primitives.jsx";
 import { useToast } from "../contexts.jsx";
 import { isSaasMode, useSaasUser } from "../lib/saas.js";
-import { Crown } from "lucide-react";
 import {
   mintInspectionUploadUrl, uploadInspectionFile, summarizeInspection,
   listInspections, deleteInspection
@@ -337,38 +336,8 @@ export const InspectionPanel = ({ context, contextId, propertyAddress }) => {
     );
   }
 
-  // Paid-plan gate. Mirrors server-side requirePaidPlan() — read-only
-  // history (already-uploaded inspections) stays visible if the user
-  // had a paid plan in the past, but the upload form is locked.
-  const planKey = saas.usage?.plan;
-  const isPaid = planKey && planKey !== "free";
-  if (!isPaid) {
-    return (
-      <Panel title="Inspection Reports" icon={<FileText size={16} />} accent>
-        <div style={{
-          padding: "28px 20px", textAlign: "center",
-          background: THEME.bgTeal, border: `1px solid ${THEME.teal}`, borderRadius: 10
-        }}>
-          <Crown size={28} color={THEME.accent} style={{ marginBottom: 10 }} />
-          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>
-            AI Inspection Summaries — paid feature
-          </div>
-          <p style={{ fontSize: 12, color: THEME.textMuted, maxWidth: 460, margin: "0 auto 14px", lineHeight: 1.55 }}>
-            Upload any home-inspection PDF and Ari AI reads it cover-to-cover —
-            urgent issues, immediate repairs, recommended maintenance, and rough
-            cost estimates. Export the summary to PDF, Excel, or Word.
-            Included on Starter, Pro, and Scale.
-          </p>
-          <button
-            onClick={() => { try { window.location.hash = "#plans"; } catch {} }}
-            className="btn-primary"
-            style={{ padding: "9px 16px", fontSize: 12 }}>
-            <Crown size={13} /> See plans
-          </button>
-        </div>
-      </Panel>
-    );
-  }
+  // No plan gate — inspections are open to all plans now. Saved-deal
+  // cap is the primary upgrade trigger.
 
   return (
     <Panel title="Inspection Reports" icon={<FileText size={16} />} accent>
