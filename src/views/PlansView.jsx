@@ -5,10 +5,47 @@
    ============================================================================ */
 import React, { useState } from "react";
 import { Check, CreditCard, Sparkles, AlertTriangle } from "lucide-react";
+import { SignUpButton } from "@clerk/react";
 import { THEME } from "../theme.js";
 import { isMobile } from "../utils.js";
 import { Panel } from "../primitives.jsx";
 import { isSaasMode, useSaasUser, fetchMetered, ApiRequestError } from "../lib/saas.js";
+
+/* Static plan list for the signed-out marketing render. Mirrors
+ * api/_lib/plans.js — when the user is signed in, useSaasUser() loads
+ * the live projection (with their actual Stripe price IDs) from /api/me
+ * and overrides this. Without it, signed-out visitors hit /plans and
+ * see a blank grid because the auth-gated /api/me call returns null. */
+const STATIC_PLANS = [
+  {
+    key: "free", name: "Free",
+    priceMonthly: 0, priceAnnual: 0,
+    includedClicks: 5, aiMessages: 10,
+    overageCostCents: null, mostPopular: false,
+    stripePriceId: null, stripePriceIdAnnual: null
+  },
+  {
+    key: "starter", name: "Starter",
+    priceMonthly: 29, priceAnnual: 290,
+    includedClicks: 100, aiMessages: 50,
+    overageCostCents: 10, mostPopular: false,
+    stripePriceId: null, stripePriceIdAnnual: null
+  },
+  {
+    key: "pro", name: "Pro",
+    priceMonthly: 79, priceAnnual: 790,
+    includedClicks: 500, aiMessages: 200,
+    overageCostCents: 10, mostPopular: true,
+    stripePriceId: null, stripePriceIdAnnual: null
+  },
+  {
+    key: "scale", name: "Scale",
+    priceMonthly: 199, priceAnnual: 1990,
+    includedClicks: 2500, aiMessages: -1,
+    overageCostCents: 10, mostPopular: false,
+    stripePriceId: null, stripePriceIdAnnual: null
+  }
+];
 
 const FAQS = [
   {
@@ -36,7 +73,10 @@ export const PlansView = () => {
   const [working, setWorking] = useState(null);
   const [error, setError] = useState(null);
 
-  const plans = saas.plans || [];
+  // Live plan list (with the user's resolved Stripe price IDs) takes
+  // precedence; fall back to the marketing-only static list when
+  // signed-out so visitors still see all four cards.
+  const plans = (saas.plans && saas.plans.length > 0) ? saas.plans : STATIC_PLANS;
   const currentPlan = saas.usage?.plan;
 
   const handleChoose = async (planKey) => {
@@ -278,7 +318,24 @@ export const PlansView = () => {
                 )}
               </ul>
 
-              {!isFree && (
+              {!isFree && !saas.user && (
+                /* Signed-out: drop them into Clerk's sign-up modal first.
+                   After auth they land back on /plans and the live
+                   useSaasUser-loaded plan list takes over with real
+                   Stripe price IDs. */
+                <SignUpButton mode="modal">
+                  <button
+                    className={popular ? "btn-primary" : "btn-secondary"}
+                    style={{
+                      padding: "11px 14px", fontSize: 13, marginTop: "auto",
+                      justifyContent: "center", cursor: "pointer"
+                    }}
+                  >
+                    <CreditCard size={13} /> Sign up &amp; choose {plan.name}
+                  </button>
+                </SignUpButton>
+              )}
+              {!isFree && saas.user && (
                 <button
                   onClick={() => handleChoose(plan.key)}
                   disabled={disabled || isWorking}

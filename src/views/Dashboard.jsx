@@ -96,7 +96,7 @@ export const Dashboard = ({ deals, onOpenDeal, onNewDeal, onDeleteDeal, onChange
         icon: <Crown size={22} />,
         title: "Hunt off-market leads",
         desc: "Search by city or ZIP for absentee owners, long-time holders, and pre-foreclosure properties. Skip-trace built in.",
-        cta: "Open Wholesale",
+        cta: "Open Off-Market",
         color: "#9333EA",
         action: () => onChangeView?.("wholesale")
       },

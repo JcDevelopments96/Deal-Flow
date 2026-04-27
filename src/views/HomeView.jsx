@@ -7,11 +7,13 @@
 import React from "react";
 import {
   Search, Crown, Calculator, Star, Users, MessageSquare, Layout,
-  Building2, MapPin, Sparkles, ArrowRight, Database, FileText
+  Building2, MapPin, Sparkles, ArrowRight, Database, FileText,
+  Check, Zap, Layers, TrendingUp
 } from "lucide-react";
 import { THEME } from "../theme.js";
 import { isMobile } from "../utils.js";
 import { Panel } from "../primitives.jsx";
+import { isSaasMode, useSaasUser } from "../lib/saas.js";
 
 const FeatureCard = ({ icon, title, desc, cta, onClick, accent }) => (
   <div
@@ -87,7 +89,130 @@ const Step = ({ num, title, desc }) => (
   </div>
 );
 
+/* Upsell card — only renders for visitors who'd actually convert
+ * (signed-out OR signed-in on the free plan). Pro tier is the anchor:
+ * unlocks the wholesale finder, inspections AI, and a 100x bump on
+ * Market Intel clicks. Hidden entirely for paid users since they
+ * already get everything listed. */
+const ProUpsell = ({ onChangeView }) => {
+  const features = [
+    {
+      icon: <Crown size={18} />,
+      title: "Off-market wholesale leads",
+      desc: "Search absentee owners, long-time holders, and pre-foreclosure properties by city or ZIP. Skip-trace + email outreach in-app."
+    },
+    {
+      icon: <FileText size={18} />,
+      title: "Ari AI inspection summaries",
+      desc: "Drop in any home-inspection PDF — Ari AI returns urgent issues, repair estimates, and a verdict in 30 seconds."
+    },
+    {
+      icon: <TrendingUp size={18} />,
+      title: "500 Market Intel clicks / mo",
+      desc: "Free plan caps at 5. Pro lets you research without watching the meter — flat $0.10 per click after that."
+    },
+    {
+      icon: <MessageSquare size={18} />,
+      title: "200 Ari AI messages / mo",
+      desc: "20× the free plan. Ask Ari about deals, markets, strategy — with live web search built in."
+    }
+  ];
+
+  return (
+    <div style={{
+      marginBottom: 36,
+      padding: isMobile() ? 24 : "32px 36px",
+      background: `linear-gradient(135deg, ${THEME.navy} 0%, #1A2332 100%)`,
+      color: "#FFFFFF",
+      borderRadius: 14,
+      position: "relative",
+      overflow: "hidden"
+    }}>
+      {/* Subtle teal accent bar on the left edge */}
+      <div style={{
+        position: "absolute", top: 0, left: 0, bottom: 0,
+        width: 4, background: THEME.accent
+      }} />
+
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <Zap size={14} color={THEME.accent} />
+        <span style={{
+          fontSize: 11, fontWeight: 700,
+          letterSpacing: "0.08em", textTransform: "uppercase",
+          color: THEME.accent
+        }}>
+          Most popular · Pro · $79/mo
+        </span>
+      </div>
+      <h2 className="serif" style={{
+        fontSize: isMobile() ? 24 : 30, fontWeight: 700,
+        margin: "0 0 8px", lineHeight: 1.15
+      }}>
+        Unlock the full investor toolkit
+      </h2>
+      <p style={{
+        fontSize: 14, color: "rgba(255,255,255,0.7)",
+        maxWidth: 600, margin: "0 0 24px", lineHeight: 1.55
+      }}>
+        Most of Deal Docket works on the free plan. The pieces below are where Pro pays for itself the first time you close a wholesale deal or skip a bad inspection.
+      </p>
+
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: isMobile() ? "1fr" : "repeat(2, 1fr)",
+        gap: 14, marginBottom: 24
+      }}>
+        {features.map(f => (
+          <div key={f.title} style={{
+            padding: 16,
+            background: "rgba(255,255,255,0.05)",
+            border: "1px solid rgba(255,255,255,0.10)",
+            borderRadius: 10,
+            display: "flex", gap: 12, alignItems: "flex-start"
+          }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+              background: THEME.accent, color: "#FFFFFF",
+              display: "flex", alignItems: "center", justifyContent: "center"
+            }}>
+              {f.icon}
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>{f.title}</div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", lineHeight: 1.5 }}>
+                {f.desc}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <button
+          onClick={() => onChangeView("plans")}
+          style={{
+            padding: "12px 22px", fontSize: 14, fontWeight: 700,
+            background: THEME.accent, color: "#FFFFFF",
+            border: "none", borderRadius: 8, cursor: "pointer",
+            display: "inline-flex", alignItems: "center", gap: 6
+          }}
+        >
+          See plans <ArrowRight size={14} />
+        </button>
+        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
+          Cancel anytime · Annual saves 17% · Starter from $29/mo
+        </span>
+      </div>
+    </div>
+  );
+};
+
 export const HomeView = ({ onChangeView, onNewDeal, onOpenCalculator }) => {
+  // Show the upgrade pitch to anyone who could plausibly convert: not
+  // signed in, OR signed in on the free plan. Paid users don't need to
+  // see "upgrade to unlock" copy.
+  const saas = useSaasUser();
+  const showUpsell = !isSaasMode() || !saas.user || saas.usage?.plan === "free";
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: isMobile() ? "16px" : "32px 28px" }}>
       {/* HERO ─────────────────────────────────────────────────────────── */}
@@ -145,7 +270,7 @@ export const HomeView = ({ onChangeView, onNewDeal, onOpenCalculator }) => {
           />
           <FeatureCard
             icon={<Crown size={20} />}
-            title="Wholesale Lead Finder"
+            title="Off-Market Lead Finder"
             desc="Find absentee owners, long-time holders, and pre-foreclosure properties by city or ZIP. Owner names + mailing addresses included. Skip-trace for phone/email and email leads in-app."
             cta="Hunt off-market deals"
             onClick={() => onChangeView("wholesale")}
@@ -208,7 +333,7 @@ export const HomeView = ({ onChangeView, onNewDeal, onOpenCalculator }) => {
           <Step
             num="2"
             title="Hunt off-market leads"
-            desc="Open Wholesale → search by city or ZIP → get a sorted list of distressed and absentee-owner properties. Save the best ones, skip-trace, and email."
+            desc="Open Off-Market → search by city or ZIP → get a sorted list of distressed and absentee-owner properties. Save the best ones, skip-trace, and email."
           />
           <Step
             num="3"
@@ -217,6 +342,13 @@ export const HomeView = ({ onChangeView, onNewDeal, onOpenCalculator }) => {
           />
         </div>
       </Panel>
+
+      {/* PRO UPSELL ──────────────────────────────────────────────────────
+          Sits between the "how it works" beat and the data-sources panel,
+          right when the user has just learned what's possible and is most
+          primed to commit. Hidden for paid users who already get all of
+          this. */}
+      {showUpsell && <ProUpsell onChangeView={onChangeView} />}
 
       {/* DATA SOURCES ─────────────────────────────────────────────────── */}
       <Panel title="Powered by trusted data" icon={<Database size={16} />} style={{ marginBottom: 36 }}>

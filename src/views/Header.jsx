@@ -462,7 +462,7 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
 
   const primary = [
     { key: "market",      label: "Find Properties", icon: <Search size={14} />, locked: marketLocked },
-    { key: "wholesale",   label: "Wholesale",       icon: <Crown size={14} />,  locked: wholesaleLocked },
+    { key: "wholesale",   label: "Off-Market",      icon: <Crown size={14} />,  locked: wholesaleLocked },
     { key: "dashboard",   label: "Deals",           icon: <Layout size={14} /> },
     { key: "watchlist",   label: "Watchlist",       icon: <Star size={14} /> }
   ];
