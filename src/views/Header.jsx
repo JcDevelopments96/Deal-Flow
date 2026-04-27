@@ -1,21 +1,21 @@
 /* ============================================================================
-   TOP NAVIGATION — brand + 5 primary tabs + Tools dropdown + More dropdown
-   + New Deal action + plan badge + auth slot.
+   TOP NAVIGATION — brand + 4 primary tabs + Tools dropdown + New Deal CTA +
+   auth slot (with Plans / Learn / Terms tucked into the avatar menu).
 
    Design intent:
-   - Labels are concrete nouns (Deals, Find Properties, Wholesale, Watchlist),
-     not abstract ones (Dashboard, Market Intel) — readable on first glance.
-   - Five primary tabs cover the day-to-day flow (find → evaluate → save).
-     Interactive utilities (Inspections, Team, Calculator) live under "Tools";
-     informational pages (Learn, Plans, Terms) live under "More". Splitting
-     the dropdown by *function* keeps the bar scannable as the app grows.
-   - The user's current plan shows as a pill next to the avatar — a one-tap
-     path to Plans/billing for paid users, an upgrade nudge for free users.
+   - Logo always navigates home, so "Home" doesn't need its own tab.
+   - Four primary destinations cover the daily flow (find → evaluate → save).
+   - "Tools" groups the interactive utilities that *do* something
+     (Inspections, Team, Calculator).
+   - Account / billing pages (Plans, Learn, Terms) live behind the avatar
+     menu when signed in; signed-out users see a "Plans" text link next
+     to Sign in / Sign up so the sales page stays one click away.
+   - Plan badge folded into the avatar — one less floating element.
    ============================================================================ */
 import React, { useEffect, useRef, useState } from "react";
 import {
   Building2, Layout, Calculator, Star, GraduationCap, Plus, Lock,
-  Users, CreditCard, Crown, ChevronDown, Search, Shield, Home, FileText, Sparkles
+  Users, CreditCard, Crown, ChevronDown, Search, Shield, FileText, Sparkles
 } from "lucide-react";
 import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/react";
 import { THEME } from "../theme.js";
@@ -24,9 +24,21 @@ import { isSaasMode, useSaasUser } from "../lib/saas.js";
 
 const authConfigured = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
-const AuthSlot = () => (
+/** Auth slot — signed-out: Plans link + Sign in/Sign up. Signed-in: avatar
+ * with custom menu items for Plans, Learn, Terms (+ Clerk's defaults). */
+const AuthSlot = ({ planLabel, onChangeView }) => (
   <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: 4 }}>
     <Show when="signed-out">
+      <button
+        onClick={() => onChangeView("plans")}
+        style={{
+          padding: "7px 10px", fontSize: 12, fontWeight: 600,
+          background: "transparent", color: "rgba(255,255,255,0.85)",
+          border: "none", borderRadius: 6, cursor: "pointer"
+        }}
+      >
+        Plans
+      </button>
       <SignInButton mode="modal">
         <button className="btn-secondary" style={{ padding: "7px 12px", fontSize: 12 }}>
           Sign in
@@ -39,7 +51,43 @@ const AuthSlot = () => (
       </SignUpButton>
     </Show>
     <Show when="signed-in">
-      <UserButton appearance={{ elements: { userButtonAvatarBox: { width: 30, height: 30 } } }} />
+      {/* Plan label rides next to the avatar — small, muted, but always
+          visible so the user knows what tier they're on. */}
+      {planLabel && (
+        <button
+          onClick={() => onChangeView("plans")}
+          title={planLabel === "Free" ? "Click to see upgrade options" : "Manage subscription"}
+          style={{
+            padding: "4px 10px", fontSize: 10, fontWeight: 700,
+            letterSpacing: "0.06em", textTransform: "uppercase",
+            background: planLabel === "Free" ? THEME.accent : "rgba(255,255,255,0.18)",
+            color: "#FFFFFF",
+            border: planLabel === "Free" ? "none" : "1px solid rgba(255,255,255,0.32)",
+            borderRadius: 999, cursor: "pointer"
+          }}
+        >
+          {planLabel === "Free" ? <>Free · Upgrade</> : planLabel}
+        </button>
+      )}
+      <UserButton appearance={{ elements: { userButtonAvatarBox: { width: 30, height: 30 } } }}>
+        <UserButton.MenuItems>
+          <UserButton.Action
+            label="Plans & billing"
+            labelIcon={<CreditCard size={14} />}
+            onClick={() => onChangeView("plans")}
+          />
+          <UserButton.Action
+            label="Learn"
+            labelIcon={<GraduationCap size={14} />}
+            onClick={() => onChangeView("education")}
+          />
+          <UserButton.Action
+            label="Terms"
+            labelIcon={<Shield size={14} />}
+            onClick={() => onChangeView("terms")}
+          />
+        </UserButton.MenuItems>
+      </UserButton>
     </Show>
   </div>
 );
@@ -88,9 +136,9 @@ const NavButton = ({ tab, isActive, onClick, darkMode = true, watchlistCount }) 
   </button>
 );
 
-/** Generic dropdown menu — used for both "Tools" (interactive features) and
- * "More" (informational pages). Same shape, different `label` + contents,
- * keeps the top bar from sprawling once the app picks up new features. */
+/** Tools dropdown — interactive utilities (Inspections, Team, Calculator).
+ * Distinct from "primary destinations" so users can scan the bar and find
+ * tools without hunting through info pages. */
 const DropdownMenu = ({ label, icon, items, activeView, onPick, watchlistCount }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -155,31 +203,6 @@ const DropdownMenu = ({ label, icon, items, activeView, onPick, watchlistCount }
   );
 };
 
-/** Plan badge — small pill next to the avatar that surfaces the user's
- * current plan and links to /plans. Free users see "Free · Upgrade" in
- * accent so the upsell is obvious without being shouty. */
-const PlanBadge = ({ plan, onClick }) => {
-  if (!plan) return null;
-  const isFree = plan === "free";
-  return (
-    <button
-      onClick={onClick}
-      title={isFree ? "Click to see upgrade options" : "Manage subscription"}
-      style={{
-        padding: "4px 10px", fontSize: 10, fontWeight: 700,
-        letterSpacing: "0.06em", textTransform: "uppercase",
-        background: isFree ? THEME.accent : "rgba(255,255,255,0.18)",
-        color: "#FFFFFF",
-        border: isFree ? "none" : "1px solid rgba(255,255,255,0.32)",
-        borderRadius: 999, cursor: "pointer",
-        display: "inline-flex", alignItems: "center", gap: 4
-      }}
-    >
-      {isFree ? <>Free · Upgrade</> : plan}
-    </button>
-  );
-};
-
 export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchlistCount = 0 }) => {
   const saas = useSaasUser();
   const usage = saas.usage;
@@ -189,11 +212,11 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
   const wholesaleLocked  = isSaasMode() && (!saas.user || usage?.plan === "free");
   const inspectionLocked = isSaasMode() && (!saas.user || usage?.plan === "free");
 
-  // PRIMARY — five destinations the user reaches for daily. Anything
-  // beyond five and the bar starts to feel noisy. These are the shortest
-  // path to "find a property", "evaluate it", and "save what you like".
+  // PRIMARY — four destinations that cover the daily investor flow:
+  // find a property → look at off-market leads → analyze deals → save what
+  // you like. "Home" lives on the logo; account/info pages live behind
+  // the avatar.
   const primary = [
-    { key: "home",        label: "Home",            icon: <Home size={14} /> },
     { key: "market",      label: "Find Properties", icon: <Search size={14} />, locked: marketLocked },
     { key: "wholesale",   label: "Wholesale",       icon: <Crown size={14} />,  locked: wholesaleLocked },
     { key: "dashboard",   label: "Deals",           icon: <Layout size={14} /> },
@@ -201,8 +224,7 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
   ];
 
   // TOOLS — interactive features that *do* something (analyze a PDF, look
-  // up local pros, run a payment calc). Distinct from "More" so users
-  // can scan the bar and find utilities without hunting through info pages.
+  // up local pros, run a payment calc).
   const tools = [
     { key: "inspections", label: "Inspections", icon: <FileText size={14} />, locked: inspectionLocked },
     { key: "team",        label: "Team",        icon: <Users size={14} /> },
@@ -212,21 +234,18 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
     }] : [])
   ];
 
-  // MORE — informational / account pages. Low-frequency stops that
-  // don't deserve top-bar real estate but still need a clear path.
-  const more = [
-    { key: "education",   label: "Learn",       icon: <GraduationCap size={14} /> },
-    { key: "plans",       label: "Plans",       icon: <CreditCard size={14} /> },
-    { key: "terms",       label: "Terms",       icon: <Shield size={14} /> }
-  ];
-
-  // Dropdown picks call onChangeView for nav items — but the calculator
-  // entry is a tool, not a route. Intercept it.
-  const handleDropdownPick = (items) => (key) => {
-    const item = items.find(s => s.key === key);
+  // Tools dropdown picks call onChangeView for nav items — but the
+  // calculator entry is a tool, not a route. Intercept it.
+  const handleToolPick = (key) => {
+    const item = tools.find(s => s.key === key);
     if (item?.__action) item.__action();
     else onChangeView(key);
   };
+
+  // Plan label for the avatar pill — capitalized "Free", "Starter", etc.
+  const planLabel = usage?.plan
+    ? usage.plan.charAt(0).toUpperCase() + usage.plan.slice(1)
+    : null;
 
   return (
     <div style={{
@@ -241,8 +260,7 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
         display: "flex", alignItems: "center", justifyContent: "space-between",
         flexWrap: "wrap", gap: 12
       }}>
-        {/* Brand — wordmark only, no subtitle. The tagline added clutter
-            without adding information for returning users. */}
+        {/* Brand — logo doubles as Home link. */}
         <button
           onClick={() => onChangeView("home")}
           style={{ display: "flex", alignItems: "center", gap: 12, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
@@ -262,7 +280,7 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
           )}
         </button>
 
-        {/* Primary tabs + Tools/More dropdowns + primary CTA + auth */}
+        {/* Primary tabs + Tools dropdown + primary CTA + auth */}
         <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
           {primary.map(tab => (
             <NavButton
@@ -279,14 +297,7 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
             icon={<Sparkles size={13} />}
             items={tools}
             activeView={view}
-            onPick={handleDropdownPick(tools)}
-            watchlistCount={watchlistCount}
-          />
-          <DropdownMenu
-            label="More"
-            items={more}
-            activeView={view}
-            onPick={handleDropdownPick(more)}
+            onPick={handleToolPick}
             watchlistCount={watchlistCount}
           />
 
@@ -294,18 +305,13 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
           <div style={{ width: 1, height: 22, background: "rgba(255,255,255,0.18)", margin: "0 6px" }} aria-hidden="true" />
 
           {/* Single primary CTA — the most common action lives here, alone,
-              so it can't be missed. Calculator lives under Tools. */}
+              so it can't be missed. */}
           <button className="btn-primary" onClick={onNewDeal} aria-label="New deal" style={{ padding: "7px 14px", fontSize: 12 }}>
             <Plus size={14} />
             {!isMobile() && "New Deal"}
           </button>
 
-          {/* Plan badge → quick path to Plans/billing */}
-          {usage?.plan && (
-            <PlanBadge plan={usage.plan} onClick={() => onChangeView("plans")} />
-          )}
-
-          {authConfigured && <AuthSlot />}
+          {authConfigured && <AuthSlot planLabel={planLabel} onChangeView={onChangeView} />}
         </div>
       </div>
     </div>

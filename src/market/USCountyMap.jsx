@@ -491,28 +491,6 @@ export const USCountyMap = ({
         </button>
       )}
 
-      {/* Bottom legend — same heat-bar treatment as the old version */}
-      <div style={{
-        position: "absolute", bottom: 12, left: 12, right: 12, zIndex: 1000,
-        padding: "8px 12px", background: "rgba(255,255,255,0.92)",
-        border: `1px solid ${THEME.border}`, borderRadius: 6,
-        fontSize: 10
-      }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-          <span style={{ fontWeight: 700, color: THEME.textMuted, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-            Median Home Value (Zillow ZHVI)
-          </span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span className="mono" style={{ color: "#15803D", fontWeight: 700 }}>More affordable</span>
-          <div style={{ flex: 1, display: "flex", gap: 1, height: 8, borderRadius: 2, overflow: "hidden" }}>
-            {[1, 0.8, 0.6, 0.4, 0.2, 0].map(t => (
-              <div key={t} style={{ flex: 1, background: scoreToHeatFill(t) }} />
-            ))}
-          </div>
-          <span className="mono" style={{ color: "#B91C1C", fontWeight: 700 }}>Pricier</span>
-        </div>
-      </div>
     </div>
   );
 };
