@@ -26,7 +26,7 @@ import {
 } from "@clerk/react";
 import { THEME } from "../theme.js";
 import { isMobile } from "../utils.js";
-import { isSaasMode, useSaasUser } from "../lib/saas.js";
+import { isSaasMode, useSaasUser, fetchMetered, ApiRequestError } from "../lib/saas.js";
 
 const authConfigured = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
@@ -45,9 +45,21 @@ function useIsMobile() {
   return is;
 }
 
+/** Days remaining until a Unix-seconds timestamp. Returns null if no
+ *  trialEnd, 0+ otherwise. */
+function daysUntil(unixSeconds) {
+  if (!unixSeconds) return null;
+  const ms = unixSeconds * 1000 - Date.now();
+  if (ms <= 0) return 0;
+  return Math.ceil(ms / (24 * 60 * 60 * 1000));
+}
+
 /** Auth slot — signed-out: Plans link + Sign in/Sign up. Signed-in: avatar
  * with custom menu items for Plans, Learn, Terms (+ Clerk's defaults). */
-const AuthSlot = ({ planLabel, onChangeView }) => (
+const AuthSlot = ({ planLabel, onChangeView, onManageBilling, trialEnd, isPaid }) => {
+  const trialDaysLeft = daysUntil(trialEnd);
+  const showTrialPill = isPaid && trialDaysLeft != null && trialDaysLeft >= 0;
+  return (
   <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: 4 }}>
     <Show when="signed-out">
       <button
@@ -85,13 +97,28 @@ const AuthSlot = ({ planLabel, onChangeView }) => (
             borderRadius: 999, cursor: "pointer"
           }}
         >
-          {planLabel === "Free" ? <>Free · Upgrade</> : planLabel}
+          {planLabel === "Free"
+            ? <>Free · Upgrade</>
+            : showTrialPill
+              ? <>{planLabel} · Trial · {trialDaysLeft}d</>
+              : planLabel}
         </button>
       )}
       <UserButton appearance={{ elements: { userButtonAvatarBox: { width: 30, height: 30 } } }}>
         <UserButton.MenuItems>
+          {/* Manage billing goes straight to Stripe Customer Portal —
+              skips the /plans round-trip. Only meaningful for paid users
+              (free users see the same item but it'll bounce them to /plans
+              via the click handler's fallback). */}
+          {isPaid && (
+            <UserButton.Action
+              label="Manage subscription"
+              labelIcon={<CreditCard size={14} />}
+              onClick={onManageBilling}
+            />
+          )}
           <UserButton.Action
-            label="Plans & billing"
+            label={isPaid ? "Plans" : "Plans & billing"}
             labelIcon={<CreditCard size={14} />}
             onClick={() => onChangeView("plans")}
           />
@@ -109,7 +136,8 @@ const AuthSlot = ({ planLabel, onChangeView }) => (
       </UserButton>
     </Show>
   </div>
-);
+  );
+};
 
 /** A single nav button — same styling for primary tabs + items inside dropdowns. */
 const NavButton = ({ tab, isActive, onClick, darkMode = true, watchlistCount }) => (
@@ -489,6 +517,28 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
   const planLabel = usage?.plan
     ? usage.plan.charAt(0).toUpperCase() + usage.plan.slice(1)
     : null;
+  const isPaid = !!usage?.plan && usage.plan !== "free";
+  const trialEnd = usage?.subscription?.trialEnd || null;
+
+  /** "Manage subscription" — opens Stripe Customer Portal directly so
+   * the user skips the /plans round-trip. Heals on stale_customer error
+   * by routing them to /plans where they can re-subscribe. */
+  const handleManageBilling = async () => {
+    try {
+      const body = await fetchMetered(saas.getToken, "/api/stripe/portal", { method: "POST" });
+      if (body?.url) window.location.href = body.url;
+    } catch (err) {
+      if (err instanceof ApiRequestError && (err.status === 404 || err.status === 409)) {
+        // No active sub OR stale customer that we just healed — drop them
+        // on /plans so they can pick a plan.
+        onChangeView("plans");
+      } else {
+        // Surface anything else by routing to /plans where the inline
+        // portal button shows error states.
+        onChangeView("plans");
+      }
+    }
+  };
 
   return (
     <>
@@ -564,7 +614,15 @@ export const Header = ({ view, onChangeView, onNewDeal, onOpenCalculator, watchl
                 New Deal
               </button>
 
-              {authConfigured && <AuthSlot planLabel={planLabel} onChangeView={onChangeView} />}
+              {authConfigured && (
+                <AuthSlot
+                  planLabel={planLabel}
+                  onChangeView={onChangeView}
+                  onManageBilling={handleManageBilling}
+                  trialEnd={trialEnd}
+                  isPaid={isPaid}
+                />
+              )}
             </div>
           )}
         </div>

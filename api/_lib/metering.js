@@ -123,7 +123,12 @@ export async function loadUsage(user) {
       ? {
           status: sub.status,
           stripeSubscriptionId: sub.stripe_subscription_id,
-          cancelAtPeriodEnd: sub.cancel_at_period_end
+          cancelAtPeriodEnd: sub.cancel_at_period_end,
+          // For trialing subs, current_period_end IS the trial end (first
+          // billing period == trial period). Used by the client to render
+          // a "Trial ends in X days" badge.
+          trialEnd: sub.status === "trialing" ? sub.current_period_end : null,
+          currentPeriodEnd: sub.current_period_end
         }
       : null
   };

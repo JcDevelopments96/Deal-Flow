@@ -136,16 +136,6 @@ export const TermsView = () => {
         send a note to the support email listed on our marketing site.
       </Section>
 
-      <div style={{
-        marginTop: 32, padding: 14, background: THEME.bgPanel,
-        border: `1px solid ${THEME.border}`, borderRadius: 8,
-        fontSize: 11, color: THEME.textDim, lineHeight: 1.55
-      }}>
-        These Terms are a starting template. They have not been reviewed by
-        a licensed attorney for your jurisdiction. Before relying on them in
-        a dispute, have counsel review and adjust to your specific business
-        and applicable law.
-      </div>
     </div>
   );
 };

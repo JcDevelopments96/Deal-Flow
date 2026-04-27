@@ -45,8 +45,32 @@ export default handler(async (req, res) => {
       `Set ${envKey} in Vercel env.`);
   }
 
-  const customerId = await ensureStripeCustomer(user);
+  let customerId = await ensureStripeCustomer(user);
   const stripe = stripeClient();
+
+  // If the stored customer id was created on a different Stripe account
+  // (e.g., a test→live migration), Stripe will reject it as
+  // resource_missing. Detect + heal so the next attempt creates a fresh
+  // customer on the current account.
+  try {
+    await stripe.customers.retrieve(customerId);
+  } catch (err) {
+    if (err?.code === "resource_missing") {
+      console.warn("[stripe:checkout] healing stale customer id", customerId);
+      const { adminDb } = await import("../_lib/db.js");
+      await adminDb()
+        .from("users")
+        .update({ stripe_customer_id: null })
+        .eq("id", user.id);
+      // Re-create from scratch — the user object in memory still has the
+      // old id, but ensureStripeCustomer reads it from the row we just
+      // cleared.
+      const refreshed = { ...user, stripe_customer_id: null };
+      customerId = await ensureStripeCustomer(refreshed);
+    } else {
+      throw err;
+    }
+  }
 
   const origin =
     req.headers.origin ||
