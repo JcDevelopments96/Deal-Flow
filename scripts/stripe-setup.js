@@ -3,11 +3,17 @@
    the webhook endpoint in either test or live Stripe mode, then prints
    the four env-var lines you need to paste into Vercel.
 
-   USAGE (test, recommended first):
-     STRIPE_SECRET_KEY=sk_test_xxx node scripts/stripe-setup.js
+   USAGE (easiest — recommended):
+     1. Create a file at the repo root called ".stripe-key" (no extension)
+     2. Paste your full secret key (sk_test_... or sk_live_...) into it
+        and save. Just the key on one line, nothing else.
+     3. Run:  node scripts/stripe-setup.js
+     The file is in .gitignore so the key never gets committed. Delete
+     it after you're done.
 
-   USAGE (live, after test passes):
-     STRIPE_SECRET_KEY=sk_live_xxx node scripts/stripe-setup.js
+   USAGE (alternative — env var):
+     STRIPE_SECRET_KEY=sk_test_xxx node scripts/stripe-setup.js
+     ($env:STRIPE_SECRET_KEY="sk_test_xxx"; node scripts/stripe-setup.js  in PowerShell)
 
    Idempotent — re-running won't create duplicates. Products are looked up
    by metadata.dealtrack_key, prices by amount + interval, the webhook by
@@ -17,12 +23,33 @@
    ============================================================================ */
 
 import Stripe from "stripe";
+import { readFileSync, existsSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, resolve } from "path";
 
-const KEY = process.env.STRIPE_SECRET_KEY;
+// Read the key from .stripe-key file (preferred) OR env var (fallback).
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const keyFilePath = resolve(__dirname, "..", ".stripe-key");
+
+let KEY = process.env.STRIPE_SECRET_KEY || "";
+if (!KEY && existsSync(keyFilePath)) {
+  KEY = readFileSync(keyFilePath, "utf8").trim();
+}
+
 if (!KEY) {
-  console.error("❌  Missing STRIPE_SECRET_KEY env var.");
-  console.error("    Run with: STRIPE_SECRET_KEY=sk_test_... node scripts/stripe-setup.js");
-  console.error("    Find it at https://dashboard.stripe.com/test/apikeys (test) or /apikeys (live).");
+  console.error("❌  No Stripe secret key found.");
+  console.error("");
+  console.error("    Easiest fix: create a file at the repo root called .stripe-key");
+  console.error("    (no extension), paste your sk_test_... or sk_live_... into it,");
+  console.error("    save, then re-run:  node scripts/stripe-setup.js");
+  console.error("");
+  console.error("    Get a key at https://dashboard.stripe.com/test/apikeys (test)");
+  console.error("    or https://dashboard.stripe.com/apikeys (live).");
+  process.exit(1);
+}
+if (!KEY.startsWith("sk_")) {
+  console.error(`❌  That doesn't look like a Stripe secret key (must start with sk_test_ or sk_live_).`);
+  console.error(`    Got: ${KEY.slice(0, 10)}...`);
   process.exit(1);
 }
 const isLive = KEY.startsWith("sk_live_");

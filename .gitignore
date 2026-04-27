@@ -13,6 +13,10 @@ build/
 .env.production
 .env.development
 
+# Local-only Stripe key file used by scripts/stripe-setup.js. Paste your
+# secret key in here, run the script, then delete the file.
+.stripe-key
+
 # IDE
 .vscode/
 .idea/
