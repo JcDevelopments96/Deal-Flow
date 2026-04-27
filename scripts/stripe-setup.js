@@ -76,7 +76,9 @@ const PLANS = [
   }
 ];
 
-const WEBHOOK_URL = "https://dealdocket.ai/api/stripe/webhook";
+// Note: must use www. — the apex redirects to www and Stripe webhooks
+// don't follow 3xx redirects (they treat the 308 as a delivery failure).
+const WEBHOOK_URL = "https://www.dealdocket.ai/api/stripe/webhook";
 const WEBHOOK_EVENTS = [
   "checkout.session.completed",
   "customer.subscription.created",
