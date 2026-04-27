@@ -26,24 +26,11 @@ const STATIC_PLANS = [
     stripePriceId: null, stripePriceIdAnnual: null
   },
   {
-    key: "starter", name: "Starter",
-    priceMonthly: 29, priceAnnual: 290,
-    includedClicks: 100, aiMessages: 50,
-    overageCostCents: 10, mostPopular: false,
-    stripePriceId: null, stripePriceIdAnnual: null
-  },
-  {
     key: "pro", name: "Pro",
-    priceMonthly: 79, priceAnnual: 790,
+    priceMonthly: 49, priceAnnual: 490,
     includedClicks: 500, aiMessages: 200,
+    dealCap: null, inspectionCap: null,
     overageCostCents: 10, mostPopular: true,
-    stripePriceId: null, stripePriceIdAnnual: null
-  },
-  {
-    key: "scale", name: "Scale",
-    priceMonthly: 199, priceAnnual: 1990,
-    includedClicks: 2500, aiMessages: -1,
-    overageCostCents: 10, mostPopular: false,
     stripePriceId: null, stripePriceIdAnnual: null
   }
 ];
@@ -63,7 +50,7 @@ const FAQS = [
   },
   {
     q: "Do annual plans save me money?",
-    a: "Yes — annual billing is ~17% off (2 months free). Pro goes from $79/mo to $66/mo equivalent, $790/yr."
+    a: "Yes — annual billing is 2 months free. Pro at $49/mo monthly drops to $40.83/mo equivalent ($490/yr) when paid annually."
   }
 ];
 
@@ -209,11 +196,14 @@ export const PlansView = () => {
         </div>
       )}
 
-      {/* Plan cards */}
+      {/* Plan cards — two-column grid, centered, since we only sell Free
+          and Pro now. Constrains the max width so the cards don't stretch
+          uncomfortably wide on large monitors. */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: isMobile() ? "1fr" : "repeat(4, 1fr)",
-        gap: 16
+        gridTemplateColumns: isMobile() ? "1fr" : "repeat(2, 1fr)",
+        gap: 18,
+        maxWidth: 760, margin: "0 auto"
       }}>
         {plans.map(plan => {
           const isCurrent = plan.key === currentPlan;

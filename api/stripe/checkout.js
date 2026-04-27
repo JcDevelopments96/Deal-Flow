@@ -1,6 +1,9 @@
 /**
  * POST /api/stripe/checkout
- * Body: { planKey: "starter" | "pro" | "scale", cadence?: "monthly" | "annual" }
+ * Body: { planKey: "pro", cadence?: "monthly" | "annual" }
+ *   Legacy keys "starter" / "scale" still resolve via planFor() so
+ *   webhooks for grandfathered subscribers keep working — but new
+ *   checkouts only target Pro.
  *
  * Returns { url } for a Stripe Checkout session. Frontend redirects the
  * user there. On success they come back to /?billing=success; on cancel
@@ -24,7 +27,7 @@ export default handler(async (req, res) => {
   const { clerkUserId, email } = await requireUserId(req);
   const user = await ensureUser({ clerkUserId, email });
 
-  const planKey = (req.body && req.body.planKey) || "starter";
+  const planKey = (req.body && req.body.planKey) || "pro";
   const cadence = (req.body && req.body.cadence) === "annual" ? "annual" : "monthly";
   const plan = planFor(planKey);
   if (plan.key === "free") {

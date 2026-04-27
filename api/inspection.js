@@ -41,7 +41,7 @@ async function enforceInspectionCap(db, user) {
   if (error) throw new ApiError(500, "db_read_failed", error.message);
   if ((count || 0) >= cap) {
     throw new ApiError(403, "inspection_cap_reached",
-      `Free plan includes ${cap} inspection report. Upgrade to Starter, Pro, or Scale for unlimited reports.`);
+      `Free plan includes ${cap} inspection report. Upgrade to Pro for unlimited reports.`);
   }
 }
 

@@ -17,9 +17,10 @@ import { ensureUser, adminDb } from "./_lib/db.js";
 import { currentPeriod } from "./_lib/periods.js";
 import { STATE_CODE_BY_FIPS } from "./_lib/stateFips.js";
 
-// Free-tier monthly cap for the Find Local Pros search. Paid plans
-// (starter/pro/scale) are unlimited because each search is cheap (~$0.02)
-// and gating heavy usage there would punish power users.
+// Free-tier monthly cap for the Find Local Pros search. Pro is unlimited
+// (and legacy starter/scale subscribers get Pro-equivalent access via
+// planFor()) because each search is cheap (~$0.02) and gating heavy
+// usage there would punish power users.
 const FINDPROS_FREE_LIMIT = 5;
 
 // Per-source caches. TTLs tuned per how often upstream data actually changes.
@@ -490,7 +491,7 @@ async function handleFindPros(category, zip, user) {
         used,
         limit: FINDPROS_FREE_LIMIT,
         upgradeRequired: true,
-        message: `You've used all ${FINDPROS_FREE_LIMIT} free Find Local Pros searches this period. Upgrade to Starter or higher for unlimited.`
+        message: `You've used all ${FINDPROS_FREE_LIMIT} free Find Local Pros searches this period. Upgrade to Pro for unlimited.`
       });
     }
     usage = { used, limit: FINDPROS_FREE_LIMIT };

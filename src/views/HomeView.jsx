@@ -141,7 +141,7 @@ const ProUpsell = ({ onChangeView }) => {
           letterSpacing: "0.08em", textTransform: "uppercase",
           color: THEME.accent
         }}>
-          Most popular · Pro · $79/mo
+          Pro · $49/mo · everything unlimited
         </span>
       </div>
       <h2 className="serif" style={{
@@ -200,7 +200,7 @@ const ProUpsell = ({ onChangeView }) => {
           See plans <ArrowRight size={14} />
         </button>
         <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>
-          Cancel anytime · Annual saves 17% · Starter from $29/mo
+          Cancel anytime · Annual ($490/yr) = 2 months free
         </span>
       </div>
     </div>

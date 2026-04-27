@@ -54,7 +54,7 @@ export const MarketIntelRibbon = () => {
     : {
         eyebrow: "Paid feature",
         title: "Unlock Market Intel",
-        body: "Live listings, rental comparables, and map click-through are available on Starter, Pro, and Scale plans. Cancel anytime.",
+        body: "Live listings, rental comparables, and map click-through are unlimited on Pro. Cancel anytime.",
         cta: { label: "Choose a plan", onClick: () => setShowUpgrade(true) }
       };
 

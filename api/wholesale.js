@@ -12,7 +12,8 @@
  *   DELETE /api/wholesale?action=delete&id=                      → delete
  *   POST   /api/wholesale?action=email        { leadId, subject, body } → Resend
  *
- * Paid tiers only (starter/pro/scale). Free users get 403 upgrade_required.
+ * Open to all plans — free users get the same access, metered against the
+ * shared 10-click monthly bucket.
  *
  * Upstream providers:
  *   - RealEstateAPI    — property + owner + foreclosure records in one call.

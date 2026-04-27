@@ -746,7 +746,7 @@ function FindProsPanel({ getToken, onAdd, savedNames }) {
 
       {showUpgrade && (
         <UpgradeModal
-          reason={`You've used all ${usage?.limit || 5} free Find Local Pros searches this period. Starter, Pro, and Scale plans get unlimited searches plus the full Wholesale toolkit.`}
+          reason={`You've used all ${usage?.limit || 5} free Find Local Pros searches this period. Pro gets unlimited searches plus unlimited saved deals and inspection reports.`}
           onClose={() => setShowUpgrade(false)}
         />
       )}
