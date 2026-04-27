@@ -123,7 +123,7 @@ export const UpgradeModal = ({ plans, currentPlan, getToken, onClose, reason }) 
           }}>
             {[
               { key: "monthly", label: "Monthly" },
-              { key: "annual",  label: "Annual", badge: "Save 17%" }
+              { key: "annual",  label: "Annual", badge: "2 months free" }
             ].map(opt => (
               <button
                 key={opt.key}

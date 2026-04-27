@@ -157,7 +157,7 @@ export const PlansView = () => {
           background: THEME.bgPanel, borderRadius: 999,
           border: `1px solid ${THEME.border}`
         }}>
-          {[{ key: "monthly", label: "Monthly" }, { key: "annual", label: "Annual", badge: "Save 17%" }].map(opt => (
+          {[{ key: "monthly", label: "Monthly" }, { key: "annual", label: "Annual", badge: "2 months free" }].map(opt => (
             <button
               key={opt.key}
               onClick={() => setCadence(opt.key)}

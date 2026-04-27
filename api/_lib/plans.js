@@ -12,7 +12,7 @@
  *   - Legacy "starter" and "scale" plan keys are still honored — existing
  *     subscribers grandfather into Pro-equivalent access until they next
  *     manage billing. New checkouts only target Pro.
- *   - Annual cadence at ~17% discount (2 months free) sold via separate Stripe Price
+ *   - Annual cadence = 2 months free (sold via a separate Stripe Price)
  *
  * Both monthly and annual cadences point to the SAME plan key under the hood —
  * the only difference is which Stripe Price they're billed against.
